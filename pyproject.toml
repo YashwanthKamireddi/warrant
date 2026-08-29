@@ -1,0 +1,39 @@
+[project]
+name = "warrant"
+version = "0.1.0"
+description = "Authorization layer for agent-initiated payments. No agent spends without a warrant."
+requires-python = ">=3.12"
+dependencies = [
+    "cryptography>=44",
+    "pydantic>=2.9",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "httpx>=0.28",
+    "anthropic>=0.40",
+    "razorpay>=1.4",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+warrant = "warrant.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "ruff>=0.8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["engine/warrant"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["engine", "."]
