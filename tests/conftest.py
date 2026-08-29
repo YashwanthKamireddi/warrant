@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
+from warrant import llm
 from warrant.crypto import SigningKey
 from warrant.models import (
     CartMandate,
@@ -88,3 +91,17 @@ def make_cart(intent: IntentMandate):
         )
 
     return _make
+
+
+@pytest.fixture
+def no_llm(monkeypatch):
+    """Force the deterministic fallback: no live client, no transcript on disk."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(llm, "_live_client", lambda: None)
+    monkeypatch.setattr(llm, "TRANSCRIPT_PATH", Path("/nonexistent/transcript.json"))
+    monkeypatch.setattr(
+        llm.TranscriptClient,
+        "__init__",
+        lambda self, transcript=None: setattr(self, "transcript", llm.Transcript()),
+    )
+    return None

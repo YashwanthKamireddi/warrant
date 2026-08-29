@@ -24,12 +24,11 @@ that field travels into the ledger.
 
 from __future__ import annotations
 
-import os
 import re
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .llm import Mode, structured_call
 from .models import Paise, Scope
 
 __all__ = [
@@ -55,7 +54,6 @@ CATEGORIES: tuple[str, ...] = (
 """Closed taxonomy. A category outside this set is a schema violation, not a value."""
 
 _HOUR = 3_600
-_DEFAULT_MODEL = "claude-opus-5"
 
 
 class Envelope(BaseModel):
@@ -95,7 +93,8 @@ class ScopeProposal(BaseModel):
         default=(),
         description="What the utterance left open. Surfaced to the human, not resolved silently.",
     )
-    source: Literal["model", "fallback"] = "model"
+    source: Mode = "live"
+    """Which path produced this: a real call, a replayed transcript, or the fallback."""
 
 
 class _ModelScope(BaseModel):
@@ -243,29 +242,19 @@ def derive_scope(
     """Propose a scope for an utterance. Never signs; never widens the envelope."""
     envelope = envelope or Envelope()
 
-    if client is None:
-        if not os.environ.get("ANTHROPIC_API_KEY"):
-            return _fallback(utterance, envelope)
-        import anthropic
-
-        client = anthropic.Anthropic()
-
-    response = client.messages.parse(  # type: ignore[attr-defined]
-        model=model or os.environ.get("WARRANT_MODEL") or _DEFAULT_MODEL,
-        max_tokens=2_000,
-        system=_SYSTEM,
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    "Convert this instruction into a bounded spending permission.\n\n"
-                    f"<instruction>\n{utterance}\n</instruction>"
-                ),
-            }
-        ],
+    parsed, mode = structured_call(
         output_format=_ModelScope,
+        system=_SYSTEM,
+        content=(
+            "Convert this instruction into a bounded spending permission.\n\n"
+            f"<instruction>\n{utterance}\n</instruction>"
+        ),
+        client=client,
+        model=model,
     )
-    parsed: _ModelScope = response.parsed_output
+    if parsed is None:
+        return _fallback(utterance, envelope)
+    assert isinstance(parsed, _ModelScope)
 
     return ScopeProposal(
         merchants=tuple(m.strip().lower() for m in parsed.merchants if m.strip()),
@@ -276,5 +265,5 @@ def derive_scope(
         duration_seconds=parsed.duration_seconds,
         plain_english=parsed.plain_english.strip(),
         ambiguities=tuple(a.strip() for a in parsed.ambiguities if a.strip()),
-        source="model",
+        source=mode,
     )

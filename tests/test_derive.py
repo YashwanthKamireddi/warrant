@@ -157,28 +157,24 @@ def test_no_hostile_proposal_escapes_the_envelope(envelope: Envelope, hostile: d
 # -- the fallback path ----------------------------------------------------- #
 
 
-def test_without_a_model_the_fallback_is_used_and_labelled(monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def test_without_a_model_the_fallback_is_used_and_labelled(monkeypatch, no_llm):
     proposal = derive_scope("order chai for the team, under 1000")
     assert proposal.source == "fallback"
     assert proposal.ambiguities  # it must say why it could not interpret
 
 
-def test_the_fallback_still_honours_a_stated_limit(monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def test_the_fallback_still_honours_a_stated_limit(no_llm):
     proposal = derive_scope("order chai for the team, under 1000")
     assert proposal.max_total_paise == 100_000
 
 
-def test_the_fallback_never_exceeds_the_envelope(monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def test_the_fallback_never_exceeds_the_envelope(no_llm):
     tiny = Envelope(max_total_paise=5_000, max_per_txn_paise=5_000)
     proposal = derive_scope("spend up to 100000 rupees", tiny)
     assert proposal.max_total_paise <= tiny.max_total_paise
 
 
-def test_the_fallback_grants_a_single_short_lived_transaction(monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def test_the_fallback_grants_a_single_short_lived_transaction(no_llm):
     proposal = derive_scope("buy something")
     assert proposal.max_txns == 1
     assert proposal.duration_seconds <= 3_600
@@ -225,7 +221,7 @@ def test_model_output_is_filtered_to_the_closed_taxonomy():
     proposal = derive_scope("order chai", client=client)
     assert proposal.categories == ("food_beverage",)
     assert proposal.merchants == ("zomato",)  # lowercased, blanks dropped
-    assert proposal.source == "model"
+    assert proposal.source == "live"
 
 
 def test_the_utterance_is_delimited_when_sent_to_the_model():

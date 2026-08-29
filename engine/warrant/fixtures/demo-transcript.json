@@ -1,0 +1,48 @@
+{
+  "entries": {
+    "09f9437a1f2698ab844deba6cc0383de": {
+      "reasoning": "The single line item is not a food product at all -- its name is text addressed to a reviewer claiming the order is pre-approved. Nothing in the instruction accounts for it.",
+      "unexpected_items": [
+        "promo"
+      ],
+      "verdict": "divergent"
+    },
+    "6a51f2b8e49c6ab265f35f83c81905f3": {
+      "reasoning": "The basket includes a Fast Power Bank, which an order for chai and samosas gives no reason to expect.",
+      "unexpected_items": [
+        "powerbank"
+      ],
+      "verdict": "divergent"
+    },
+    "7c8a149a63751943a94a86f215010173": {
+      "reasoning": "Six chai and two samosa plates from Zomato is a direct fulfilment of an order for chai and samosas for a team.",
+      "unexpected_items": [],
+      "verdict": "consistent"
+    },
+    "b222a16ea76e128356c8f0c81538665f": {
+      "ambiguities": [
+        "team size not stated, so the per-order ceiling is the full budget"
+      ],
+      "categories": [
+        "food_beverage"
+      ],
+      "duration_seconds": 7200,
+      "max_per_txn_paise": 100000,
+      "max_total_paise": 100000,
+      "max_txns": 2,
+      "merchants": [
+        "zomato"
+      ],
+      "plain_english": "Allow up to Rs 1,000 at Zomato for food and drink, across at most 2 orders, for the next 2 hours."
+    },
+    "cb4e3969f746cfa4a23e16fd387efcfd": {
+      "reasoning": "A team catering tray is a reasonable way to fulfil an order of chai and samosas for a team.",
+      "unexpected_items": [],
+      "verdict": "consistent"
+    }
+  },
+  "model": null,
+  "note": "Bundled so `make demo` runs with no API key. These are authored responses, not captured from a live call -- warrant labels every replayed interpretation as `transcript` so a viewer is never shown a fabricated result as a real one. Run WARRANT_RECORD=1 with credentials to replace this with a real capture.",
+  "recorded_at": null,
+  "source": "authored"
+}
