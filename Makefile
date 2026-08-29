@@ -56,7 +56,7 @@ audit-tokens: ## fail on any colour outside the token system
 audit-contrast: ## fail on any rendered pair below WCAG AA
 	python3 .verify/audit_contrast.py
 
-browser: build ## drive the console in a real browser and screenshot every state
+browser: build ## layout, overlap and flow checks in a real browser, with screenshots
 	@uv run warrant serve --port $(VERIFY_PORT) >/tmp/warrant-verify.log 2>&1 & \
 	echo $$! > /tmp/warrant-verify.pid; \
 	trap 'kill $$(cat /tmp/warrant-verify.pid) 2>/dev/null' EXIT; \
@@ -65,6 +65,7 @@ browser: build ## drive the console in a real browser and screenshot every state
 		sleep 0.25; \
 	done; \
 	python3 .verify/layout.py http://127.0.0.1:$(VERIFY_PORT) && \
+	python3 .verify/audit_overlap.py http://127.0.0.1:$(VERIFY_PORT) && \
 	python3 .verify/walk.py http://127.0.0.1:$(VERIFY_PORT)
 
 verify: lint test typecheck audit-tokens audit-contrast browser ## everything, in order

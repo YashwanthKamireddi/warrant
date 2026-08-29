@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "./api";
 import { relativeWindow, rupees } from "./format";
 import { Certificate } from "./components/Certificate";
+import { ChainDiagram } from "./components/ChainDiagram";
 import { DecisionCard } from "./components/DecisionCard";
 import { EvidenceView } from "./components/EvidenceView";
 import { LedgerView } from "./components/LedgerView";
@@ -304,7 +305,7 @@ export function App() {
                     onClick={derive}
                     disabled={busy || !utterance.trim()}
                   >
-                    Derive the permission
+                    {busy ? "Deriving…" : "Derive the permission"}
                   </button>
                 </>
               )}
@@ -330,10 +331,34 @@ export function App() {
                     onClick={approve}
                     disabled={busy}
                   >
-                    Approve and sign with the subject's key
+                    {busy ? "Signing…" : "Approve and sign with the subject's key"}
                   </button>
                 )}
               </section>
+            )}
+
+            {!pending && (
+              <>
+                <section className="step upcoming">
+                  <div className="step-head">
+                    <span className="step-index">2</span>
+                    <span className="step-title">They approve a bounded permission</span>
+                  </div>
+                  <p className="step-hint">
+                    The instruction becomes a scope with hard ceilings, shown back in plain English
+                    and signed with their own key.
+                  </p>
+                </section>
+                <section className="step upcoming">
+                  <div className="step-head">
+                    <span className="step-index">3</span>
+                    <span className="step-title">The agent builds a basket</span>
+                  </div>
+                  <p className="step-hint">
+                    Every basket is checked against that permission before any money moves.
+                  </p>
+                </section>
+              </>
             )}
 
             {error && (
@@ -403,7 +428,7 @@ export function App() {
                   onClick={authorize}
                   disabled={busy || lines.length === 0}
                 >
-                  Authorise this basket
+                  {busy ? "Checking…" : "Authorise this basket"}
                 </button>
                 <div className="row">
                   <button className="btn btn-secondary" onClick={runScripted} disabled={busy}>
@@ -450,11 +475,18 @@ export function App() {
             <div className="pane-inner">
               {tab === "decisions" &&
                 (outcomes.length === 0 ? (
-                  <Empty icon={<Basket />} title="No baskets authorised yet">
-                    Every basket the agent proposes is checked against the signed permission before
-                    any money moves. The verdict, the rule that produced it, and the numbers behind
-                    that rule all appear here.
-                  </Empty>
+                  /* Before anything has run, the pane earns its space by
+                     explaining the architecture a reviewer is about to watch,
+                     rather than showing an empty box. */
+                  approved ? (
+                    <Empty icon={<Basket />} title="No baskets authorised yet">
+                      Every basket the agent proposes is checked against the signed permission
+                      before any money moves. The verdict, the rule that produced it, and the
+                      numbers behind that rule all appear here.
+                    </Empty>
+                  ) : (
+                    <ChainDiagram />
+                  )
                 ) : (
                   outcomes.map((outcome, i) => (
                     <DecisionCard key={`${outcome.cart.id}-${i}`} outcome={outcome} index={i} />

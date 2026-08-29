@@ -151,14 +151,24 @@ Runs, in order, and fails on the first problem:
 | `typecheck` | the console compiles under `strict` |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 29 rendered pairs meet WCAG AA, computed from the tokens |
+| `audit-overlap` | nothing spills outside its box or paints over a sibling, across 6 states |
 | `browser` | the frame holds at 5 viewports; the real flow runs with no console errors, and the console's verdicts match what `warrant demo` prints |
 
 Screenshots of every state land in `.verify/shots/`.
 
-Two of those gates exist because looking at the thing in a browser found bugs
-that a green build could not: the storefront had drifted by one SKU between two
-files while all 75 tests passed, and the top bar reported "credentials
-configured" while actually replaying a transcript.
+Three of those gates exist because looking at the thing in a browser found bugs
+a green build could not:
+
+- the storefront had drifted by one SKU between two files while all 75 tests passed
+- the top bar reported "credentials configured" while actually replaying a transcript
+- a component rendered `className="signer seal"`, and `seal` was a standalone rule
+  elsewhere setting a 46px circle, so the label was clamped and its text spilled
+  across the content beneath it
+
+The last one is why `audit-overlap` checks *content spilling out of its box*, not
+just sibling overlap — sibling-box overlap does not catch a cascade collision,
+which was verified by reintroducing the bug and watching the detector name it:
+`span.link-signer.seal spills 145x0px outside its box`.
 
 ---
 

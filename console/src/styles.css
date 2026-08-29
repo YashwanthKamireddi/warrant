@@ -1452,3 +1452,155 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ==========================================================================
+   First-run explainer — the mandate chain, drawn
+   ========================================================================== */
+
+.explainer {
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+}
+
+.explainer-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding-bottom: var(--s-5);
+  border-bottom: 1px solid var(--line);
+}
+.explainer-head h2 {
+  font: 600 21px/1.35 var(--font);
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  max-width: 30ch;
+  text-wrap: balance;
+}
+.explainer-head p {
+  font: var(--t-body);
+  color: var(--ink-3);
+  max-width: 62ch;
+}
+.explainer-head b {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.chain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.link {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: var(--s-4);
+}
+
+.link-spine {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
+}
+.link-node {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+  background: var(--surface);
+  flex: none;
+}
+/* Namespaced deliberately. A bare `.seal` here collided with the certificate's
+ * seal rule and painted this label as a 46px gold disc over the text below it. */
+.link-node--root {
+  border-color: var(--seal);
+  background: var(--seal-bg);
+  box-shadow: 0 0 0 3px var(--seal-bg);
+}
+.link-thread {
+  flex: 1;
+  width: 2px;
+  background: linear-gradient(var(--line-strong), var(--line));
+  border-radius: var(--r-pill);
+  min-height: 34px;
+}
+
+.link-body {
+  padding-bottom: var(--s-6);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.link-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+.link-title code {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.link-signer {
+  font: var(--t-micro);
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+.link-signer--root {
+  color: var(--seal);
+  font-weight: 600;
+}
+.link-says {
+  font: var(--t-body);
+  color: var(--ink-2);
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-xs);
+}
+.link-note {
+  font: var(--t-small);
+  color: var(--ink-3);
+  max-width: 64ch;
+}
+
+.explainer-foot {
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+}
+.explainer-foot p {
+  font: var(--t-small);
+  color: var(--ink-3);
+  max-width: 72ch;
+}
+.explainer-foot b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* -- rail steps that have not been reached yet ---------------------------- */
+
+.step.upcoming {
+  opacity: 0.55;
+}
+.step.upcoming .step-title {
+  color: var(--ink-3);
+}
+.step-hint {
+  font: var(--t-small);
+  color: var(--ink-4);
+}
