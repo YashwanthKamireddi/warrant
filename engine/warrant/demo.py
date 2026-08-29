@@ -28,7 +28,7 @@ __all__ = ["DemoStep", "Scenario", "build_scenario", "UTTERANCE"]
 
 UTTERANCE = "order chai and samosas for my team from zomato, keep it under 1000"
 
-T0 = 1_756_000_000  # a fixed instant, so runs are byte-identical
+T0 = 1_788_255_000  # 2026-09-01 09:30 UTC, fixed so runs are byte-identical
 
 
 def _item(sku: str, name: str, category: str, qty: int, rupees: float) -> LineItem:

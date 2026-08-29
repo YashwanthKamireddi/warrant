@@ -25,7 +25,14 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-__all__ = ["Mode", "Transcript", "TranscriptClient", "structured_call", "resolve_mode"]
+__all__ = [
+    "Capability",
+    "Mode",
+    "Transcript",
+    "TranscriptClient",
+    "describe_capability",
+    "structured_call",
+]
 
 Mode = Literal["live", "transcript", "fallback"]
 
@@ -86,13 +93,43 @@ def _live_client() -> Any | None:
         return None
 
 
-def resolve_mode(client: object | None) -> Mode:
-    """What the next structured call will do, without making it."""
-    if client is not None:
-        return "live"
-    if _live_client() is not None:
-        return "live"
-    return "transcript" if TRANSCRIPT_PATH.exists() else "fallback"
+class Capability(BaseModel):
+    """What is *available*, which is not the same as what will happen.
+
+    Constructing an SDK client proves a credential was found, not that it still
+    works -- an expired token constructs fine and fails at call time. So this
+    reports availability only. The authoritative mode is the ``source`` field on
+    each proposal and finding, recorded after the call actually ran.
+    """
+
+    credentials_configured: bool
+    transcript_available: bool
+    transcript_provenance: str
+
+    @property
+    def note(self) -> str:
+        if self.credentials_configured:
+            return (
+                "Credentials are configured. Every interpretation is still labelled "
+                "with the path it actually took, because a credential can be present "
+                "and expired."
+            )
+        if self.transcript_available:
+            return (
+                f"No credentials configured. Interpretations are "
+                f"{self.transcript_provenance}."
+            )
+        return "No credentials and no transcript. Scopes narrow to the deterministic minimum."
+
+
+def describe_capability() -> Capability:
+    """Report what is available. Never claims what a future call will do."""
+    transcript = Transcript.load()
+    return Capability(
+        credentials_configured=_live_client() is not None,
+        transcript_available=bool(transcript.entries),
+        transcript_provenance=transcript.provenance,
+    )
 
 
 def structured_call(
