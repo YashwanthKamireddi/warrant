@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { shortHash } from "../format";
+import { rupees, shortHash } from "../format";
 
-/** The only ornament in the product. A seal means one thing: a key signed this.
- *  It carries the last four of the key id, so two different signers are visibly
- *  different rather than both being "signed". */
+/** The single ornament in the product. A seal means one thing — a key signed
+ *  this — so it carries four characters of that key id. Two different signers
+ *  are visibly different rather than both being "signed". */
 export function Seal({ keyId, stamping }: { keyId: string | null; stamping?: boolean }) {
   if (!keyId) {
     return (
-      <div className="seal" style={{ opacity: 0.28 }} aria-label="not yet signed">
+      <div className="seal unsigned" aria-label="Not yet signed" title="Not yet signed">
         <span>—</span>
       </div>
     );
@@ -23,40 +23,86 @@ export function Seal({ keyId, stamping }: { keyId: string | null; stamping?: boo
   );
 }
 
-/** Hashes are long and mostly noise, but the full value has to be reachable --
- *  a reviewer verifying the chain needs to copy it, not squint at it. */
-export function Hash({ value, chars = 10 }: { value: string; chars?: number }) {
+/** Hashes are long and mostly noise, but the full value must stay reachable —
+ *  anyone verifying the chain needs to copy it, not squint at it. */
+export function Hash({ value, chars = 8 }: { value: string; chars?: number }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
-      className="copy"
-      title={value}
+      className={`hash${copied ? " copied" : ""}`}
+      title={`${value} — click to copy`}
       onClick={() => {
         void navigator.clipboard?.writeText(value);
         setCopied(true);
-        setTimeout(() => setCopied(false), 1100);
+        setTimeout(() => setCopied(false), 1200);
       }}
     >
-      {copied ? "copied" : `${shortHash(value, chars)}…`}
+      {copied ? "copied" : shortHash(value, chars)}
     </button>
   );
 }
 
-export function Meter({ used, total }: { used: number; total: number }) {
+/** A spend gauge. Turns amber near the ceiling and red at it, because the
+ *  distance to a hard bound is the number an operator actually watches. */
+export function Gauge({
+  label,
+  used,
+  total,
+  unit = "money",
+}: {
+  label: string;
+  used: number;
+  total: number;
+  unit?: "money" | "count";
+}) {
   const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
-  const tone = pct >= 100 ? "over" : pct >= 90 ? "near" : "";
+  const tone = pct >= 100 ? "full" : pct >= 85 ? "warn" : "";
+  const fmt = (v: number) => (unit === "money" ? rupees(v, { compact: true }) : String(v));
   return (
-    <div className="meter" role="presentation">
-      <i className={tone} style={{ width: `${pct}%` }} />
+    <div className="gauge">
+      <div className="gauge-top">
+        <span className="gauge-label">{label}</span>
+        <span className="gauge-value">
+          {fmt(used)} <em>/ {fmt(total)}</em>
+        </span>
+      </div>
+      <div
+        className="track"
+        role="meter"
+        aria-valuenow={used}
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-label={label}
+      >
+        <i className={tone} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
 
-export function Empty({ title, children }: { title: string; children: React.ReactNode }) {
+export function Badge({ kind }: { kind: "pass" | "warn" | "fail" }) {
+  const glyph = kind === "pass" ? "✓" : kind === "warn" ? "!" : "✕";
+  return (
+    <span className={`badge ${kind}`} aria-hidden>
+      {glyph}
+    </span>
+  );
+}
+
+export function Empty({
+  icon,
+  title,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="empty">
-      <strong>{title}</strong>
-      <span>{children}</span>
+      <span className="empty-mark">{icon}</span>
+      <h3>{title}</h3>
+      <p>{children}</p>
     </div>
   );
 }

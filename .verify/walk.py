@@ -32,28 +32,31 @@ with sync_playwright() as pw:
 
     print(f"opening {BASE}")
     page.goto(BASE, wait_until="networkidle")
-    page.wait_for_selector(".mark strong", timeout=10_000)
+    page.wait_for_selector(".brand-words b", timeout=10_000)
     shot(page, "01-initial")
 
     print("deriving the permission")
     page.get_by_role("button", name="Derive the permission").click()
-    page.wait_for_selector(".permission", timeout=10_000)
+    page.wait_for_selector(".certificate", timeout=10_000)
     shot(page, "02-derived")
 
     print("approving and signing")
     page.get_by_role("button", name="Approve and sign with the subject's key").click()
-    page.wait_for_selector(".catalog", timeout=10_000)
+    page.wait_for_selector(".storefront", timeout=10_000)
     page.wait_for_timeout(600)
     shot(page, "03-signed")
 
     print("running the five scripted baskets")
-    page.get_by_role("button", name="Run the five scripted baskets").click()
+    page.get_by_role("button", name="Run five scripted baskets").click()
     page.wait_for_selector(".decision", timeout=20_000)
     page.wait_for_timeout(900)
     shot(page, "04-decisions")
 
     verdicts = page.locator(".decision .verdict").all_inner_texts()
     print(f"  verdicts: {verdicts}")
+    expected = ["ALLOW", "BLOCK", "BLOCK", "BLOCK", "ESCALATE"]
+    if verdicts != expected:
+        errors.append(f"verdicts {verdicts} != {expected} printed by `warrant demo`")
 
     print("opening the ledger")
     page.get_by_role("tab", name="Ledger").click()
@@ -67,14 +70,9 @@ with sync_playwright() as pw:
 
     print("tampering with the ledger")
     page.get_by_role("button", name="Tamper with the ledger").click()
-    page.wait_for_selector(".verify-banner.bad, .ledger-row.broken", timeout=10_000)
+    page.wait_for_selector(".notice.stop, .ledger-row.orphaned", timeout=10_000)
     page.wait_for_timeout(500)
     shot(page, "07-tampered")
-
-    print("light theme")
-    page.get_by_role("button", name="light").click()
-    page.wait_for_timeout(400)
-    shot(page, "08-light")
 
     browser.close()
 

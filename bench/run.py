@@ -26,11 +26,12 @@ from dataclasses import dataclass, field
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from corpus import CATEGORIES, Case, build_corpus  # noqa: E402
 from warrant.crypto import SigningKey  # noqa: E402
 from warrant.gate import MandateState  # noqa: E402
 from warrant.llm import describe_capability  # noqa: E402
 from warrant.models import CartMandate, Verdict  # noqa: E402
+
+from corpus import CATEGORIES, Case, build_corpus  # noqa: E402
 
 from policies import POLICIES  # noqa: E402  isort: skip
 

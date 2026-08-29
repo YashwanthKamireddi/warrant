@@ -34,6 +34,12 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
+[tool.ruff.lint.isort]
+# The engine is first-party; bench/ imports it alongside its own sibling
+# modules, so isort needs to be told which is which.
+known-first-party = ["warrant"]
+known-local-folder = ["corpus", "policies"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["engine", "."]

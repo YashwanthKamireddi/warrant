@@ -9,25 +9,27 @@ interface Props {
   disabled: boolean;
 }
 
-/** The agent's basket. The catalog deliberately contains items that drift out of
- *  scope -- wrong category, wrong merchant, an injected instruction sitting in a
- *  product name -- because a control plane you can only demonstrate on the happy
+/** The agent's basket. The catalog deliberately stocks items that fall out of
+ *  scope — wrong category, wrong merchant, an injected instruction sitting in a
+ *  product name — because a control plane you can only demonstrate on the happy
  *  path demonstrates nothing. */
 export function Storefront({ catalog, quantities, merchant, onChange, disabled }: Props) {
   const visible = catalog.filter((p) => p.merchant === merchant);
 
   return (
-    <div className="catalog">
+    <div className="storefront">
       {visible.map((product) => {
         const qty = quantities[product.sku] ?? 0;
         return (
-          <div className="product" key={product.sku}>
-            <span className="product-name">
-              <span title={product.name}>{product.name}</span>
-              <em>{product.note}</em>
+          <div className={`product${qty > 0 ? " picked" : ""}`} key={product.sku}>
+            <span className="product-id">
+              <b title={product.name}>{product.name}</b>
+              <span>{product.note}</span>
             </span>
-            <span className="product-price">{rupees(product.unit_paise, { compact: true })}</span>
-            <span className="qty">
+            <span className="product-price">
+              {rupees(product.unit_paise, { compact: true })}
+            </span>
+            <span className="stepper">
               <button
                 onClick={() => onChange(product.sku, Math.max(0, qty - 1))}
                 disabled={disabled || qty === 0}

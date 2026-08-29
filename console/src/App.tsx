@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "./api";
 import { relativeWindow, rupees } from "./format";
+import { Certificate } from "./components/Certificate";
 import { DecisionCard } from "./components/DecisionCard";
 import { EvidenceView } from "./components/EvidenceView";
 import { LedgerView } from "./components/LedgerView";
-import { PermissionCard } from "./components/PermissionCard";
 import { Storefront } from "./components/Storefront";
-import { Empty, Hash, Meter } from "./components/primitives";
+import { Basket, Rows, ShieldMark } from "./components/icons";
+import { Badge, Empty, Gauge, Hash } from "./components/primitives";
 import type {
   ChainStatus,
   EvidencePack,
@@ -18,7 +19,13 @@ import type {
   Signature,
 } from "./types";
 
-type Tab = "trace" | "ledger" | "evidence";
+type Tab = "decisions" | "ledger" | "evidence";
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: "decisions", label: "Decisions" },
+  { key: "ledger", label: "Ledger" },
+  { key: "evidence", label: "Dispute evidence" },
+];
 
 export function App() {
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -34,16 +41,11 @@ export function App() {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [merchant, setMerchant] = useState("zomato");
   const [cosign, setCosign] = useState(false);
-  const [tab, setTab] = useState<Tab>("trace");
+  const [tab, setTab] = useState<Tab>("decisions");
   const [evidence, setEvidence] = useState<EvidencePack | null>(null);
   const [evidenceError, setEvidenceError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
 
   useEffect(() => {
     api
@@ -66,6 +68,16 @@ export function App() {
       setBusy(false);
     }
   }, []);
+
+  const refreshEvidence = async (id: string) => {
+    try {
+      setEvidence(await api.evidence(id));
+      setEvidenceError(null);
+    } catch (e) {
+      setEvidence(null);
+      setEvidenceError(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   const derive = () =>
     run(async () => {
@@ -91,7 +103,7 @@ export function App() {
       setLedger(approved.ledger);
       setChain(await api.chain(sessionId));
       setJustSigned(true);
-      setTimeout(() => setJustSigned(false), 500);
+      setTimeout(() => setJustSigned(false), 520);
     });
 
   const lines = useMemo(
@@ -102,7 +114,7 @@ export function App() {
     [quantities],
   );
 
-  const cartTotal = useMemo(() => {
+  const basketTotal = useMemo(() => {
     if (!meta) return 0;
     return lines.reduce((sum, line) => {
       const product = meta.catalog.find((p) => p.sku === line.sku);
@@ -120,22 +132,12 @@ export function App() {
       setChain(await api.chain(sessionId));
       setQuantities({});
       setCosign(false);
-      setTab("trace");
+      setTab("decisions");
       if (result.outcome.receipt) void refreshEvidence(sessionId);
     });
 
-  const refreshEvidence = async (id: string) => {
-    try {
-      setEvidence(await api.evidence(id));
-      setEvidenceError(null);
-    } catch (e) {
-      setEvidence(null);
-      setEvidenceError(e instanceof Error ? e.message : String(e));
-    }
-  };
-
   /** Runs the scripted baskets one at a time and keeps whatever succeeded. A
-   *  single failing step used to discard the entire run, which hid the failure
+   *  single failing step used to discard the whole run, hiding the failure
    *  behind an empty screen instead of showing it. */
   const runScripted = () =>
     run(async () => {
@@ -158,7 +160,7 @@ export function App() {
         }
       }
       setChain(await api.chain(sessionId));
-      setTab("trace");
+      setTab("decisions");
       void refreshEvidence(sessionId);
       if (failures.length > 0) throw new Error(failures.join(" · "));
     });
@@ -186,124 +188,174 @@ export function App() {
     () => (meta ? [...new Set(meta.catalog.map((p) => p.merchant))] : []),
     [meta],
   );
+  const needsCosign =
+    scope?.step_up_over_paise != null && basketTotal > scope.step_up_over_paise;
 
   return (
     <div className="shell">
-      <header className="topbar">
-        <span className="mark">
-          <strong>WARRANT</strong>
-          <span>no agent spends without one</span>
+      {/* ---------------------------------------------------------- app bar */}
+      <header className="appbar">
+        <div className="brand">
+          <span className="brand-mark">
+            <ShieldMark />
+          </span>
+          <span className="brand-words">
+            <b>Warrant</b>
+            <span>No agent spends without one</span>
+          </span>
+        </div>
+
+        <span className="appbar-divider" />
+
+        <span className="appbar-context">
+          {sessionId ? (
+            <>
+              <span className="mono">{sessionId}</span>
+              {scope?.revoked && <span className="pill stop"><span className="dot" />Revoked</span>}
+            </>
+          ) : (
+            "No session"
+          )}
         </span>
 
-        {scope && (
-          <div className="budget">
-            <div className="budget-row">
-              <span>
-                spent <b>{rupees(scope.spent_paise, { compact: true })}</b> of{" "}
-                {rupees(scope.max_total_paise, { compact: true })}
-              </span>
-              <span>
-                {scope.txns_used}/{scope.max_txns} orders ·{" "}
-                {relativeWindow(scope.not_before, scope.expires_at)} window
-              </span>
-            </div>
-            <Meter used={scope.spent_paise} total={scope.max_total_paise} />
-          </div>
-        )}
+        <span className="grow" />
 
-        <span className="topbar-spacer" />
-
-        {/* Reports the path the last interpretation actually took. Credentials
-         *  being configured is not the same as a live call succeeding -- an
-         *  expired token constructs a client fine and fails at call time -- so
-         *  before anything has run this says only what is available. */}
+        {/* Reports the path the last interpretation actually took. A credential
+            being present is not the same as a live call succeeding. */}
         {meta && (
           <span
-            className={`chip ${pending ? (pending.source === "live" ? "live" : "replay") : ""}`}
+            className={`pill ${pending ? (pending.source === "live" ? "ok" : "hold") : ""}`}
             title={meta.capability_note}
           >
             <span className="dot" />
             {pending
               ? {
-                  live: "interpreted live",
-                  transcript: "interpretation replayed",
-                  fallback: "no model · deterministic",
+                  live: "Interpreted live",
+                  transcript: "Interpretation replayed",
+                  fallback: "No model · deterministic",
                 }[pending.source]
               : meta.capability.credentials_configured
-                ? "credentials available"
-                : "no credentials"}
+                ? "Credentials available"
+                : "No credentials"}
           </span>
         )}
-        {scope?.revoked && (
-          <span className="chip" style={{ color: "var(--block)", borderColor: "var(--block)" }}>
-            <span className="dot" style={{ background: "var(--block)" }} />
-            revoked
-          </span>
-        )}
-        <button
-          className="iconbtn"
-          onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-        >
-          {theme === "dark" ? "light" : "dark"}
-        </button>
       </header>
 
-      <div className="body">
-        <aside className="rail">
-          <div className="rail-top">
-          <section className="section">
-            <span className="section-label">
-              <span>1 · the person says something</span>
-            </span>
-            {approved ? (
-              <p className="utterance">“{utterance}”</p>
-            ) : (
-              <textarea
-                className="utterance-input"
-                value={utterance}
-                onChange={(e) => setUtterance(e.target.value)}
-                spellCheck={false}
-                aria-label="Instruction given to the agent"
+      {/* --------------------------------------------------- mandate strip */}
+      <div className="mandatebar">
+        {scope ? (
+          <>
+            <Gauge label="Spent" used={scope.spent_paise} total={scope.max_total_paise} />
+            <Gauge
+              label="Orders"
+              used={scope.txns_used}
+              total={scope.max_txns}
+              unit="count"
+            />
+            {scope.rail_block_paise !== null && (
+              <Gauge
+                label="Reserve Pay block"
+                used={scope.rail_block_used_paise}
+                total={scope.rail_block_paise}
               />
             )}
-            {!approved && (
-              <button className="primary" onClick={derive} disabled={busy || !utterance.trim()}>
-                Derive the permission
-              </button>
-            )}
-          </section>
-
-          {pending && (
-            <section className="section">
-              <span className="section-label">
-                <span>2 · {approved ? "the permission they signed" : "approve to sign"}</span>
+            <span className="mandate-facts">
+              <span>
+                Window <b>{relativeWindow(scope.not_before, scope.expires_at)}</b>
               </span>
-              <PermissionCard
-                pending={pending}
-                scope={scope}
-                signature={signature}
-                justSigned={justSigned}
-              />
-              {!approved && (
-                <button className="primary" onClick={approve} disabled={busy}>
-                  Approve and sign with the subject's key
-                </button>
+              <span>
+                Merchants <b>{scope.merchants.join(", ")}</b>
+              </span>
+              <span>
+                Categories <b>{scope.categories.join(", ")}</b>
+              </span>
+            </span>
+          </>
+        ) : (
+          <span className="mandate-idle">
+            No mandate in force. Nothing can be spent until a person signs one.
+          </span>
+        )}
+      </div>
+
+      {/* ------------------------------------------------------- workspace */}
+      <div className="workspace">
+        <aside className="rail">
+          <div className="rail-scroll">
+            <section className="step">
+              <div className="step-head">
+                <span className={`step-index${approved ? " done" : ""}`}>1</span>
+                <span className="step-title">The person says something</span>
+              </div>
+              {approved ? (
+                <p className="said">{utterance}</p>
+              ) : (
+                <>
+                  <textarea
+                    className="field"
+                    value={utterance}
+                    onChange={(e) => setUtterance(e.target.value)}
+                    spellCheck={false}
+                    aria-label="Instruction given to the agent"
+                    placeholder="order chai and samosas for my team from zomato, keep it under 1000"
+                  />
+                  <button
+                    className="btn btn-primary btn-block"
+                    onClick={derive}
+                    disabled={busy || !utterance.trim()}
+                  >
+                    Derive the permission
+                  </button>
+                </>
               )}
             </section>
-          )}
 
-          {error && <p className="error" style={{ margin: "0 16px 14px" }}>{error}</p>}
+            {pending && (
+              <section className="step">
+                <div className="step-head">
+                  <span className={`step-index${approved ? " done" : ""}`}>2</span>
+                  <span className="step-title">
+                    {approved ? "The permission they signed" : "Approve to sign"}
+                  </span>
+                </div>
+                <Certificate
+                  pending={pending}
+                  scope={scope}
+                  signature={signature}
+                  justSigned={justSigned}
+                />
+                {!approved && (
+                  <button
+                    className="btn btn-primary btn-block"
+                    onClick={approve}
+                    disabled={busy}
+                  >
+                    Approve and sign with the subject's key
+                  </button>
+                )}
+              </section>
+            )}
+
+            {error && (
+              <div style={{ padding: "0 20px 16px" }}>
+                <div className="notice stop">
+                  <Badge kind="fail" />
+                  <span>{error}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {approved && meta && (
-            <section className="section rail-basket">
-              <span className="section-label">
-                <span>3 · the agent builds a basket</span>
+            <section className="rail-basket step">
+              <div className="step-head">
+                <span className="step-index done">3</span>
+                <span className="step-title">The agent builds a basket</span>
+                <span className="grow" />
                 <select
+                  className="select"
                   value={merchant}
                   onChange={(e) => setMerchant(e.target.value)}
-                  className="copy"
-                  style={{ background: "transparent" }}
                   aria-label="Merchant"
                 >
                   {merchants.map((m) => (
@@ -312,7 +364,7 @@ export function App() {
                     </option>
                   ))}
                 </select>
-              </span>
+              </div>
 
               <Storefront
                 catalog={meta.catalog}
@@ -322,41 +374,43 @@ export function App() {
                 onChange={(sku, qty) => setQuantities((q) => ({ ...q, [sku]: qty }))}
               />
 
-              <div className="cart-total">
-                <span className="label">
+              <div className="basket-total">
+                <span>
                   {lines.length === 0
-                    ? "nothing selected"
+                    ? "Nothing selected"
                     : `${lines.length} line${lines.length > 1 ? "s" : ""}`}
                 </span>
-                <span className="amount">{rupees(cartTotal)}</span>
+                <b>{rupees(basketTotal)}</b>
               </div>
 
-              {scope?.step_up_over_paise != null && cartTotal > scope.step_up_over_paise && (
+              {needsCosign && scope?.step_up_over_paise != null && (
                 <label className="cosign">
                   <input
                     type="checkbox"
                     checked={cosign}
                     onChange={(e) => setCosign(e.target.checked)}
                   />
-                  Subject co-signs this basket (required over{" "}
-                  {rupees(scope.step_up_over_paise, { compact: true })})
+                  <span>
+                    Over {rupees(scope.step_up_over_paise, { compact: true })} the subject must
+                    co-sign this exact basket. Tick to simulate them approving it.
+                  </span>
                 </label>
               )}
 
               <div className="rail-actions">
                 <button
-                  className="primary"
+                  className="btn btn-primary btn-block"
                   onClick={authorize}
                   disabled={busy || lines.length === 0}
                 >
                   Authorise this basket
                 </button>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button className="secondary" onClick={runScripted} disabled={busy}>
-                    Run the five scripted baskets
+                <div className="row">
+                  <button className="btn btn-secondary" onClick={runScripted} disabled={busy}>
+                    Run five scripted baskets
                   </button>
                   <button
-                    className="secondary danger"
+                    className="btn btn-danger"
                     onClick={revoke}
                     disabled={busy || scope?.revoked}
                   >
@@ -370,77 +424,76 @@ export function App() {
 
         <main className="main">
           <nav className="tabs" role="tablist">
-            {(
-              [
-                ["trace", "Decisions", outcomes.length],
-                ["ledger", "Ledger", ledger.length],
-                ["evidence", "Dispute evidence", null],
-              ] as const
-            ).map(([key, label, count]) => (
-              <button
-                key={key}
-                className="tab"
-                role="tab"
-                aria-selected={tab === key}
-                onClick={() => {
-                  setTab(key);
-                  if (key === "evidence" && sessionId && !evidence) void refreshEvidence(sessionId);
-                }}
-              >
-                {label}
-                {count !== null && count > 0 && <span className="count">{count}</span>}
-              </button>
-            ))}
+            {TABS.map(({ key, label }) => {
+              const count =
+                key === "decisions" ? outcomes.length : key === "ledger" ? ledger.length : 0;
+              return (
+                <button
+                  key={key}
+                  className="tab"
+                  role="tab"
+                  aria-selected={tab === key}
+                  onClick={() => {
+                    setTab(key);
+                    if (key === "evidence" && sessionId && !evidence)
+                      void refreshEvidence(sessionId);
+                  }}
+                >
+                  {label}
+                  {count > 0 && <span className="count">{count}</span>}
+                </button>
+              );
+            })}
           </nav>
 
           <div className="pane" role="tabpanel">
-            {tab === "trace" &&
-              (outcomes.length === 0 ? (
-                <Empty title="No baskets authorised yet">
-                  Every basket the agent proposes is checked against the signed permission before
-                  any money moves. The verdict, the rule that produced it and the numbers behind it
-                  all appear here.
-                </Empty>
-              ) : (
-                <div className="decisions">
-                  {outcomes.map((outcome, i) => (
+            <div className="pane-inner">
+              {tab === "decisions" &&
+                (outcomes.length === 0 ? (
+                  <Empty icon={<Basket />} title="No baskets authorised yet">
+                    Every basket the agent proposes is checked against the signed permission before
+                    any money moves. The verdict, the rule that produced it, and the numbers behind
+                    that rule all appear here.
+                  </Empty>
+                ) : (
+                  outcomes.map((outcome, i) => (
                     <DecisionCard key={`${outcome.cart.id}-${i}`} outcome={outcome} index={i} />
-                  ))}
-                </div>
-              ))}
+                  ))
+                ))}
 
-            {tab === "ledger" && <LedgerView entries={ledger} chain={chain} />}
-            {tab === "evidence" && <EvidenceView pack={evidence} error={evidenceError} />}
+              {tab === "ledger" && <LedgerView entries={ledger} chain={chain} />}
+              {tab === "evidence" && <EvidenceView pack={evidence} error={evidenceError} />}
+            </div>
           </div>
         </main>
       </div>
 
+      {/* ------------------------------------------------------ status bar */}
       <footer className="statusbar">
         {chain ? (
           <>
-            <span className={`state ${chain.intact ? "ok" : "bad"}`}>
+            <span className={`state ${chain.intact ? "ok" : "stop"}`}>
               <span className="dot" />
-              {chain.intact ? "chain intact" : `chain broken at ${chain.break?.seq}`}
+              {chain.intact ? "Chain intact" : `Chain broken at entry ${chain.break?.seq}`}
             </span>
             <span>
               {chain.length} {chain.length === 1 ? "entry" : "entries"}
             </span>
             <span>
-              head <Hash value={chain.head} chars={12} />
+              head <Hash value={chain.head} chars={14} />
             </span>
           </>
         ) : (
-          <span>no ledger yet</span>
+          <span>No ledger yet</span>
         )}
-        <span className="spacer" />
-        {sessionId && <span>{sessionId}</span>}
+        <span className="grow" />
         <button
-          className="iconbtn"
+          className="btn btn-ghost btn-sm"
           onClick={tamper}
           disabled={busy || !chain || chain.length === 0}
           title="Edit a settled entry directly in SQLite, the way an insider would"
         >
-          Tamper with the ledger
+          <Rows size={13} /> Tamper with the ledger
         </button>
       </footer>
     </div>
