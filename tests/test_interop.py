@@ -169,3 +169,28 @@ def test_seeded_keys_make_the_export_reproducible(intent, user_key, make_cart, c
     a = _chain(intent, make_cart((chai,)), None, user_key)
     b = _chain(intent, make_cart((chai,)), None, SigningKey.from_seed("test/user"))
     assert a == b
+
+
+def test_the_export_reports_the_authorizers_signatures_rather_than_unsigned(
+    settled_chain, user_key
+):
+    """Signatures are excluded from body(), so a document rebuilt from its body
+    alone reports itself unsigned. The export must not understate the integrity
+    of the thing it exists to demonstrate."""
+    chain, outcome = settled_chain
+    creds = {c["type"][1]: c for c in chain["verifiableCredential"]}
+    assert creds["CartMandate"]["proof"] is not None
+    assert creds["PaymentMandate"]["proof"] is not None
+    assert (
+        creds["CartMandate"]["proof"]["verificationMethod"]
+        == outcome.cart.signature.key_id
+    )
+
+
+def test_the_authorizer_and_the_subject_are_visibly_different_signers(settled_chain):
+    chain, _ = settled_chain
+    creds = {c["type"][1]: c for c in chain["verifiableCredential"]}
+    assert (
+        creds["IntentMandate"]["proof"]["verificationMethod"]
+        != creds["CartMandate"]["proof"]["verificationMethod"]
+    )

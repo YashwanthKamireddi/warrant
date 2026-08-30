@@ -68,6 +68,21 @@ with sync_playwright() as pw:
     page.wait_for_timeout(900)
     shot(page, "06-evidence")
 
+    print("opening the AP2 export")
+    page.get_by_role("tab", name="AP2 export").click()
+    page.wait_for_selector(".cred", timeout=10_000)
+    page.wait_for_timeout(500)
+    shot(page, "08-standards")
+    creds = page.locator(".cred-kind").all_inner_texts()
+    if creds != ["IntentMandate", "CartMandate", "PaymentMandate"]:
+        errors.append(f"AP2 export rendered {creds}")
+    proofs = page.locator(".cred-proof").all_inner_texts()
+    if any("unsigned" in p for p in proofs):
+        errors.append(f"AP2 export reported an unsigned credential: {proofs}")
+    signers = {p.split("·")[-1].strip() for p in proofs}
+    if len(signers) < 2:
+        errors.append("AP2 export does not show the subject and authorizer as different signers")
+
     print("tampering with the ledger")
     page.get_by_role("button", name="Tamper with the ledger").click()
     page.wait_for_selector(".notice.stop, .ledger-row.orphaned", timeout=10_000)

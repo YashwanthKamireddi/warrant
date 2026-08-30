@@ -1690,3 +1690,66 @@ a {
   border-radius: var(--r-xs);
   border: 1px solid var(--ok-line);
 }
+
+/* ==========================================================================
+   Standards export
+   ========================================================================== */
+
+.creds {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.cred {
+  display: grid;
+  grid-template-columns: 170px 150px 1fr;
+  gap: var(--s-3);
+  align-items: baseline;
+  padding: 10px var(--s-4);
+  background: var(--surface);
+}
+.cred-kind {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.cred-issuer {
+  font: var(--t-small);
+  color: var(--ink-3);
+}
+.cred-proof {
+  font-size: 11px;
+  color: var(--ink-4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.divergences {
+  display: flex;
+  flex-direction: column;
+}
+.divergence {
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.divergence:last-child {
+  border-bottom: none;
+}
+.divergence b {
+  font: var(--t-body-strong);
+  color: var(--ink);
+}
+.divergence p {
+  font: var(--t-small);
+  color: var(--ink-3);
+  max-width: 78ch;
+}

@@ -13,6 +13,7 @@ a demo that needs no migrations is a demo a reviewer can actually run.
 from __future__ import annotations
 
 import secrets
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -25,7 +26,7 @@ from pydantic import BaseModel, Field
 from .authorize import Authorizer, PendingIntent
 from .catalog import PRODUCTS, by_sku
 from .chain import EventKind, Ledger
-from .crypto import SigningKey
+from .crypto import Signature, SigningKey
 from .demo import STEPS, UTTERANCE, build_scenario
 from .evidence import assemble_evidence
 from .interop import to_ap2_chain
@@ -404,10 +405,17 @@ def submit_cart(session_id: str, body: CartRequest) -> dict[str, Any]:
             update={"user_cosignature": session.subject_key.sign(cart.body())}
         )
 
+    started = time.perf_counter()
     outcome = session.authorizer.authorize(
         session.intent, cart, subject_key=session.subject_key.public, now=now
     )
+    elapsed_us = (time.perf_counter() - started) * 1_000_000
+
     payload = _outcome_json(outcome)
+    payload["elapsed_us"] = round(elapsed_us, 1)
+    # The rail is a network call on the Razorpay path and would swamp the number
+    # people actually want, which is what the gate itself costs.
+    payload["rail_kind"] = session.rail_kind
     session.outcomes.append(payload)
 
     return {
@@ -513,10 +521,24 @@ def ap2_chain(session_id: str) -> dict[str, Any]:
     cart = receipt = None
     decision = None
     if source is not None:
+        # Rebuild from the signed body and re-attach the signature. Signatures are
+        # excluded from body(), so validating the body alone produces a document
+        # that reports itself unsigned -- which would understate the integrity of
+        # the very thing this export exists to demonstrate.
         cart = CartMandate.model_validate(source["cart_body"])
+        if source["cart"].get("signature"):
+            cart = cart.model_copy(
+                update={"signature": Signature.from_dict(source["cart"]["signature"])}
+            )
         decision = {"verdict": source["verdict"], "checks": source["checks"]}
         if source.get("receipt"):
             receipt = DebitReceipt.model_validate(source["receipt"]["body"])
+            if source["receipt"].get("signature"):
+                receipt = receipt.model_copy(
+                    update={
+                        "signature": Signature.from_dict(source["receipt"]["signature"])
+                    }
+                )
 
     return to_ap2_chain(
         session.intent,

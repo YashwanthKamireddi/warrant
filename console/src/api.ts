@@ -88,6 +88,9 @@ export const api = {
     ),
 
   evidence: (sessionId: string) => request<EvidencePack>(`/sessions/${sessionId}/evidence`),
+
+  ap2: (sessionId: string) =>
+    request<Record<string, unknown>>(`/sessions/${sessionId}/ap2`),
 };
 
 export { ApiError };

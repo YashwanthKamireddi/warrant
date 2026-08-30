@@ -65,6 +65,9 @@ export interface Outcome {
   rail: RailResult | null;
   ledger_seqs: number[];
   label: string | null;
+  /** Wall time for the whole authorisation, including the rail call. */
+  elapsed_us?: number;
+  rail_kind?: string;
 }
 
 export interface Scope {

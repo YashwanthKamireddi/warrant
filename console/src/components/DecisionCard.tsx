@@ -77,6 +77,19 @@ export function DecisionCard({ outcome, index }: { outcome: Outcome; index: numb
               {outcome.checks.length} checks{failed > 0 ? `, ${failed} failed` : ""}
             </span>
             <span>{outcome.model_used ? "model consulted" : "no model call"}</span>
+            {outcome.elapsed_us !== undefined && (
+              <span
+                title={
+                  outcome.rail_kind === "razorpay"
+                    ? "Includes the Razorpay network round trip"
+                    : "Gate, ledger and simulated rail, in process"
+                }
+              >
+                {outcome.elapsed_us < 1000
+                  ? `${Math.round(outcome.elapsed_us)}µs`
+                  : `${(outcome.elapsed_us / 1000).toFixed(1)}ms`}
+              </span>
+            )}
           </span>
         </span>
         <span className="decision-amount">{rupees(outcome.cart.total_paise)}</span>

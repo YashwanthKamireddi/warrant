@@ -6,6 +6,7 @@ import { ChainDiagram } from "./components/ChainDiagram";
 import { DecisionCard } from "./components/DecisionCard";
 import { EvidenceView } from "./components/EvidenceView";
 import { LedgerView } from "./components/LedgerView";
+import { StandardsView } from "./components/StandardsView";
 import { Storefront } from "./components/Storefront";
 import { Basket, Rows, ShieldMark } from "./components/icons";
 import { Badge, Empty, Gauge, Hash } from "./components/primitives";
@@ -20,12 +21,13 @@ import type {
   Signature,
 } from "./types";
 
-type Tab = "decisions" | "ledger" | "evidence";
+type Tab = "decisions" | "ledger" | "evidence" | "standards";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "decisions", label: "Decisions" },
   { key: "ledger", label: "Ledger" },
   { key: "evidence", label: "Dispute evidence" },
+  { key: "standards", label: "AP2 export" },
 ];
 
 export function App() {
@@ -532,6 +534,7 @@ export function App() {
 
               {tab === "ledger" && <LedgerView entries={ledger} chain={chain} />}
               {tab === "evidence" && <EvidenceView pack={evidence} error={evidenceError} />}
+              {tab === "standards" && <StandardsView sessionId={sessionId} />}
             </div>
           </div>
         </main>

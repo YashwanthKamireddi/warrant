@@ -184,7 +184,7 @@ when a basket sits inside every stated bound and is still wrong, or how a refusa
 is recorded. That gap is the gate, the judge and the ledger here.
 
 `GET /api/sessions/{id}/ap2` emits the chain in AP2's vocabulary inside a W3C
-Verifiable-Credentials envelope. `tests/test_interop.py` reconstructs a verifier's
+Verifiable-Credentials envelope, and the console's **AP2 export** tab renders it next to the divergences. `tests/test_interop.py` reconstructs a verifier's
 job from the exported document alone — canonicalise, check the proof against the
 published key, follow the digests — and confirms it holds.
 
@@ -267,7 +267,7 @@ Runs, in order, and fails on the first problem:
 | --- | --- |
 | `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 162 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
+| `test` | 164 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
 | `typecheck` | the console compiles under `strict` |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 29 rendered pairs meet WCAG AA, computed from the tokens |
