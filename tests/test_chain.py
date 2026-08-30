@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from warrant.chain import GENESIS_HASH, EventKind, Ledger
 
 
@@ -92,3 +94,93 @@ def test_head_advances_and_starts_at_genesis():
         assert ledger.head == GENESIS_HASH
         entry = ledger.append(EventKind.INTENT_ISSUED, "s", {}, recorded_at=1)
         assert ledger.head == entry.hash
+
+
+# -- concurrency ----------------------------------------------------------- #
+
+
+def test_the_chain_survives_concurrent_appends():
+    """Deriving the next sequence number and inserting it is a read-modify-write.
+
+    Before this was serialised, eight concurrent writers lost 251 of 320 entries
+    and broke the chain: duplicate sequence numbers, and successors linked to a
+    head that had already moved. For an audit trail that is the worst possible
+    class of bug, because the damage is invisible until someone verifies.
+    """
+    import threading
+
+    with Ledger() as ledger:
+        errors: list[str] = []
+        writers, per_writer = 8, 40
+
+        def write(writer: int) -> None:
+            for i in range(per_writer):
+                try:
+                    ledger.append(
+                        EventKind.CART_PROPOSED,
+                        f"sess_{writer}",
+                        {"writer": writer, "i": i},
+                        recorded_at=1_000 + i,
+                    )
+                except Exception as exc:  # noqa: BLE001 - recorded, then asserted on
+                    errors.append(f"{type(exc).__name__}: {exc}")
+
+        threads = [threading.Thread(target=write, args=(w,)) for w in range(writers)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert errors == []
+        assert ledger.length == writers * per_writer
+        assert ledger.audit() is None
+
+
+def test_concurrent_appends_produce_contiguous_sequence_numbers():
+    import threading
+
+    with Ledger() as ledger:
+        def write(writer: int) -> None:
+            for i in range(25):
+                ledger.append(
+                    EventKind.CART_PROPOSED, "s", {"w": writer, "i": i}, recorded_at=1
+                )
+
+        threads = [threading.Thread(target=write, args=(w,)) for w in range(6)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        seqs = [e.seq for e in ledger.entries()]
+        assert seqs == list(range(1, len(seqs) + 1))
+
+
+def test_a_failed_append_leaves_no_partial_entry(tmp_path):
+    """A rolled-back append must not advance the chain."""
+    with Ledger(tmp_path / "rollback.db") as ledger:
+        ledger.append(EventKind.INTENT_ISSUED, "s", {"ok": True}, recorded_at=1)
+        head_before, length_before = ledger.head, ledger.length
+
+        class Unserialisable:
+            pass
+
+        with pytest.raises(TypeError):
+            ledger.append(
+                EventKind.CART_PROPOSED, "s", {"bad": Unserialisable()}, recorded_at=2
+            )
+
+        assert ledger.length == length_before
+        assert ledger.head == head_before
+        assert ledger.audit() is None
+
+
+def test_sequence_numbers_come_from_the_maximum_not_the_count(tmp_path):
+    """A count is wrong the moment anything is removed, and would reuse a number."""
+    with Ledger(tmp_path / "gap.db") as ledger:
+        for i in range(4):
+            ledger.append(EventKind.CART_PROPOSED, "s", {"i": i}, recorded_at=i)
+        ledger._db.execute("DELETE FROM ledger WHERE seq = 2")
+
+        entry = ledger.append(EventKind.CART_PROPOSED, "s", {"i": 9}, recorded_at=9)
+        assert entry.seq == 5

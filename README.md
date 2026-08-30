@@ -244,6 +244,12 @@ can say **no** depends on anything that can be unreachable.
   so consuming the nonce on settlement leaves a window in which the same cart can
   be presented repeatedly, placing an order each time. Found by running against
   Razorpay test mode; the simulator settles synchronously and never showed it.
+- **Appends are serialised.** Deriving the next sequence number and the previous
+  hash, then inserting, is a read-modify-write. Under eight concurrent writers
+  the ledger lost 251 of 320 entries and broke its own chain. Every append now
+  runs inside a `BEGIN IMMEDIATE` transaction behind a process lock, and
+  sequence numbers derive from `MAX(seq)` rather than a count, which would
+  silently reuse a number after any deletion.
 - **Writes are ordered write-ahead.** `cart_allowed` is recorded before the rail
   is called, so a crash between the two leaves something for reconciliation to
   find. `debit_settled` is recorded before the running totals move, because those
@@ -280,7 +286,7 @@ Runs, in order, and fails on the first problem:
 | `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
 | `docs-check` | every number in this README matches what the code measures |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 198 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
+| `test` | 202 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
 | `typecheck` | the console compiles under `strict` |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 31 rendered pairs meet WCAG AA, computed from the tokens |

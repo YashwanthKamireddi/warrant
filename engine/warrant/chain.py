@@ -12,6 +12,13 @@ the interesting question in a dispute is almost always what they declined to do,
 and at what time, and why. "We did not debit at 21:40 because the mandate had
 expired at 19:00" is a row here, not an absence of rows.
 
+**Appends are serialised.** Deriving the next sequence number and the previous
+hash, then inserting, is a read-modify-write. Two of them interleaving produce a
+duplicate sequence number or a forked chain, and under eight concurrent writers
+this store lost 251 of 320 entries and broke its own chain. Every append now runs
+inside a ``BEGIN IMMEDIATE`` transaction behind a process-level lock, so the
+window between reading the head and committing the successor does not exist.
+
 **Entries are replayable.** Every entry carries the complete input to the
 decision it records, so re-running the ledger reproduces the same verdicts. That
 is what lets a reviewer -- or a bank -- check our conclusions instead of
@@ -20,7 +27,9 @@ trusting them.
 
 from __future__ import annotations
 
+import json
 import sqlite3
+import threading
 from collections.abc import Iterator
 from contextlib import closing
 from enum import StrEnum
@@ -96,10 +105,17 @@ class Ledger:
 
     def __init__(self, path: str | Path | None = None) -> None:
         self._path = str(path) if path else ":memory:"
-        self._db = sqlite3.connect(self._path, check_same_thread=False)
+        # isolation_level=None puts the connection in autocommit mode so that
+        # transactions are begun explicitly, rather than sqlite3 guessing where
+        # one should start from the statement type.
+        self._db = sqlite3.connect(
+            self._path, check_same_thread=False, isolation_level=None, timeout=30.0
+        )
         self._db.row_factory = sqlite3.Row
+        self._lock = threading.RLock()
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute("PRAGMA foreign_keys=ON")
+        self._db.execute("PRAGMA busy_timeout=30000")
         self._create_schema()
 
     def _create_schema(self) -> None:
@@ -125,7 +141,9 @@ class Ledger:
 
     @property
     def head(self) -> str:
-        row = self._db.execute("SELECT entry_hash FROM ledger ORDER BY seq DESC LIMIT 1").fetchone()
+        row = self._db.execute(
+            "SELECT entry_hash FROM ledger ORDER BY seq DESC LIMIT 1"
+        ).fetchone()
         return row["entry_hash"] if row else GENESIS_HASH
 
     @property
@@ -140,38 +158,56 @@ class Ledger:
         *,
         recorded_at: int,
     ) -> LedgerEntry:
-        """Add an entry. The caller supplies the clock so replays are exact."""
-        import json
+        """Add an entry. The caller supplies the clock so replays are exact.
 
-        entry = LedgerEntry(
-            seq=self.length + 1,
-            prev_hash=self.head,
-            recorded_at=recorded_at,
-            kind=kind,
-            session_id=session_id,
-            payload=payload,
-        )
-        self._db.execute(
-            "INSERT INTO ledger (seq, prev_hash, entry_hash, recorded_at, kind,"
-            " session_id, payload) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (
-                entry.seq,
-                entry.prev_hash,
-                entry.hash,
-                entry.recorded_at,
-                str(entry.kind),
-                entry.session_id,
-                json.dumps(payload, separators=(",", ":"), sort_keys=True),
-            ),
-        )
-        self._db.commit()
-        return entry
+        The whole read-modify-write runs inside one immediate transaction behind a
+        lock. Reading the head and inserting its successor as separate statements
+        is what let concurrent writers fork the chain.
+        """
+        with self._lock:
+            cursor = self._db.cursor()
+            try:
+                cursor.execute("BEGIN IMMEDIATE")
+                row = cursor.execute(
+                    "SELECT seq, entry_hash FROM ledger ORDER BY seq DESC LIMIT 1"
+                ).fetchone()
+                # Derived from MAX(seq), not COUNT(*): a count is wrong the moment
+                # anything is ever removed, and would silently reuse a number.
+                prev_hash = row["entry_hash"] if row else GENESIS_HASH
+                next_seq = (row["seq"] if row else 0) + 1
+
+                entry = LedgerEntry(
+                    seq=next_seq,
+                    prev_hash=prev_hash,
+                    recorded_at=recorded_at,
+                    kind=kind,
+                    session_id=session_id,
+                    payload=payload,
+                )
+                cursor.execute(
+                    "INSERT INTO ledger (seq, prev_hash, entry_hash, recorded_at, kind,"
+                    " session_id, payload) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        entry.seq,
+                        entry.prev_hash,
+                        entry.hash,
+                        entry.recorded_at,
+                        str(entry.kind),
+                        entry.session_id,
+                        json.dumps(payload, separators=(",", ":"), sort_keys=True),
+                    ),
+                )
+                self._db.execute("COMMIT")
+            except Exception:
+                self._db.execute("ROLLBACK")
+                raise
+            finally:
+                cursor.close()
+            return entry
 
     # -- reading ----------------------------------------------------------- #
 
     def _row_to_entry(self, row: sqlite3.Row) -> LedgerEntry:
-        import json
-
         return LedgerEntry(
             seq=row["seq"],
             prev_hash=row["prev_hash"],

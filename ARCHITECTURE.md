@@ -150,6 +150,18 @@ Most systems log what they did. A dispute almost always turns on what was
 *declined*, when, and under which rule. `cart_blocked` carries the failed rule
 names and the observed-versus-limit numbers.
 
+### Appends are serialised
+
+Deriving the next sequence number and the previous hash, then inserting, is a
+read-modify-write. Two interleaving produce a duplicate sequence number or a
+forked chain. Under eight concurrent writers this store lost **251 of 320
+entries** and broke its own chain — the worst class of bug for an audit trail,
+because the damage is invisible until someone verifies. Every append now runs in
+a `BEGIN IMMEDIATE` transaction behind a process lock.
+
+*Rejected:* deriving the sequence from `COUNT(*)`. It is wrong the moment
+anything is removed, and would silently reuse a number.
+
 ### Writes are ordered write-ahead
 
 `cart_allowed` is recorded **before** the rail is called, so a crash between the
