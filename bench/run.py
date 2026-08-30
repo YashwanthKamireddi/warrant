@@ -21,7 +21,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import statistics
 import sys
+import time
 from dataclasses import dataclass, field
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -62,6 +64,10 @@ class Tally:
     friction_paise: int = 0
     """Legitimate spend that was stopped. The cost of being wrong the other way."""
 
+    latencies_us: list[float] = field(default_factory=list)
+    """Wall time for each decision, in microseconds. This sits in the payment
+    path, so how long it takes is a product question, not a footnote."""
+
     per_category: dict[str, list[int]] = field(default_factory=dict)
     """category -> [handled correctly, total]. For `legitimate` that means
     allowed; for every other category it means not settled."""
@@ -100,7 +106,9 @@ def run_policy(name: str, cases: list[Case], client: object | None) -> Tally:
         if case.settle_first:
             state.record_settled(cart)
 
+        started = time.perf_counter()
         verdict = policy(case.intent, cart, state, case.now, subject.public, client)
+        tally.latencies_us.append((time.perf_counter() - started) * 1_000_000)
 
         stopped = verdict is not Verdict.ALLOW
         should_stop = case.should is not Verdict.ALLOW
@@ -162,6 +170,28 @@ def report(results: dict[str, Tally], cases: list[Case]) -> None:
     )
     print(DIM("  friction  = legitimate spend stopped, i.e. conversion killed"))
     print()
+
+    # -- what it costs to sit in the payment path ------------------------- #
+
+    lat = sorted(results["warrant"].latencies_us)
+    if lat:
+        def pct(p: float) -> float:
+            return lat[min(len(lat) - 1, int(len(lat) * p))]
+
+        print(BOLD("  Decision latency"))
+        print(DIM("  " + "─" * 58))
+        print(
+            f"  p50 {pct(0.50):>7.0f}µs   p95 {pct(0.95):>7.0f}µs   "
+            f"p99 {pct(0.99):>7.0f}µs   max {lat[-1]:>7.0f}µs"
+        )
+        print(
+            DIM(
+                f"  mean {statistics.mean(lat):.0f}µs over {len(lat)} decisions, "
+                "in-process, no model call.\n"
+                "  A model call adds its own round trip and only runs on carts that\n"
+                "  already cleared every binding check.\n"
+            )
+        )
 
     # -- per category, for the full system ------------------------------- #
 
@@ -253,6 +283,19 @@ def main() -> int:
                             "false_stops": t.false_stops,
                             "leaked_paise": t.leaked_paise,
                             "friction_paise": t.friction_paise,
+                            "latency_us_p50": round(
+                                sorted(t.latencies_us)[len(t.latencies_us) // 2], 1
+                            )
+                            if t.latencies_us
+                            else None,
+                            "latency_us_p99": round(
+                                sorted(t.latencies_us)[
+                                    min(len(t.latencies_us) - 1, int(len(t.latencies_us) * 0.99))
+                                ],
+                                1,
+                            )
+                            if t.latencies_us
+                            else None,
                             "per_category": t.per_category,
                         }
                         for name, t in results.items()

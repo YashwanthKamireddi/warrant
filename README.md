@@ -76,6 +76,11 @@ exactly on any machine.
 | `model_only` — ask a model if the basket looks right | 0.2% | ₹238,791 | ₹0 |
 | **`warrant`** | **80.0%** | **₹28,900** | **₹0** |
 
+**Decision latency** — this sits in the payment path, so it is measured, not
+assumed: **p50 252µs, p95 1.5ms, p99 2.4ms** across 495 in-process decisions with
+no model call. A model call adds its own round trip and only ever runs on carts
+that already cleared every binding check.
+
 ### Where this loses
 
 Every number above is measured on data this repository generates. Discount it
@@ -179,7 +184,7 @@ Runs, in order, and fails on the first problem:
 | gate | what it proves |
 | --- | --- |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 82 tests: signature forgery, chain tampering, replay, envelope escape |
+| `test` | 112 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification |
 | `typecheck` | the console compiles under `strict` |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 29 rendered pairs meet WCAG AA, computed from the tokens |
