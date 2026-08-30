@@ -16,6 +16,16 @@ The three verdicts mean exactly this:
   block      a binding check failed. No debit, and the refusal is recorded with
              the rule that caused it.
 
+Authorisation is serialised per mandate. Checking a ceiling and then spending
+against it is a read-modify-write, and six carts arriving together all read a
+budget of zero, all passed a ₹1,000 ceiling and settled ₹3,600 between them --
+a direct double-spend in the one thing this system exists to prevent. The lock is
+per intent digest, not global, so one customer's mandate serialises while every
+other proceeds in parallel. It is held across the rail call deliberately: a
+mandate is a single person's bounded delegation and has no reason to run parallel
+debits, and releasing early to reclaim throughput would put the window straight
+back.
+
 Writes are ordered write-ahead, which matters because this sits in a payment path.
 ``cart_allowed`` is recorded **before** the rail is called, so a crash between the
 two leaves a record of what was about to be attempted and reconciliation has
@@ -27,6 +37,8 @@ counter behind it is corrected by the next rebuild.
 
 from __future__ import annotations
 
+import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel, ConfigDict
@@ -107,6 +119,8 @@ class Authorizer:
     rail: Rail = field(default_factory=SimulatedRail)
     model_client: object | None = None
     _states: dict[str, MandateState] = field(default_factory=dict, init=False)
+    _locks: dict[str, threading.RLock] = field(default_factory=dict, init=False)
+    _registry_lock: threading.Lock = field(default_factory=threading.Lock, init=False)
 
     # -- issuing authority -------------------------------------------------- #
 
@@ -210,7 +224,26 @@ class Authorizer:
         now: int,
         skip_semantic: bool = False,
     ) -> AuthorizationOutcome:
-        """Evaluate a cart and, if it clears, place the debit on the rail."""
+        """Evaluate a cart and, if it clears, place the debit on the rail.
+
+        Serialised per mandate: the ceiling check and the spend it authorises have
+        to be atomic with respect to each other, or concurrent carts each see a
+        budget nobody has claimed yet.
+        """
+        with self._lock_for(intent):
+            return self._authorize_locked(
+                intent, cart, subject_key=subject_key, now=now, skip_semantic=skip_semantic
+            )
+
+    def _authorize_locked(
+        self,
+        intent: IntentMandate,
+        cart: CartMandate,
+        *,
+        subject_key: VerifyKey,
+        now: int,
+        skip_semantic: bool = False,
+    ) -> AuthorizationOutcome:
         session = self.session_for(intent)
         state = self.state_for(intent)
         seqs: list[int] = []
@@ -319,6 +352,16 @@ class Authorizer:
         if poll is None:
             return []
 
+        with self._lock_for(intent):
+            return self._settle_locked(intent, poll=poll, now=now)
+
+    def _settle_locked(
+        self,
+        intent: IntentMandate,
+        *,
+        poll: Callable[[str, CartMandate], RailResult],
+        now: int,
+    ) -> list[AuthorizationOutcome]:
         session = self.session_for(intent)
         state = self.state_for(intent)
         entries = list(self.ledger.entries(session))
@@ -442,6 +485,12 @@ class Authorizer:
         return f"sess_{intent.digest.removeprefix('sha256:')[:16]}"
 
     def state_for(self, intent: IntentMandate) -> MandateState:
-        return self._states.setdefault(
-            intent.digest, MandateState(intent_digest=intent.digest)
-        )
+        with self._registry_lock:
+            return self._states.setdefault(
+                intent.digest, MandateState(intent_digest=intent.digest)
+            )
+
+    def _lock_for(self, intent: IntentMandate) -> threading.RLock:
+        """One lock per mandate. Different customers never wait on each other."""
+        with self._registry_lock:
+            return self._locks.setdefault(intent.digest, threading.RLock())

@@ -150,6 +150,19 @@ Most systems log what they did. A dispute almost always turns on what was
 *declined*, when, and under which rule. `cart_blocked` carries the failed rule
 names and the observed-versus-limit numbers.
 
+### Authorisation is serialised per mandate
+
+Checking a ceiling and then spending against it is a read-modify-write. Six carts
+arriving together each read a budget nobody had claimed yet, all passed a ₹100
+ceiling, and settled **₹360** between them — a direct double-spend in the one
+thing this system exists to prevent, invisible to 198 single-threaded tests.
+
+The lock is keyed on the intent digest, so one customer's mandate serialises while
+every other proceeds in parallel. It is held across the rail call deliberately: a
+mandate is a single person's bounded delegation and has no reason to run parallel
+debits, and releasing early to reclaim throughput would put the window straight
+back.
+
 ### Appends are serialised
 
 Deriving the next sequence number and the previous hash, then inserting, is a

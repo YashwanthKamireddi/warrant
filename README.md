@@ -244,6 +244,11 @@ can say **no** depends on anything that can be unreachable.
   so consuming the nonce on settlement leaves a window in which the same cart can
   be presented repeatedly, placing an order each time. Found by running against
   Razorpay test mode; the simulator settles synchronously and never showed it.
+- **Authorisation is serialised per mandate.** Checking a ceiling and then
+  spending against it is a read-modify-write. Six carts arriving together each
+  read a budget nobody had claimed, all passed a ₹100 ceiling and settled ₹360
+  between them. The lock is per intent digest, so one customer's mandate
+  serialises while every other proceeds in parallel.
 - **Appends are serialised.** Deriving the next sequence number and the previous
   hash, then inserting, is a read-modify-write. Under eight concurrent writers
   the ledger lost 251 of 320 entries and broke its own chain. Every append now
@@ -286,7 +291,7 @@ Runs, in order, and fails on the first problem:
 | `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
 | `docs-check` | every number in this README matches what the code measures |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 202 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
+| `test` | 207 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
 | `typecheck` | the console compiles under `strict` |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 31 rendered pairs meet WCAG AA, computed from the tokens |
