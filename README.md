@@ -326,6 +326,7 @@ console/         The control plane. A view onto the engine, never a second one.
 
 ---
 
+**[SUBMISSION.md](SUBMISSION.md)** — the form answers and the video script.
 **[ARCHITECTURE.md](ARCHITECTURE.md)** — trust boundaries and the decision record.
 **[INCIDENTS.md](INCIDENTS.md)** — what broke, kept as it happened.
 
