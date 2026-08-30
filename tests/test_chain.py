@@ -184,3 +184,65 @@ def test_sequence_numbers_come_from_the_maximum_not_the_count(tmp_path):
 
         entry = ledger.append(EventKind.CART_PROPOSED, "s", {"i": 9}, recorded_at=9)
         assert entry.seq == 5
+
+
+def test_reads_are_safe_while_a_writer_is_appending():
+    """A sqlite3 connection is not safe for interleaved cursor use across threads.
+
+    Locking only the writes left readers walking a cursor while an append moved
+    underneath them. That surfaced as entries deserialising with a None kind and
+    as 'another row available' errors -- an audit trail handing back garbage
+    instead of failing loudly, which is the worst way for this component to be
+    wrong.
+    """
+    import threading
+
+    with Ledger() as ledger:
+        ledger.append(EventKind.INTENT_ISSUED, "s", {"seed": True}, recorded_at=1)
+        problems: list[str] = []
+        stop = threading.Event()
+
+        def writer() -> None:
+            for i in range(120):
+                try:
+                    ledger.append(EventKind.CART_PROPOSED, "s", {"i": i}, recorded_at=i)
+                except Exception as exc:  # noqa: BLE001 - recorded, then asserted
+                    problems.append(f"write {type(exc).__name__}: {exc}")
+            stop.set()
+
+        def reader() -> None:
+            while not stop.is_set():
+                try:
+                    for entry in ledger.entries("s"):
+                        assert entry.kind is not None
+                        assert entry.seq >= 1
+                    ledger.audit()
+                    _ = ledger.head, ledger.length
+                except Exception as exc:  # noqa: BLE001
+                    problems.append(f"read {type(exc).__name__}: {exc}")
+                    return
+
+        threads = [threading.Thread(target=writer)] + [
+            threading.Thread(target=reader) for _ in range(3)
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert problems == []
+        assert ledger.audit() is None
+
+
+def test_abandoning_a_generator_does_not_hold_the_connection():
+    """Rows are materialised inside the lock, so a caller that stops reading
+    half-way cannot block a writer."""
+    with Ledger() as ledger:
+        for i in range(10):
+            ledger.append(EventKind.CART_PROPOSED, "s", {"i": i}, recorded_at=i)
+
+        stream = ledger.entries()
+        next(stream)  # take one, abandon the rest
+
+        entry = ledger.append(EventKind.CART_ALLOWED, "s", {"after": True}, recorded_at=99)
+        assert entry.seq == 11

@@ -163,6 +163,20 @@ mandate is a single person's bounded delegation and has no reason to run paralle
 debits, and releasing early to reclaim throughput would put the window straight
 back.
 
+### Ledger reads are serialised too
+
+A sqlite3 connection is not safe for interleaved cursor use across threads, even
+with `check_same_thread=False`. Locking only the writes left readers walking a
+cursor while an append moved underneath them, surfacing as entries that
+deserialised with a `None` kind and as `another row available` errors — the audit
+trail handing back garbage instead of failing loudly, which is the worst way for
+this particular component to be wrong.
+
+Reads materialise their rows inside the lock before yielding, so a caller that
+abandons a generator half-way cannot hold the connection either.
+
+*Found by* a test that was flaky 3 runs in 5. The flake was the bug.
+
 ### Appends are serialised
 
 Deriving the next sequence number and the previous hash, then inserting, is a

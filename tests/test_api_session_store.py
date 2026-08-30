@@ -163,3 +163,57 @@ def test_the_full_ledger_is_still_available_from_its_own_endpoint(client):
     kinds = [e["kind"] for e in entries]
     assert "intent_issued" in kinds
     assert "debit_settled" in kinds
+
+
+# -- session mutations are guarded ------------------------------------------ #
+
+
+def test_concurrent_carts_on_one_session_keep_every_invariant(client):
+    """FastAPI runs sync endpoints in a threadpool, so one session can be hit by
+    several requests at once. Nonces must stay unique, the ledger contiguous, the
+    chain intact, and the mandate's own caps respected."""
+    import threading
+
+    sid = client.post("/api/sessions", json={}).json()["session_id"]
+    client.post(f"/api/sessions/{sid}/approve", json={"approved": True})
+
+    n = 12
+    barrier = threading.Barrier(n)
+    lock = threading.Lock()
+    verdicts: list[str] = []
+
+    def buy() -> None:
+        barrier.wait()
+        response = client.post(
+            f"/api/sessions/{sid}/carts",
+            json={"merchant": "zomato", "lines": [{"sku": "chai-6", "qty": 1}]},
+        )
+        with lock:
+            verdicts.append(response.json()["outcome"]["verdict"])
+
+    threads = [threading.Thread(target=buy) for _ in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    session = SESSIONS[sid]
+    scope = client.get(f"/api/sessions/{sid}").json()["scope"]
+    entries = client.get(f"/api/sessions/{sid}/ledger").json()["ledger"]
+    chain = client.get(f"/api/sessions/{sid}/chain").json()
+
+    assert len(session.nonces) == len(set(session.nonces))
+    assert len(session.outcomes) == len(session.documents) == n
+    assert scope["spent_paise"] <= scope["max_total_paise"]
+    assert scope["txns_used"] <= scope["max_txns"]
+    assert [e["seq"] for e in entries] == list(range(1, len(entries) + 1))
+    assert chain["intact"]
+
+
+def test_nonce_derivation_reserves_in_one_step(client):
+    """Reading the length and then appending is a read-modify-write."""
+    sid = client.post("/api/sessions", json={}).json()["session_id"]
+    session = SESSIONS[sid]
+    issued = {session.next_nonce() for _ in range(50)}
+    assert len(issued) == 50
+    assert len(session.nonces) == 50

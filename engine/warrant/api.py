@@ -13,6 +13,7 @@ a demo that needs no migrations is a demo a reviewer can actually run.
 from __future__ import annotations
 
 import secrets
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -124,12 +125,39 @@ class Session:
     pending: PendingIntent | None = None
     clock: int = 0
     outcomes: list[dict[str, Any]] = field(default_factory=list)
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     nonces: list[str] = field(default_factory=list)
     """One per submitted cart. A replay re-presents an earlier one."""
 
     def tick(self, seconds: int = 47) -> int:
-        self.clock += seconds
-        return self.clock
+        with self._lock:
+            self.clock += seconds
+            return self.clock
+
+    def next_nonce(self) -> str:
+        """Derive and reserve a cart nonce in one step.
+
+        Reading the length and then appending is a read-modify-write. Under
+        CPython's GIL the window is a few bytecodes and it did not reproduce in
+        sixty trials of sixteen racing threads -- but it is incorrect regardless,
+        and free-threaded builds remove the accident that hides it. A collision
+        here would refuse a legitimate cart as a replay, which is friction rather
+        than a hole, and still worth not having.
+        """
+        with self._lock:
+            nonce = f"{self.id}-cart-{len(self.nonces) + 1}"
+            self.nonces.append(nonce)
+            return nonce
+
+    def reserve_nonce(self, nonce: str) -> None:
+        with self._lock:
+            self.nonces.append(nonce)
+
+    def record(self, payload: dict[str, Any], cart, receipt) -> None:
+        """Keep the rendered outcome and its signed documents in step."""
+        with self._lock:
+            self.outcomes.append(payload)
+            self.documents.append((cart, receipt))
 
 
 MAX_SESSIONS = 64
@@ -426,9 +454,9 @@ def submit_cart(session_id: str, body: CartRequest) -> dict[str, Any]:
                 detail=f"cannot replay cart {body.replay_of}; only {len(session.nonces)} submitted",
             )
         nonce = session.nonces[body.replay_of - 1]
+        session.reserve_nonce(nonce)
     else:
-        nonce = f"{session_id}-cart-{len(session.nonces) + 1}"
-    session.nonces.append(nonce)
+        nonce = session.next_nonce()
 
     now = session.tick()
     cart = session.authorizer.propose_cart(
@@ -451,11 +479,10 @@ def submit_cart(session_id: str, body: CartRequest) -> dict[str, Any]:
 
     payload = _outcome_json(outcome)
     payload["elapsed_us"] = round(elapsed_us, 1)
-    session.documents.append((outcome.cart, outcome.receipt))
     # The rail is a network call on the Razorpay path and would swamp the number
     # people actually want, which is what the gate itself costs.
     payload["rail_kind"] = session.rail_kind
-    session.outcomes.append(payload)
+    session.record(payload, outcome.cart, outcome.receipt)
 
     return {
         "outcome": payload,
@@ -481,8 +508,7 @@ def settle(session_id: str) -> dict[str, Any]:
     for outcome in finished:
         payload = _outcome_json(outcome)
         payload["label"] = "Settled asynchronously after the customer authorised."
-        session.outcomes.append(payload)
-        session.documents.append((outcome.cart, outcome.receipt))
+        session.record(payload, outcome.cart, outcome.receipt)
 
     return {
         "settled": [_outcome_json(o) for o in finished],

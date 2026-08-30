@@ -12,6 +12,15 @@ the interesting question in a dispute is almost always what they declined to do,
 and at what time, and why. "We did not debit at 21:40 because the mandate had
 expired at 19:00" is a row here, not an absence of rows.
 
+**Reads are serialised too.** A sqlite3 connection is not safe for interleaved
+cursor use across threads, even with ``check_same_thread=False``. Locking only
+the writes left readers walking a cursor while an append moved underneath them,
+which surfaced as rows with a ``None`` kind and as ``another row available``
+errors -- an audit trail handing back garbage rather than failing loudly, which is
+the worst way for this particular component to be wrong. Every read materialises
+its rows inside the lock before yielding, so a caller that abandons a generator
+half-way cannot hold the connection either.
+
 **Appends are serialised.** Deriving the next sequence number and the previous
 hash, then inserting, is a read-modify-write. Two of them interleaving produce a
 duplicate sequence number or a forked chain, and under eight concurrent writers
@@ -141,14 +150,17 @@ class Ledger:
 
     @property
     def head(self) -> str:
-        row = self._db.execute(
-            "SELECT entry_hash FROM ledger ORDER BY seq DESC LIMIT 1"
-        ).fetchone()
+        with self._lock:
+            row = self._db.execute(
+                "SELECT entry_hash FROM ledger ORDER BY seq DESC LIMIT 1"
+            ).fetchone()
         return row["entry_hash"] if row else GENESIS_HASH
 
     @property
     def length(self) -> int:
-        return int(self._db.execute("SELECT COUNT(*) AS n FROM ledger").fetchone()["n"])
+        with self._lock:
+            row = self._db.execute("SELECT COUNT(*) AS n FROM ledger").fetchone()
+        return int(row["n"])
 
     def append(
         self,
@@ -218,19 +230,28 @@ class Ledger:
         )
 
     def entries(self, session_id: str | None = None) -> Iterator[LedgerEntry]:
-        if session_id:
-            rows = self._db.execute(
-                "SELECT * FROM ledger WHERE session_id = ? ORDER BY seq", (session_id,)
-            )
-        else:
-            rows = self._db.execute("SELECT * FROM ledger ORDER BY seq")
+        """Yield entries in order.
+
+        Rows are fetched inside the lock and then yielded, rather than the cursor
+        being walked lazily. A generator abandoned half-way would otherwise hold
+        the connection open while a writer needed it.
+        """
+        with self._lock:
+            if session_id:
+                rows = self._db.execute(
+                    "SELECT * FROM ledger WHERE session_id = ? ORDER BY seq", (session_id,)
+                ).fetchall()
+            else:
+                rows = self._db.execute("SELECT * FROM ledger ORDER BY seq").fetchall()
         for row in rows:
             yield self._row_to_entry(row)
 
     def sessions(self) -> list[str]:
-        rows = self._db.execute(
-            "SELECT session_id, MIN(seq) AS first FROM ledger GROUP BY session_id ORDER BY first"
-        )
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT session_id, MIN(seq) AS first FROM ledger"
+                " GROUP BY session_id ORDER BY first"
+            ).fetchall()
         return [row["session_id"] for row in rows]
 
     # -- integrity --------------------------------------------------------- #
@@ -239,7 +260,9 @@ class Ledger:
         """Recompute the whole chain. Returns the first break, or None if intact."""
         expected_prev = GENESIS_HASH
         expected_seq = 1
-        for row in self._db.execute("SELECT * FROM ledger ORDER BY seq"):
+        with self._lock:
+            rows = self._db.execute("SELECT * FROM ledger ORDER BY seq").fetchall()
+        for row in rows:
             entry = self._row_to_entry(row)
             if entry.seq != expected_seq:
                 return ChainBreak(

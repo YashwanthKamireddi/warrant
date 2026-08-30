@@ -249,6 +249,11 @@ can say **no** depends on anything that can be unreachable.
   read a budget nobody had claimed, all passed a ₹100 ceiling and settled ₹360
   between them. The lock is per intent digest, so one customer's mandate
   serialises while every other proceeds in parallel.
+- **Ledger reads are serialised too.** A sqlite3 connection is not safe for
+  interleaved cursor use across threads. Locking only the writes left readers
+  walking a cursor while an append moved underneath them — entries came back
+  with a `None` kind rather than an error, which is the worst way for an audit
+  trail to be wrong. Reads materialise inside the lock before yielding.
 - **Appends are serialised.** Deriving the next sequence number and the previous
   hash, then inserting, is a read-modify-write. Under eight concurrent writers
   the ledger lost 251 of 320 entries and broke its own chain. Every append now
@@ -291,7 +296,7 @@ Runs, in order, and fails on the first problem:
 | `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
 | `docs-check` | every number in this README matches what the code measures |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 207 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
+| `test` | 211 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
 | `typecheck` | the console compiles under `strict` |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 31 rendered pairs meet WCAG AA, computed from the tokens |
