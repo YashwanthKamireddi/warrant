@@ -165,11 +165,42 @@ the payload. Delete the injection heuristic entirely and it still fails.
 
 ---
 
+## Interoperability with AP2
+
+The fair criticism is that Google's AP2 already defines a chained mandate model —
+Intent, Cart, Payment — with 60-plus partners, and NPCI's UAP will do agent
+authorisation at the network level. So why a merchant-side implementation?
+
+**Because those specify what the credential is, not who checks it.** AP2
+standardises a signed, chained, non-repudiable record of what a user authorised.
+It does not say which rules a merchant evaluates before settlement, what happens
+when a basket sits inside every stated bound and is still wrong, or how a refusal
+is recorded. That gap is the gate, the judge and the ledger here.
+
+`GET /api/sessions/{id}/ap2` emits the chain in AP2's vocabulary inside a W3C
+Verifiable-Credentials envelope. `tests/test_interop.py` reconstructs a verifier's
+job from the exported document alone — canonicalise, check the proof against the
+published key, follow the digests — and confirms it holds.
+
+**It is shape-compatible, not certified interop**, and the three places the models
+genuinely differ travel *inside* the document under a `warrant:` namespace rather
+than being left for someone to discover. The one that matters: AP2 has the user
+sign every Cart Mandate; Warrant has the authoriser sign it and requires the
+user's co-signature only above a step-up threshold — because Reserve Pay exists so
+a user does not re-authenticate per purchase, and a chain demanding a user
+signature on every cart cannot express standing delegation at all. Above the
+threshold the two converge exactly.
+
 ## Honest limits
 
 - **Disputes cannot be created through Razorpay's API** — they are bank-initiated.
   The evidence pack is assembled and verified in full, and maps onto the real
   contest schema, but submitting it needs a real dispute.
+- **Replay protection consumes a nonce at authorisation, not settlement.** A real
+  rail reports `settled=False` until the customer authorises on their own device,
+  so consuming the nonce on settlement leaves a window in which the same cart can
+  be presented repeatedly, placing an order each time. Found by running against
+  Razorpay test mode; the simulator settles synchronously and never showed it.
 - **Writes are ordered write-ahead.** `cart_allowed` is recorded before the rail
   is called, so a crash between the two leaves something for reconciliation to
   find. `debit_settled` is recorded before the running totals move, because those
@@ -201,7 +232,7 @@ Runs, in order, and fails on the first problem:
 | gate | what it proves |
 | --- | --- |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 137 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
+| `test` | 155 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
 | `typecheck` | the console compiles under `strict` |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 29 rendered pairs meet WCAG AA, computed from the tokens |

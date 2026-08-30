@@ -72,7 +72,28 @@ class MandateState:
     rail_block_used_paise: Paise = 0
     revoked: bool = False
 
+    def record_authorized(self, cart: CartMandate) -> None:
+        """Consume the cart's nonce the moment it is placed on the rail.
+
+        Replay protection guards the *presentation* of a cart, not its
+        settlement, and the two are not the same instant on a real rail. Razorpay
+        issues an order and a payment link server-side and reports
+        ``settled=False`` until the customer authorises on their own device --
+        which is exactly right, and which means a nonce consumed only on
+        settlement leaves a window where the same cart can be presented again and
+        again, placing an order every time.
+
+        The simulated rail settles immediately, so it never showed this. The real
+        one did, on the first run.
+        """
+        self.seen_nonces.add(cart.nonce)
+
     def record_settled(self, cart: CartMandate) -> None:
+        """Money actually moved: charge it against the budget.
+
+        Spend and transaction count stay on settlement rather than authorisation,
+        so a payment the customer abandons does not burn the mandate's budget.
+        """
         self.spent_paise += cart.total_paise
         self.txn_count += 1
         self.rail_block_used_paise += cart.total_paise

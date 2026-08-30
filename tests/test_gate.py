@@ -337,3 +337,38 @@ def test_the_known_gap_is_documented_by_a_test(intent, make_cart, state, user_ke
     decision = _run(intent, make_cart((mislabelled,)), state, user_key)
     assert _rule(decision, "merchant.mcc_scope").status == "pass"
     assert decision.verdict is Verdict.ALLOW
+
+
+def test_a_cart_placed_on_a_rail_that_has_not_settled_still_cannot_be_replayed(
+    intent, make_cart, state, user_key, chai
+):
+    """Found by running against Razorpay test mode rather than the simulator.
+
+    A real rail issues an order and reports settled=False until the customer
+    authorises on their own device. Consuming the nonce only on settlement left a
+    window in which the same cart could be presented again and again, placing an
+    order every time.
+    """
+    cart = make_cart((chai,))
+    assert _run(intent, cart, state, user_key).verdict is Verdict.ALLOW
+
+    state.record_authorized(cart)  # placed on the rail, not yet settled
+
+    decision = _run(intent, cart, state, user_key)
+    assert decision.verdict is Verdict.BLOCK
+    assert _rule(decision, "replay.cart_nonce").status == "fail"
+
+
+def test_authorising_does_not_charge_the_budget(intent, make_cart, state, user_key, chai):
+    """An abandoned payment must not burn the mandate's spend or attempt count."""
+    cart = make_cart((chai,))
+    state.record_authorized(cart)
+    assert state.spent_paise == 0
+    assert state.txn_count == 0
+
+
+def test_settlement_charges_the_budget(intent, make_cart, state, user_key, chai):
+    cart = make_cart((chai,))
+    state.record_settled(cart)
+    assert state.spent_paise == cart.total_paise
+    assert state.txn_count == 1

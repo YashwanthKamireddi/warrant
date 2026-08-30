@@ -162,6 +162,43 @@ test is wrong first.
 
 ---
 
+## 7. The real rail found a double-spend the simulator was hiding
+
+**What happened.** Ten minutes after Razorpay test keys existed, the first run of
+`warrant demo --rail razorpay` printed:
+
+```
+4  The same cart, replayed    ALLOW  (expected block)
+```
+
+The simulator had passed this step every time for days.
+
+**Why.** Replay protection consumed a cart's nonce in `record_settled()`. The
+simulated rail settles synchronously, so the nonce was always consumed before the
+replay arrived. A real rail does not work that way: Razorpay issues an order and a
+payment link server-side and reports `settled=False` until the customer authorises
+on their own device — which is correct, and which is precisely the property that
+makes the rail trustworthy.
+
+So on any real rail there was a window between *placed* and *settled* in which the
+same cart could be presented again and again, **placing an order every time**. With
+Reserve Pay each of those can capture. That is a double-spend, not a cosmetic bug.
+
+**How I got out.** Split the state transition in two, because it was always two
+things wearing one name:
+
+- `record_authorized()` — consumes the nonce the moment the cart reaches the rail.
+  Replay protection guards the *presentation* of a cart.
+- `record_settled()` — charges spend and attempt count. Those stay on settlement,
+  so a payment the customer abandons does not burn the mandate's budget.
+
+**What I took from it.** Every argument for getting real keys was about
+credibility with a reviewer. The actual return was a double-spend vector found in
+the first minute of running it, in a code path 155 tests and a passing demo had
+agreed was fine. A simulator agrees with whatever assumption you built into it.
+
+---
+
 ## Still open
 
 Honesty requires listing what has not been fixed.

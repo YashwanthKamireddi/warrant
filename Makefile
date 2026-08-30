@@ -31,8 +31,9 @@ demo: ## run the five-cart scenario in the terminal
 bench: ## run the benchmark, offline and deterministic
 	uv run python bench/run.py
 
-bench-live: ## run a small benchmark against a real model (costs API calls)
-	uv run python bench/run.py --live --per-category 5
+bench-live: ## live-model run on only the categories a model can change (~30 calls)
+	uv run python bench/run.py --live --per-category 5 \
+		--categories injection_subtle,semantic_drift,legitimate
 
 build: ## build the console
 	cd console && npm run build

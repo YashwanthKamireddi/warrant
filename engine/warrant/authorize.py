@@ -248,6 +248,12 @@ class Authorizer:
             ).seq
         )
 
+        # The nonce is spent the moment the cart reaches the rail. On a rail that
+        # settles asynchronously -- which is every real one -- consuming it only on
+        # settlement leaves a window in which the same cart can be presented
+        # repeatedly, placing an order each time.
+        state.record_authorized(signed_cart)
+
         result = self.rail.attempt(signed_cart, idempotency_key=signed_cart.digest)
         seqs.append(
             self.ledger.append(

@@ -271,6 +271,15 @@ def main() -> int:
         help="cases per category (default 45). Lower this when running --live.",
     )
     parser.add_argument(
+        "--categories",
+        default=None,
+        help=(
+            "comma-separated categories to run. Only two categories can change "
+            "under --live (injection_subtle, semantic_drift), so pair this with "
+            "--live to keep a real run to a few dozen calls."
+        ),
+    )
+    parser.add_argument(
         "--live",
         action="store_true",
         help=(
@@ -283,6 +292,15 @@ def main() -> int:
     args = parser.parse_args()
 
     cases = build_corpus(n_per_category=args.per_category)
+
+    if args.categories:
+        wanted = {c.strip() for c in args.categories.split(",") if c.strip()}
+        unknown = wanted - set(CATEGORIES)
+        if unknown:
+            print(f"unknown categories: {', '.join(sorted(unknown))}")
+            print(f"available: {', '.join(CATEGORIES)}")
+            return 2
+        cases = [c for c in cases if c.category in wanted]
 
     if not args.live:
         # Default to no network. Once credentials exist, a bare `make bench` would

@@ -105,3 +105,29 @@ def no_llm(monkeypatch):
         lambda self, transcript=None: setattr(self, "transcript", llm.Transcript()),
     )
     return None
+
+
+@pytest.fixture
+def settled_chain(intent, user_key, chai, samosa):
+    """A full chain with a settled payment, exported in AP2 shape."""
+    from warrant.authorize import Authorizer
+    from warrant.chain import Ledger
+    from warrant.interop import to_ap2_chain
+
+    authorizer = Authorizer(
+        authorizer_key=SigningKey.from_seed("test/authorizer"), ledger=Ledger()
+    )
+    cart = authorizer.propose_cart(
+        intent, merchant="zomato", items=(chai, samosa), now=NOW, nonce="interop"
+    )
+    outcome = authorizer.authorize(
+        intent, cart, subject_key=user_key.public, now=NOW, skip_semantic=True
+    )
+    chain = to_ap2_chain(
+        intent,
+        outcome.cart,
+        outcome.receipt,
+        subject_key=user_key.public,
+        decision=outcome.decision.model_dump(mode="json"),
+    )
+    return chain, outcome

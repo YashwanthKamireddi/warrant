@@ -28,8 +28,9 @@ from .chain import EventKind, Ledger
 from .crypto import SigningKey
 from .demo import STEPS, UTTERANCE, build_scenario
 from .evidence import assemble_evidence
+from .interop import to_ap2_chain
 from .llm import describe_capability
-from .models import IntentMandate, LineItem, RailBinding
+from .models import CartMandate, DebitReceipt, IntentMandate, LineItem, RailBinding
 
 __all__ = ["app"]
 
@@ -146,6 +147,7 @@ def _scope_json(intent: IntentMandate, session: Session) -> dict[str, Any]:
 
 def _outcome_json(outcome, step_label: str | None = None) -> dict[str, Any]:
     return {
+        "cart_body": outcome.cart.body(),
         "cart": {
             "id": outcome.cart.id,
             "digest": outcome.cart.digest,
@@ -429,6 +431,40 @@ def tamper(session_id: str) -> dict[str, Any]:
     ledger._db.commit()
 
     return {"tampered_seq": target.seq, "what": what, "chain": _chain_status(session)}
+
+
+@app.get("/api/sessions/{session_id}/ap2")
+def ap2_chain(session_id: str) -> dict[str, Any]:
+    """The same chain in AP2's vocabulary, W3C-VC shaped.
+
+    Shape-compatible, not certified interop -- the divergences travel inside the
+    document rather than being left for someone to discover.
+    """
+    session = _session(session_id)
+    if session.intent is None:
+        raise HTTPException(status_code=409, detail="no intent in this session")
+
+    settled = next(
+        (o for o in reversed(session.outcomes) if o.get("receipt")), None
+    )
+    last = session.outcomes[-1] if session.outcomes else None
+    source = settled or last
+
+    cart = receipt = None
+    decision = None
+    if source is not None:
+        cart = CartMandate.model_validate(source["cart_body"])
+        decision = {"verdict": source["verdict"], "checks": source["checks"]}
+        if source.get("receipt"):
+            receipt = DebitReceipt.model_validate(source["receipt"]["body"])
+
+    return to_ap2_chain(
+        session.intent,
+        cart,
+        receipt,
+        subject_key=session.subject_key.public,
+        decision=decision,
+    )
 
 
 @app.get("/api/sessions/{session_id}/evidence")
