@@ -47,9 +47,20 @@ DebitReceipt     signed by the AUTHORIZER
                  "this payment settled that cart under that intent"
 ```
 
-The asymmetry is the point. Only the human's key can widen what may be spent.
-The authorizer can attest that something already permitted was checked; it
-cannot grant authority it was never given.
+Only the human's key can *widen* what may be spent, so the authorizer cannot
+produce a chain that verifies as in-scope for a purchase nobody permitted.
+
+**Being precise about what that buys, because the tempting claim is wrong:** a
+compromised authorizer can still skip its own gate and call the rail directly.
+The rail enforces the blocked *amount*, not the category allowlist, so it could
+spend the remaining block on anything. The chain does not prevent that — it makes
+it provable afterwards, because the receipt names a cart, the cart names an
+intent, and anyone with the subject's public key can see the purchase fell
+outside what was signed. **Detection with attribution, not prevention.**
+
+Preventing it outright needs the *rail* to enforce scope, not just an amount —
+which is the layer NPCI's UAP is being designed to occupy. This is what that
+layer has to do; it runs merchant-side today because that is where it can run.
 
 ---
 
@@ -60,30 +71,51 @@ exactly on any machine.
 
 | policy | violations caught | leaked | legitimate spend blocked |
 | --- | --- | --- | --- |
-| `no_gate` — today's default | 0.0% | ₹232,890 | ₹0 |
-| `amount_only` — a ceiling and nothing else | 16.7% | ₹135,885 | ₹0 |
-| `model_only` — ask a model if the basket looks right | 0.3% | ₹232,391 | ₹0 |
-| **`warrant`** | **87.5%** | **₹24,750** | **₹0** |
+| `no_gate` — today's default | 0.0% | ₹239,290 | ₹0 |
+| `amount_only` — a ceiling and nothing else | 13.3% | ₹142,285 | ₹0 |
+| `model_only` — ask a model if the basket looks right | 0.2% | ₹238,791 | ₹0 |
+| **`warrant`** | **80.0%** | **₹28,900** | **₹0** |
 
 ### Where this loses
 
-The number above is measured on data this repository generates. You should
-discount it accordingly, and here is exactly where.
+Every number above is measured on data this repository generates. Discount it
+accordingly — and here is exactly where.
 
-**`semantic_drift`: 0 of 45.** A basket at the right merchant, in the right
-category, under every ceiling — and not what was asked for. No arithmetic
-distinguishes that from a legitimate order. Only reading the basket against the
-instruction does, and with no model reachable Warrant catches none of them. That
-row is printed in the same table as the rest, and it is the only row a live model
-moves. Every other row is arithmetic and will not change.
+**`injection_subtle`: 0 of 45. `semantic_drift`: 0 of 45.** Both sit inside every
+bound the subject signed — right merchant, right category, under every ceiling —
+so no arithmetic touches them, and the payload in `injection_subtle` is phrased to
+evade the instruction-text heuristic. Only reading the basket against the
+instruction catches either, and no model was reachable on this run. **These two
+rows are the only ones a live model moves.** Every other row is arithmetic.
+
+**`injection_oos` is scored separately on purpose.** Those payloads are blocked,
+but on the *category* bound — nothing recognised the payload. Folding them into an
+"injection caught" figure would be the flattering way to report this, and it is
+how most demos of this kind are reported.
+
+**`legitimate 45/45` and `friction ₹0` are close to circular.** This corpus defines
+a legitimate basket as one inside the scope, and the policy allows baskets inside
+the scope. Read that row as evidence the gate is not over-firing, and nothing
+more. It is not evidence real customers would not be blocked, because no real
+customer generated it.
 
 **The mechanical categories are exact by construction, not by cleverness.** A
 ceiling comparison cannot be 97% right. Read `scope_drift`, `replay`, `expired`
-and the rest as evidence the rules are wired up, not as evidence the approach is
-smart.
+and the rest as evidence the rules are wired up, not that the approach is smart.
 
-**The corpus is eight-ninths violations**, so a bare accuracy figure would be
-meaningless. That is why the table reports money and not accuracy.
+### Known limitations, stated plainly
+
+**Categories come from the merchant's own catalog, and we do not verify them.**
+This is the load-bearing weakness. A merchant with sloppy tagging degrades the
+gate by accident; one that tags everything `food_beverage` defeats it on purpose.
+The fix is to take the category from the rail's merchant category code rather
+than the item metadata — which requires rail-side data this layer does not have
+merchant-side. It is a real hole and it is not closed.
+
+**The heuristic that catches `injection_blunt` is shallow and beatable.** That is
+the point of `injection_subtle` scoring zero next to it. The heuristic is an
+early-warning signal, never the defence; the defence is that nothing a model
+emits can widen a signed scope.
 
 ---
 

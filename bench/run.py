@@ -184,25 +184,35 @@ def report(results: dict[str, Tally], cases: list[Case]) -> None:
 
     print(BOLD("  Where this loses"))
     print(DIM("  " + "─" * 58))
-    if "semantic_drift" in zero_rows:
-        print(
-            "  semantic_drift is not a bug in the rules -- it is the limit of having\n"
-            "  rules. Those baskets sit inside every bound the subject signed, so no\n"
-            "  amount of arithmetic distinguishes them from a legitimate order. Only\n"
-            "  reading the basket against the instruction does, and with no model\n"
-            f"  reachable Warrant catches {warrant.per_category['semantic_drift'][0]}"
-            f"/{warrant.per_category['semantic_drift'][1]} of them.\n"
-        )
-        print(
-            "  Run with credentials configured and this row is the one that moves.\n"
-            "  Every other row is arithmetic and will not change.\n"
-        )
-    if warrant.false_stops:
-        print(
-            f"  {warrant.false_stops} legitimate baskets were stopped, costing "
-            f"{_rupees(warrant.friction_paise)} of\n  conversion. That is the price of the "
-            "advisory checks and it is real.\n"
-        )
+
+    subtle = warrant.per_category.get("injection_subtle", [0, 0])
+    drift = warrant.per_category.get("semantic_drift", [0, 0])
+    print(
+        f"  injection_subtle {subtle[0]}/{subtle[1]} and semantic_drift {drift[0]}/{drift[1]}.\n"
+        "  Both sit inside every bound the subject signed -- right merchant, right\n"
+        "  category, under every ceiling -- so no arithmetic touches them, and the\n"
+        "  payload in injection_subtle is phrased to evade the instruction-text\n"
+        "  heuristic. Only reading the basket against the instruction catches either,\n"
+        "  and no model was reachable on this run.\n"
+    )
+    print(
+        "  Those two rows are the only ones a live model moves. Every other row is\n"
+        "  arithmetic and will not change.\n"
+    )
+    print(
+        "  injection_oos is scored separately on purpose. Those payloads are blocked,\n"
+        "  but on the category bound -- nothing recognised the payload. Counting them\n"
+        "  as 'injection caught' would be the flattering way to report this.\n"
+    )
+    print(
+        f"  legitimate {warrant.per_category.get('legitimate', [0, 0])[0]}"
+        f"/{warrant.per_category.get('legitimate', [0, 0])[1]} and friction "
+        f"{_rupees(warrant.friction_paise)} are close to circular: this corpus defines\n"
+        "  a legitimate basket as one inside the scope, and the policy allows baskets\n"
+        "  inside the scope. Read that row as evidence the gate is not over-firing,\n"
+        "  and nothing more. It is not evidence that real customers would not be\n"
+        "  blocked, because no real customer generated it.\n"
+    )
     print(
         "  The mechanical categories are exact by construction, not by cleverness.\n"
         "  A ceiling comparison cannot be 97% right. Read those rows as a check that\n"

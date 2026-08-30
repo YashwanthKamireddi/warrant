@@ -11,12 +11,25 @@ Three documents, each binding to the one above it by content address:
     DebitReceipt     signed by the AUTHORIZER
                      "This rail payment settled that cart under that intent."
 
-The trust model is deliberately asymmetric, and the asymmetry is the point.
-Only the human's key can widen what may be spent. The authorizer can only ever
-attest that something already permitted was checked -- it cannot grant authority
-it was not given. A compromised authorizer can refuse valid carts (denial of
-service, visible and recoverable) but cannot manufacture a spend the user never
-sanctioned, because it does not hold the user's key.
+The trust model is asymmetric, and it is worth being precise about what the
+asymmetry does and does not buy, because the tempting overstatement is wrong.
+
+Only the human's key can *widen* what may be spent. The authorizer holds no key
+that can enlarge a scope, so it cannot produce a chain that verifies as
+in-scope for a purchase the subject never permitted.
+
+What it can still do, if compromised, is skip its own gate and call the rail
+directly. The rail enforces the blocked *amount*, not the category or merchant
+allowlist, so a compromised authorizer can spend up to the remaining block on
+anything at all. The mandate chain does not prevent that. What it does is make
+it **provable afterwards**: the receipt names a cart, the cart names an intent,
+and anyone holding the subject's public key can see the purchase fell outside
+what was signed. Detection with attribution, not prevention.
+
+Preventing it outright requires the rail itself to enforce scope rather than
+just an amount -- which is exactly the layer NPCI's UAP is being designed to
+occupy. This implementation is what that layer has to do; today it runs
+merchant-side because that is where it can run at all.
 
 Above a step-up threshold the user must co-sign the cart itself, which collapses
 the standing delegation back to explicit per-purchase consent for large amounts.
