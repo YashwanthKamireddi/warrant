@@ -41,6 +41,7 @@ export function App() {
   const [chain, setChain] = useState<ChainStatus | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [merchant, setMerchant] = useState("zomato");
+  const [rail, setRail] = useState<"simulated" | "razorpay">("simulated");
   const [cosign, setCosign] = useState(false);
   const [tab, setTab] = useState<Tab>("decisions");
   const [evidence, setEvidence] = useState<EvidencePack | null>(null);
@@ -82,7 +83,7 @@ export function App() {
 
   const derive = () =>
     run(async () => {
-      const started = await api.start(utterance);
+      const started = await api.start(utterance, rail);
       setSessionId(started.session_id);
       setPending(started.pending);
       setSignature(null);
@@ -221,6 +222,20 @@ export function App() {
 
         <span className="grow" />
 
+        {sessionId && (
+          <span
+            className={`pill ${rail === "razorpay" ? "ok" : ""}`}
+            title={
+              rail === "razorpay"
+                ? "Creating real Orders and Payment Links in Razorpay test mode"
+                : "Deterministic in-process rail. No network."
+            }
+          >
+            <span className="dot" />
+            {rail === "razorpay" ? "Razorpay test mode" : "Simulated rail"}
+          </span>
+        )}
+
         {/* Reports the path the last interpretation actually took. A credential
             being present is not the same as a live call succeeding. */}
         {meta && (
@@ -300,6 +315,28 @@ export function App() {
                     aria-label="Instruction given to the agent"
                     placeholder="order chai and samosas for my team from zomato, keep it under 1000"
                   />
+                  {meta && meta.rails.length > 1 && (
+                    <div className="rail-choice" role="radiogroup" aria-label="Payment rail">
+                      {meta.rails.map((option) => (
+                        <button
+                          key={option.id}
+                          role="radio"
+                          aria-checked={rail === option.id}
+                          className={`rail-option${rail === option.id ? " on" : ""}`}
+                          disabled={!option.available}
+                          title={option.note}
+                          onClick={() => setRail(option.id)}
+                        >
+                          <b>{option.label}</b>
+                          <span>
+                            {option.available
+                              ? option.note
+                              : "Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to enable"}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <button
                     className="btn btn-primary btn-block"
                     onClick={derive}

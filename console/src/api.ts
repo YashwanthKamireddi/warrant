@@ -41,10 +41,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   meta: () => request<Meta>("/meta"),
 
-  start: (utterance: string) =>
+  start: (utterance: string, rail: "simulated" | "razorpay") =>
     request<StartResponse>("/sessions", {
       method: "POST",
-      body: JSON.stringify({ utterance }),
+      body: JSON.stringify({ utterance, rail }),
     }),
 
   approve: (sessionId: string) =>

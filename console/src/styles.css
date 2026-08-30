@@ -1604,3 +1604,89 @@ a {
   font: var(--t-small);
   color: var(--ink-4);
 }
+
+/* ==========================================================================
+   Rail selection and real-rail placement
+   ========================================================================== */
+
+.rail-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-2);
+}
+
+.rail-option {
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition:
+    border-color 0.14s,
+    background 0.14s,
+    box-shadow 0.14s;
+}
+.rail-option b {
+  font: var(--t-body-strong);
+  color: var(--ink);
+}
+.rail-option span {
+  font: var(--t-micro);
+  color: var(--ink-4);
+  line-height: 1.4;
+}
+.rail-option:hover:not(:disabled) {
+  border-color: var(--ink-4);
+}
+.rail-option.on {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  box-shadow: var(--sh-sm);
+}
+.rail-option.on b {
+  color: var(--brand);
+}
+.rail-option:disabled {
+  background: var(--sunken);
+  cursor: default;
+}
+.rail-option:disabled b {
+  color: var(--ink-4);
+}
+
+.placed {
+  padding: var(--s-3) var(--s-5);
+  border-top: 1px solid var(--line);
+  background: var(--ok-bg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  align-items: flex-start;
+}
+.placed-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font: var(--t-body);
+  color: var(--ok);
+}
+.placed-head b {
+  font-weight: 600;
+}
+.placed p {
+  font: var(--t-small);
+  color: var(--ink-2);
+  max-width: 68ch;
+}
+.placed code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  background: var(--surface);
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--ok-line);
+}

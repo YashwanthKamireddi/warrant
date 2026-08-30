@@ -212,7 +212,10 @@ threshold the two converge exactly.
   **real** Orders and Payment Links in your test account and refuses to start
   against a non-test key, but reports `settled=False` until the rail confirms a
   capture. A script cannot fake a customer authorising on their own device, and
-  that property is what makes the rail trustworthy.
+  that property is what makes the rail trustworthy. The console offers the same
+  choice, and `make browser-razorpay` asserts a real `order_…` id and an
+  `https://rzp.io/…` link come back — deliberately outside `make verify`, which
+  must pass for anyone who clones the repo without credentials.
 - **The bundled transcript is authored, not captured.** With no API key, scope
   derivation replays it so `make demo` works offline. Every interpretation is
   labelled with the path it actually took — `live`, `transcript` or `fallback` —

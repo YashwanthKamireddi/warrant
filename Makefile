@@ -12,7 +12,7 @@ CONSOLE_PORT ?= 8787
 
 .DEFAULT_GOAL := help
 .PHONY: help install demo bench console serve test lint typecheck build \
-        audit-tokens audit-contrast audit-overlap browser verify clean open bench-live
+        audit-tokens audit-contrast audit-overlap browser browser-razorpay verify clean open bench-live
 
 help:
 	@printf '\n  \033[1mWarrant\033[0m — authorization for agent-initiated payments\n\n'
@@ -76,6 +76,9 @@ audit-contrast: ## fail on any rendered pair below WCAG AA
 
 audit-overlap: build ## fail if anything spills its box or paints over a sibling
 	@$(MAKE) --no-print-directory _with-server SCRIPT=.verify/audit_overlap.py
+
+browser-razorpay: build ## drive the console against real Razorpay test mode (needs keys)
+	@$(MAKE) --no-print-directory _with-server SCRIPT=.verify/walk_razorpay.py
 
 browser: build ## layout, overlap and flow checks in a real browser, with screenshots
 	@uv run warrant serve --port $(VERIFY_PORT) >/tmp/warrant-verify.log 2>&1 & \

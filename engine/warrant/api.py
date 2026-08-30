@@ -15,7 +15,7 @@ from __future__ import annotations
 import secrets
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +31,8 @@ from .evidence import assemble_evidence
 from .interop import to_ap2_chain
 from .llm import describe_capability
 from .models import CartMandate, DebitReceipt, IntentMandate, LineItem, RailBinding
+from .rails.razorpay_rail import RazorpayNotConfigured, RazorpayRail
+from .rails.simulated import SimulatedRail
 
 __all__ = ["app"]
 
@@ -54,6 +56,53 @@ app.add_middleware(
 CATALOG: tuple[dict[str, Any], ...] = tuple(p._asdict() for p in PRODUCTS)
 
 
+def _available_rails() -> list[dict[str, Any]]:
+    """Only offer a rail that will actually work.
+
+    The Razorpay rail refuses to construct without test-mode credentials, so
+    offering it unconditionally would put a control in the console that errors
+    the moment anyone touches it.
+    """
+    rails: list[dict[str, Any]] = [
+        {
+            "id": "simulated",
+            "label": "Simulated rail",
+            "note": "Deterministic. Settles immediately. No network.",
+            "available": True,
+        }
+    ]
+    try:
+        RazorpayRail()
+    except RazorpayNotConfigured as exc:
+        rails.append(
+            {
+                "id": "razorpay",
+                "label": "Razorpay test mode",
+                "note": str(exc),
+                "available": False,
+            }
+        )
+    else:
+        rails.append(
+            {
+                "id": "razorpay",
+                "label": "Razorpay test mode",
+                "note": (
+                    "Creates real Orders and Payment Links in your test account. "
+                    "Reports settled=False until the rail confirms a capture."
+                ),
+                "available": True,
+            }
+        )
+    return rails
+
+
+def _build_rail(kind: str):
+    if kind == "razorpay":
+        return RazorpayRail()
+    return SimulatedRail()
+
+
 @dataclass(slots=True)
 class Session:
     """One demo session: its ledger, its keys, its signed intent."""
@@ -61,6 +110,7 @@ class Session:
     id: str
     authorizer: Authorizer
     subject_key: SigningKey
+    rail_kind: str = "simulated"
     intent: IntentMandate | None = None
     pending: PendingIntent | None = None
     clock: int = 0
@@ -90,6 +140,7 @@ def _session(session_id: str) -> Session:
 
 class StartRequest(BaseModel):
     utterance: str = Field(default=UTTERANCE, max_length=400)
+    rail: Literal["simulated", "razorpay"] = "simulated"
 
 
 class ApproveRequest(BaseModel):
@@ -206,6 +257,7 @@ def meta() -> dict[str, Any]:
     return {
         "capability": capability.model_dump(mode="json"),
         "capability_note": capability.note,
+        "rails": _available_rails(),
         "catalog": list(CATALOG),
         "default_utterance": UTTERANCE,
         "scripted_steps": [
@@ -231,15 +283,22 @@ def start_session(body: StartRequest) -> dict[str, Any]:
     """Derive a scope from an utterance. Signs nothing -- approval comes next."""
     scenario = build_scenario()
     session_id = "sess_" + secrets.token_hex(6)
+    try:
+        rail = _build_rail(body.rail)
+    except RazorpayNotConfigured as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     session = Session(
         id=session_id,
         authorizer=Authorizer(
             authorizer_key=SigningKey.from_seed(f"warrant/console/authorizer/{session_id}"),
             ledger=Ledger(),
             envelope=scenario.authorizer.envelope,
+            rail=rail,
         ),
         subject_key=SigningKey.from_seed("warrant/demo/subject/priya"),
         clock=scenario.t0,
+        rail_kind=body.rail,
     )
     session.pending = session.authorizer.prepare_intent(
         body.utterance, subject="user_priya", agent="agent_claude", now=session.clock
@@ -249,6 +308,7 @@ def start_session(body: StartRequest) -> dict[str, Any]:
     return {
         "session_id": session_id,
         "utterance": body.utterance,
+        "rail": body.rail,
         "pending": {
             "approval_prompt": session.pending.approval_prompt,
             "ambiguities": list(session.pending.proposal.ambiguities),

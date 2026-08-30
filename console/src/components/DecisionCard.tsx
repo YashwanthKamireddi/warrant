@@ -51,7 +51,13 @@ function Checks({ checks }: { checks: Check[] }) {
 }
 
 export function DecisionCard({ outcome, index }: { outcome: Outcome; index: number }) {
-  const [open, setOpen] = useState(outcome.verdict !== "allow");
+  // Allowed baskets collapse, because a clean pass has nothing to read. The one
+  // exception is a debit placed on a real rail but not yet settled: the payment
+  // link is the only actionable thing on the page and must not sit behind a click.
+  const awaitingPayment = Boolean(
+    outcome.rail && outcome.rail.ok && !outcome.rail.settled,
+  );
+  const [open, setOpen] = useState(outcome.verdict !== "allow" || awaitingPayment);
   const failed = outcome.checks.filter((c) => c.status === "fail").length;
 
   return (
@@ -104,12 +110,25 @@ export function DecisionCard({ outcome, index }: { outcome: Outcome; index: numb
           )}
 
           {outcome.rail && outcome.rail.ok && !outcome.rail.settled && (
-            <div className="teaches">
-              Placed on the rail as <span className="mono">{outcome.rail.ref.order_id}</span>,
-              awaiting payment.{" "}
+            <div className="placed">
+              <span className="placed-head">
+                <Badge kind="pass" />
+                <b>Placed on the rail</b>
+                <span className="mono">{outcome.rail.ref.order_id}</span>
+              </span>
+              <p>
+                Reported as <code>settled=false</code>. A payment cannot be completed
+                server to server — the customer authorises on their own device, which is
+                the property that makes the rail trustworthy.
+              </p>
               {typeof outcome.rail.raw.payment_link === "string" && (
-                <a href={outcome.rail.raw.payment_link} target="_blank" rel="noreferrer">
-                  Open the payment link
+                <a
+                  className="btn btn-secondary btn-sm"
+                  href={outcome.rail.raw.payment_link}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open the real payment link ↗
                 </a>
               )}
             </div>

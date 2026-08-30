@@ -99,6 +99,7 @@ export interface PendingIntent {
 export interface StartResponse {
   session_id: string;
   utterance: string;
+  rail: "simulated" | "razorpay";
   pending: PendingIntent;
   envelope: Record<string, unknown>;
 }
@@ -146,6 +147,13 @@ export interface ScriptedStep {
   replay_of: number | null;
 }
 
+export interface RailOption {
+  id: "simulated" | "razorpay";
+  label: string;
+  note: string;
+  available: boolean;
+}
+
 export interface Meta {
   capability: {
     credentials_configured: boolean;
@@ -153,6 +161,7 @@ export interface Meta {
     transcript_provenance: string;
   };
   capability_note: string;
+  rails: RailOption[];
   catalog: Product[];
   default_utterance: string;
   scripted_steps: ScriptedStep[];
