@@ -170,6 +170,13 @@ the payload. Delete the injection heuristic entirely and it still fails.
 - **Disputes cannot be created through Razorpay's API** — they are bank-initiated.
   The evidence pack is assembled and verified in full, and maps onto the real
   contest schema, but submitting it needs a real dispute.
+- **Writes are ordered write-ahead.** `cart_allowed` is recorded before the rail
+  is called, so a crash between the two leaves something for reconciliation to
+  find. `debit_settled` is recorded before the running totals move, because those
+  totals are rebuilt from the ledger — a counter ahead of the record would survive
+  as a permanent overspend allowance, whereas a counter behind it is corrected by
+  the next replay. Both orderings are asserted by tests that fail the write on
+  purpose.
 - **A payment cannot be completed server to server.** `--rail razorpay` creates
   **real** Orders and Payment Links in your test account and refuses to start
   against a non-test key, but reports `settled=False` until the rail confirms a
@@ -194,7 +201,7 @@ Runs, in order, and fails on the first problem:
 | gate | what it proves |
 | --- | --- |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 112 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification |
+| `test` | 137 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
 | `typecheck` | the console compiles under `strict` |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 29 rendered pairs meet WCAG AA, computed from the tokens |

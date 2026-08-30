@@ -15,6 +15,14 @@ The three verdicts mean exactly this:
   escalate   every binding check passed but something wants a human. No debit.
   block      a binding check failed. No debit, and the refusal is recorded with
              the rule that caused it.
+
+Writes are ordered write-ahead, which matters because this sits in a payment path.
+``cart_allowed`` is recorded **before** the rail is called, so a crash between the
+two leaves a record of what was about to be attempted and reconciliation has
+something to find. ``debit_settled`` is recorded **before** the running totals
+move, because those totals are derived from the ledger on replay -- a counter
+ahead of the record would survive as a permanent overspend allowance, whereas a
+counter behind it is corrected by the next rebuild.
 """
 
 from __future__ import annotations
@@ -259,7 +267,12 @@ class Authorizer:
                 rail=result.ref,
                 settled_at=now,
             ).signed_by(self.authorizer_key)
-            state.record_settled(signed_cart)
+            # Ledger first, then state. The ledger is the source of truth: running
+            # totals are derived from it on replay, so if this append fails after
+            # the counters moved, memory would claim spend the ledger cannot
+            # account for -- and a rebuild would under-count and permit an
+            # overspend. Writing first means the worst case is a counter behind
+            # the record, which the next replay corrects.
             seqs.append(
                 self.ledger.append(
                     EventKind.DEBIT_SETTLED,
@@ -268,6 +281,7 @@ class Authorizer:
                     recorded_at=now,
                 ).seq
             )
+            state.record_settled(signed_cart)
 
         return AuthorizationOutcome(
             cart=signed_cart,

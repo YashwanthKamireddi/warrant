@@ -202,3 +202,70 @@ def test_no_rail_binding_still_produces_a_pack(intent, user_key, chai):
     )
     pack = assemble_evidence(ledger, session, subject_key=user_key.public)
     assert pack.signatures_verified
+
+
+# -- write ordering in the payment path ------------------------------------ #
+
+
+def test_the_ledger_is_written_before_the_running_totals_move(intent, user_key, chai):
+    """The ledger is the source of truth, so it must never lag the counters.
+
+    A counter ahead of the record survives every replay as a permanent overspend
+    allowance. A counter behind it is corrected by the next rebuild. This test
+    fails the append and asserts the counters did not move.
+    """
+    ledger = Ledger()
+    authorizer = Authorizer(
+        authorizer_key=SigningKey.from_seed("test/authorizer"), ledger=ledger
+    )
+    state = authorizer.state_for(intent)
+    real_append = ledger.append
+
+    def fail_on_settlement(kind, *args, **kwargs):
+        if kind is EventKind.DEBIT_SETTLED:
+            raise RuntimeError("disk full")
+        return real_append(kind, *args, **kwargs)
+
+    ledger.append = fail_on_settlement  # type: ignore[method-assign]
+
+    cart = authorizer.propose_cart(
+        intent, merchant="zomato", items=(chai,), now=2_000, nonce="ordering"
+    )
+    with pytest.raises(RuntimeError, match="disk full"):
+        authorizer.authorize(
+            intent, cart, subject_key=user_key.public, now=2_000, skip_semantic=True
+        )
+
+    assert state.spent_paise == 0
+    assert state.txn_count == 0
+
+
+def test_the_intent_to_debit_is_recorded_before_the_rail_is_called(
+    intent, user_key, chai
+):
+    """Write-ahead: a crash between the decision and the rail must still leave
+    something for reconciliation to find."""
+    ledger = Ledger()
+    seen: list[str] = []
+
+    class _ExplodingRail:
+        kind = "exploding"
+
+        def attempt(self, cart, *, idempotency_key):
+            seen.extend(str(e.kind) for e in ledger.entries())
+            raise RuntimeError("rail unreachable")
+
+    authorizer = Authorizer(
+        authorizer_key=SigningKey.from_seed("test/authorizer"),
+        ledger=ledger,
+        rail=_ExplodingRail(),
+    )
+    cart = authorizer.propose_cart(
+        intent, merchant="zomato", items=(chai,), now=2_000, nonce="wal"
+    )
+    with pytest.raises(RuntimeError, match="rail unreachable"):
+        authorizer.authorize(
+            intent, cart, subject_key=user_key.public, now=2_000, skip_semantic=True
+        )
+
+    assert "cart_allowed" in seen
