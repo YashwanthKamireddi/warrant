@@ -233,6 +233,12 @@ can say **no** depends on anything that can be unreachable.
 - **Disputes cannot be created through Razorpay's API** — they are bank-initiated.
   The evidence pack is assembled and verified in full, and maps onto the real
   contest schema, but submitting it needs a real dispute.
+- **A real rail settles asynchronously, and the loop closes.** Razorpay issues an
+  order and a payment link; the customer authorises on their own device minutes
+  later. `settle_pending()` polls for that capture and turns it into a signed
+  receipt and a settled ledger entry — reconstructing pending work from the ledger
+  rather than memory, so a restarted process still finishes what it started. In
+  the console it is **Check the rail for settlement**.
 - **Replay protection consumes a nonce at authorisation, not settlement.** A real
   rail reports `settled=False` until the customer authorises on their own device,
   so consuming the nonce on settlement leaves a window in which the same cart can
@@ -274,7 +280,7 @@ Runs, in order, and fails on the first problem:
 | `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
 | `docs-check` | every number in this README matches what the code measures |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 164 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
+| `test` | 173 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
 | `typecheck` | the console compiles under `strict` |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 31 rendered pairs meet WCAG AA, computed from the tokens |

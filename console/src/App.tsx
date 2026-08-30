@@ -169,6 +169,24 @@ export function App() {
       if (failures.length > 0) throw new Error(failures.join(" · "));
     });
 
+  /** Finishes debits the rail accepted but had not yet captured. On the Razorpay
+   *  path this is the step that turns a paid link into a signed receipt. */
+  const settle = () =>
+    run(async () => {
+      if (!sessionId) return;
+      const result = await api.settle(sessionId);
+      if (result.settled.length > 0) {
+        setOutcomes((prev) => [...prev, ...result.settled]);
+        setScope(result.scope);
+        setLedger(result.ledger);
+        setChain(await api.chain(sessionId));
+        void refreshEvidence(sessionId);
+        setTab("decisions");
+      } else {
+        throw new Error("Nothing has been captured yet. Pay the link, then check again.");
+      }
+    });
+
   const tamper = () =>
     run(async () => {
       if (!sessionId) return;
@@ -469,6 +487,11 @@ export function App() {
                 >
                   {busy ? "Checking…" : "Authorise this basket"}
                 </button>
+                {rail === "razorpay" && (
+                  <button className="btn btn-secondary" onClick={settle} disabled={busy}>
+                    {busy ? "Checking…" : "Check the rail for settlement"}
+                  </button>
+                )}
                 <div className="row">
                   <button className="btn btn-secondary" onClick={runScripted} disabled={busy}>
                     Run five scripted baskets

@@ -297,6 +297,100 @@ class Authorizer:
             ledger_seqs=tuple(seqs),
         )
 
+    # -- finishing what the rail started ------------------------------------ #
+
+    def settle_pending(
+        self,
+        intent: IntentMandate,
+        *,
+        now: int,
+    ) -> list[AuthorizationOutcome]:
+        """Ask the rail whether anything it accepted has since been captured.
+
+        A real rail settles asynchronously: Razorpay issues an order and a payment
+        link, and the customer authorises on their own device minutes later. Until
+        this ran, a debit placed from the console could never finish -- no receipt,
+        no evidence pack, no way to complete the one path that matters most.
+
+        Pending work is reconstructed from the ledger rather than held in memory,
+        so a restarted process still finishes what it started.
+        """
+        poll = getattr(self.rail, "poll", None)
+        if poll is None:
+            return []
+
+        session = self.session_for(intent)
+        state = self.state_for(intent)
+        entries = list(self.ledger.entries(session))
+
+        settled_carts = {
+            e.payload["receipt"]["body"]["cart_digest"]
+            for e in entries
+            if e.kind is EventKind.DEBIT_SETTLED
+        }
+        carts = {
+            e.payload["cart"]["digest"]: e.payload["cart"]
+            for e in entries
+            if e.kind is EventKind.CART_ALLOWED
+        }
+
+        finished: list[AuthorizationOutcome] = []
+        for entry in entries:
+            if entry.kind is not EventKind.DEBIT_AUTHORIZED:
+                continue
+            digest = entry.payload["cart_digest"]
+            order_id = entry.payload["rail"]["ref"].get("order_id")
+            if digest in settled_carts or order_id is None or digest not in carts:
+                continue
+
+            envelope = carts[digest]
+            cart = CartMandate.model_validate(envelope["body"])
+            result = poll(order_id, cart)
+
+            if not result.settled:
+                # A poll that comes back not-ok is a real outcome -- the customer's
+                # payment failed, or the rail is unreachable -- and belongs in the
+                # ledger. Still-awaiting is not an event and is not recorded, or a
+                # console left open would fill the chain with nothing happening.
+                if not result.ok:
+                    self.ledger.append(
+                        EventKind.DEBIT_FAILED,
+                        session,
+                        {"cart_digest": digest, "rail": result.model_dump(mode="json")},
+                        recorded_at=now,
+                    )
+                continue
+
+            receipt = DebitReceipt(
+                cart_digest=digest,
+                intent_digest=intent.digest,
+                amount_paise=result.amount_paise,
+                rail=result.ref,
+                settled_at=now,
+            ).signed_by(self.authorizer_key)
+
+            # Ledger first, then state -- the same ordering the synchronous path uses.
+            seq = self.ledger.append(
+                EventKind.DEBIT_SETTLED,
+                session,
+                {"receipt": receipt.envelope()},
+                recorded_at=now,
+            ).seq
+            state.record_settled(cart)
+            settled_carts.add(digest)
+
+            finished.append(
+                AuthorizationOutcome(
+                    cart=cart,
+                    decision=Decision(verdict=Verdict.ALLOW, checks=(), reasons=()),
+                    receipt=receipt,
+                    rail=result,
+                    ledger_seqs=(seq,),
+                )
+            )
+
+        return finished
+
     # -- helpers ------------------------------------------------------------ #
 
     @staticmethod

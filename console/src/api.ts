@@ -74,6 +74,12 @@ export const api = {
       },
     ),
 
+  settle: (sessionId: string) =>
+    request<{ settled: Outcome[]; scope: Scope; ledger: LedgerEntry[] }>(
+      `/sessions/${sessionId}/settle`,
+      { method: "POST" },
+    ),
+
   revoke: (sessionId: string) =>
     request<{ scope: Scope; ledger: LedgerEntry[] }>(`/sessions/${sessionId}/revoke`, {
       method: "POST",

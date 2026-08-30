@@ -425,6 +425,31 @@ def submit_cart(session_id: str, body: CartRequest) -> dict[str, Any]:
     }
 
 
+@app.post("/api/sessions/{session_id}/settle")
+def settle(session_id: str) -> dict[str, Any]:
+    """Ask the rail whether anything it accepted has since been captured.
+
+    On the Razorpay path this is how a debit actually finishes: the order and
+    payment link go out, the customer authorises on their own device, and this
+    turns that into a signed receipt and a settled ledger entry.
+    """
+    session = _session(session_id)
+    if session.intent is None:
+        raise HTTPException(status_code=409, detail="no intent in this session")
+
+    finished = session.authorizer.settle_pending(session.intent, now=session.tick())
+    for outcome in finished:
+        payload = _outcome_json(outcome)
+        payload["label"] = "Settled asynchronously after the customer authorised."
+        session.outcomes.append(payload)
+
+    return {
+        "settled": [_outcome_json(o) for o in finished],
+        "scope": _scope_json(session.intent, session),
+        "ledger": _ledger_json(session),
+    }
+
+
 @app.post("/api/sessions/{session_id}/revoke")
 def revoke(session_id: str) -> dict[str, Any]:
     """The subject withdraws authority mid-session."""
