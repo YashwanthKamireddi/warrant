@@ -26,6 +26,7 @@ import statistics
 import sys
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -289,6 +290,15 @@ def main() -> int:
         ),
     )
     parser.add_argument("--json", action="store_true", help="emit machine-readable results")
+    parser.add_argument(
+        "--write-results",
+        default=None,
+        help=(
+            "write the measured results to this file. The README quotes it, and "
+            "make docs-check fails if the two disagree -- so the numbers in the "
+            "documentation cannot drift away from the numbers the code produces."
+        ),
+    )
     args = parser.parse_args()
 
     cases = build_corpus(n_per_category=args.per_category)
@@ -314,6 +324,36 @@ def main() -> int:
         )
 
     results = {name: run_policy(name, cases, None) for name in POLICIES}
+
+    if args.write_results:
+        import json as _json
+
+        out = Path(args.write_results)
+        out.write_text(
+            _json.dumps(
+                {
+                    "cases": len(cases),
+                    "categories": len(CATEGORIES),
+                    "seed": 20260901,
+                    "live": args.live,
+                    "policies": {
+                        name: {
+                            "recall": round(t.recall, 4),
+                            "misses": t.misses,
+                            "false_stops": t.false_stops,
+                            "leaked_paise": t.leaked_paise,
+                            "friction_paise": t.friction_paise,
+                            "per_category": t.per_category,
+                        }
+                        for name, t in results.items()
+                    },
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        )
+        print(f"\n  wrote {out}")
 
     if args.json:
         print(

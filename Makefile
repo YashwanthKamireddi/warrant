@@ -12,7 +12,7 @@ CONSOLE_PORT ?= 8787
 
 .DEFAULT_GOAL := help
 .PHONY: help install demo bench console serve test lint typecheck build \
-        audit-secrets audit-tokens audit-contrast audit-overlap browser browser-razorpay browsers verify clean open bench-live
+        audit-secrets docs-check audit-tokens audit-contrast audit-overlap browser browser-razorpay browsers verify clean open bench-live
 
 help:
 	@printf '\n  \033[1mWarrant\033[0m — authorization for agent-initiated payments\n\n'
@@ -27,8 +27,8 @@ install: console/node_modules ## install python deps, console deps and the brows
 demo: ## run the five-cart scenario in the terminal
 	uv run warrant demo
 
-bench: ## run the benchmark, offline and deterministic
-	uv run python bench/run.py
+bench: ## run the benchmark and refresh the committed results artifact
+	uv run python bench/run.py --write-results bench/RESULTS.json
 
 bench-live: ## live-model run on only the categories a model can change (~30 calls)
 	uv run python bench/run.py --live --per-category 5 \
@@ -77,6 +77,9 @@ typecheck: console/node_modules ## typecheck the console
 audit-secrets: ## fail if any credential material is tracked or in history
 	uv run python .verify/audit_secrets.py
 
+docs-check: ## fail if any number in the README drifts from what the code measures
+	uv run python .verify/audit_docs.py
+
 audit-tokens: ## fail on any colour outside the token system
 	uv run python .verify/audit_tokens.py
 
@@ -118,7 +121,7 @@ browsers:
 		sys.exit(0 if any(pathlib.Path.home().joinpath('.cache/ms-playwright').glob('chromium*')) else 1)" \
 		|| uv run playwright install chromium
 
-verify: audit-secrets lint test typecheck audit-tokens audit-contrast browsers browser ## everything, in order
+verify: audit-secrets lint test typecheck docs-check audit-tokens audit-contrast browsers browser ## everything, in order
 	@printf '\n  \033[32mAll gates passed.\033[0m Screenshots in .verify/shots/\n\n'
 
 clean:

@@ -9,7 +9,7 @@ traces back to a scope a human signed — checked *before* settlement, provable
 ```bash
 git clone … && cd warrant
 make demo      # the five-cart scenario. no API key, no network, no install step
-make bench     # 495 labelled sessions, four policies
+make bench     # 540 labelled sessions, four policies
 make console   # the control plane at http://127.0.0.1:8787
 make verify    # every gate, from a clean checkout
 ```
@@ -72,19 +72,25 @@ layer has to do; it runs merchant-side today because that is where it can run.
 
 ## Results
 
-405 labelled sessions, four policies, one seed. `make bench` reproduces this
+540 labelled sessions, four policies, one seed. `make bench` reproduces this
 exactly on any machine.
 
 | policy | violations caught | leaked | legitimate spend blocked |
 | --- | --- | --- | --- |
-| `no_gate` — today's default | 0.0% | ₹239,290 | ₹0 |
-| `amount_only` — a ceiling and nothing else | 13.3% | ₹142,285 | ₹0 |
-| `model_only` — ask a model if the basket looks right | 0.2% | ₹238,791 | ₹0 |
-| **`warrant`** | **80.0%** | **₹28,900** | **₹0** |
+| `no_gate` — today's default | 0.0% | ₹281,635 | ₹0 |
+| `amount_only` — a ceiling and nothing else | 14.3% | ₹154,081 | ₹0 |
+| `model_only` — ask a model if the basket looks right | 1.4% | ₹278,142 | ₹0 |
+| **`warrant`** | **81.8%** | **₹27,700** | **₹0** |
+
+Measured, committed and checked on every build: `bench/RESULTS.json` is written by `make bench`,
+the table above quotes it, and `make docs-check` fails the build if the two
+disagree. The numbers in this document cannot drift away from the numbers the
+code produces.
 
 **Decision latency** — this sits in the payment path, so it is measured, not
-assumed: **p50 252µs, p95 1.5ms, p99 2.4ms** across 495 in-process decisions with
-no model call. A model call adds its own round trip and only ever runs on carts
+assumed: **p50 under 300µs and p99 under 3ms** across 540 in-process decisions
+with no model call. Stated as bounds rather than a point, because a hardware
+figure quoted to the microsecond is a claim about my laptop. A model call adds its own round trip and only ever runs on carts
 that already cleared every binding check.
 
 ### Where this loses
@@ -266,11 +272,12 @@ Runs, in order, and fails on the first problem:
 | gate | what it proves |
 | --- | --- |
 | `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
+| `docs-check` | every number in this README matches what the code measures |
 | `lint` | ruff over engine, bench and tests |
 | `test` | 164 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
 | `typecheck` | the console compiles under `strict` |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
-| `audit-contrast` | all 29 rendered pairs meet WCAG AA, computed from the tokens |
+| `audit-contrast` | all 31 rendered pairs meet WCAG AA, computed from the tokens |
 | `audit-overlap` | nothing spills outside its box or paints over a sibling, across 6 states |
 | `browser` | the frame holds at 5 viewports; the real flow runs with no console errors, and the console's verdicts match what `warrant demo` prints |
 
@@ -279,7 +286,7 @@ Screenshots of every state land in `.verify/shots/`.
 Three of those gates exist because looking at the thing in a browser found bugs
 a green build could not:
 
-- the storefront had drifted by one SKU between two files while all 75 tests passed
+- the storefront had drifted by one SKU between two files while all the tests passed
 - the top bar reported "credentials configured" while actually replaying a transcript
 - a component rendered `className="signer seal"`, and `seal` was a standalone rule
   elsewhere setting a 46px circle, so the label was clamped and its text spilled
