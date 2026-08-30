@@ -110,12 +110,22 @@ and the rest as evidence the rules are wired up, not that the approach is smart.
 
 ### Known limitations, stated plainly
 
-**Categories come from the merchant's own catalog, and we do not verify them.**
-This is the load-bearing weakness. A merchant with sloppy tagging degrades the
-gate by accident; one that tags everything `food_beverage` defeats it on purpose.
-The fix is to take the category from the rail's merchant category code rather
-than the item metadata — which requires rail-side data this layer does not have
-merchant-side. It is a real hole and it is not closed.
+**Categories come from the merchant's own catalog. Half of that hole is now
+closed, and it is worth being exact about which half.**
+
+Card networks solved the first half decades ago: an acquirer assigns a merchant a
+**category code** at onboarding, and the merchant does not pick it. Razorpay does
+this today — it is the MCC on every account it underwrites. `merchants.py` holds
+that registry and `merchant.mcc_scope` is a binding rule, so a merchant cannot
+serve a mandate scoped to a category its acquirer never underwrote it for. An
+unregistered merchant fails closed: nothing is backed, rather than anything being
+allowed.
+
+What stays open is a merchant mislabelling *within* its own category. Zomato is
+MCC 5812; a power bank listed there as `food_beverage` still passes. Catching that
+needs the item actually purchased, which no metadata layer can see — it needs the
+rail. `test_the_known_gap_is_documented_by_a_test` asserts the gap so nobody later
+mistakes the MCC rule for a complete fix.
 
 **The heuristic that catches `injection_blunt` is shallow and beatable.** That is
 the point of `injection_subtle` scoring zero next to it. The heuristic is an

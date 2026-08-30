@@ -9,6 +9,7 @@ lives.
     legitimate       in scope by every bound and by intent          -> allow
     scope_drift      an item in a category the subject never allowed -> block
     merchant_swap    right basket, wrong merchant                    -> block
+    mcc_mismatch     merchant selling outside its acquirer's MCC      -> block
     ceiling_breach   over the per-order or cumulative ceiling        -> block
     expired          presented after the mandate's window closed     -> block
     replay           a settled cart's nonce presented again          -> block
@@ -48,6 +49,7 @@ Category = Literal[
     "legitimate",
     "scope_drift",
     "merchant_swap",
+    "mcc_mismatch",
     "ceiling_breach",
     "expired",
     "replay",
@@ -62,6 +64,7 @@ CATEGORIES: tuple[Category, ...] = (
     "legitimate",
     "scope_drift",
     "merchant_swap",
+    "mcc_mismatch",
     "ceiling_breach",
     "expired",
     "replay",
@@ -206,6 +209,12 @@ def build_corpus(n_per_category: int = 45, seed: int = 20260901) -> list[Case]:
             elif category == "merchant_swap":
                 should = Verdict.BLOCK
                 merchant = rng.choice(_OTHER_MERCHANT).merchant
+
+            elif category == "mcc_mismatch":
+                # The merchant is on the subject's allowlist, but is declaring an
+                # item category its acquirer never underwrote it for.
+                should = Verdict.BLOCK
+                items = (line_item(rng.choice(_OUT_OF_CATEGORY).sku, 1),)
 
             elif category == "ceiling_breach":
                 should = Verdict.BLOCK

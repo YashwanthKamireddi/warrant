@@ -277,3 +277,63 @@ def test_evaluation_is_a_pure_function_of_its_inputs(
     first = _run(intent, cart, state, user_key)
     second = _run(intent, cart, state, user_key)
     assert first == second
+
+
+# -- the merchant does not write its own category ------------------------- #
+
+
+def test_categories_are_checked_against_the_acquirers_assigned_mcc(
+    intent, make_cart, state, user_key
+):
+    """Zomato is MCC 5812. It cannot serve electronics however it tags them."""
+    smuggled = LineItem(
+        sku="pb", name="Power Bank", category="electronics", qty=1, unit_paise=1_000
+    )
+    decision = _run(intent, make_cart((smuggled,)), state, user_key)
+    assert decision.verdict is Verdict.BLOCK
+    assert _rule(decision, "merchant.mcc_scope").status == "fail"
+
+
+def test_an_unregistered_merchant_fails_closed(intent, make_cart, state, user_key, chai):
+    # No acquirer record means nothing is backed, not that anything is allowed.
+    decision = _run(intent, make_cart((chai,), merchant="unknown-shop"), state, user_key)
+    assert decision.verdict is Verdict.BLOCK
+    assert _rule(decision, "merchant.mcc_scope").status == "fail"
+    assert "not a registered merchant" in _rule(decision, "merchant.mcc_scope").detail
+
+
+def test_a_registered_merchant_selling_within_its_mcc_passes_the_check(
+    intent, make_cart, state, user_key, chai
+):
+    decision = _run(intent, make_cart((chai,)), state, user_key)
+    assert _rule(decision, "merchant.mcc_scope").status == "pass"
+
+
+def test_mcc_is_checked_independently_of_the_subjects_own_allowlist(
+    intent, make_cart, state, user_key
+):
+    """Two separate questions: what may this merchant sell, and what did the
+    subject permit. Both must hold."""
+    cable = LineItem(
+        sku="c", name="USB-C Cable", category="electronics", qty=1, unit_paise=1_000
+    )
+    decision = _run(intent, make_cart((cable,), merchant="amazon"), state, user_key)
+    # Amazon's MCC does cover electronics, so that check passes...
+    assert _rule(decision, "merchant.mcc_scope").status == "pass"
+    # ...and the subject still never authorised Amazon.
+    assert _rule(decision, "scope.merchant").status == "fail"
+    assert decision.verdict is Verdict.BLOCK
+
+
+def test_the_known_gap_is_documented_by_a_test(intent, make_cart, state, user_key):
+    """A merchant mislabelling *inside* its own category still passes.
+
+    This is the limitation named in the README. It is asserted here so that if
+    someone later believes the MCC check closed it, this test says otherwise.
+    """
+    mislabelled = LineItem(
+        sku="pb", name="Power Bank", category="food_beverage", qty=1, unit_paise=1_000
+    )
+    decision = _run(intent, make_cart((mislabelled,)), state, user_key)
+    assert _rule(decision, "merchant.mcc_scope").status == "pass"
+    assert decision.verdict is Verdict.ALLOW

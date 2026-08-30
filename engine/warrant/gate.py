@@ -22,6 +22,7 @@ import re
 from dataclasses import dataclass, field
 
 from .crypto import VerifyKey
+from .merchants import REGISTRY, assigned_categories
 from .models import (
     CartMandate,
     Check,
@@ -182,6 +183,30 @@ def evaluate(
             limit=", ".join(scope.merchants),
         )
     )
+    # The merchant declares its own item categories, so before trusting them at
+    # all, check them against what the merchant's acquirer assigned it. A merchant
+    # does not write its own MCC.
+    record = REGISTRY.get(cart.merchant)
+    permitted_by_mcc = assigned_categories(cart.merchant)
+    unbacked = sorted(c for c in cart.categories if c not in permitted_by_mcc)
+    checks.append(
+        _check(
+            "merchant.mcc_scope",
+            not unbacked,
+            f"Every declared category is within MCC {record.mcc} "
+            f"({record.description})" if record else "",
+            (
+                f"{cart.merchant} is not a registered merchant, so no category it "
+                f"declares is backed by an acquirer"
+                if record is None
+                else f"Declared categories outside MCC {record.mcc} "
+                f"({record.description}): {', '.join(unbacked)}"
+            ),
+            observed=", ".join(sorted(cart.categories)),
+            limit=", ".join(sorted(permitted_by_mcc)) or "unregistered",
+        )
+    )
+
     offending = sorted(c for c in cart.categories if not scope.permits_category(c))
     checks.append(
         _check(
