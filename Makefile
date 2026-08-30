@@ -12,7 +12,7 @@ CONSOLE_PORT ?= 8787
 
 .DEFAULT_GOAL := help
 .PHONY: help install demo bench console serve test lint typecheck build \
-        audit-tokens audit-contrast audit-overlap browser verify clean open
+        audit-tokens audit-contrast audit-overlap browser verify clean open bench-live
 
 help:
 	@printf '\n  \033[1mWarrant\033[0m — authorization for agent-initiated payments\n\n'
@@ -28,8 +28,11 @@ install: ## install python deps, console deps and the browser driver
 demo: ## run the five-cart scenario in the terminal
 	uv run warrant demo
 
-bench: ## run the benchmark over 405 labelled sessions
+bench: ## run the benchmark, offline and deterministic
 	uv run python bench/run.py
+
+bench-live: ## run a small benchmark against a real model (costs API calls)
+	uv run python bench/run.py --live --per-category 5
 
 build: ## build the console
 	cd console && npm run build

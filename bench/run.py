@@ -12,8 +12,9 @@ basket inside every signed bound that is still not what was asked for -- is
 undetectable by arithmetic, and with no model reachable Warrant catches none of
 it. That row is printed in the same table as everything else.
 
-    uv run python bench/run.py
-    uv run python bench/run.py --json          machine-readable
+    uv run python bench/run.py                        offline, deterministic
+    uv run python bench/run.py --live --per-category 5   with a real model
+    uv run python bench/run.py --json                 machine-readable
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from dataclasses import dataclass, field
 
 sys.path.insert(0, os.path.dirname(__file__))
 
+from warrant import llm  # noqa: E402
 from warrant.crypto import SigningKey  # noqa: E402
 from warrant.gate import MandateState  # noqa: E402
 from warrant.llm import describe_capability  # noqa: E402
@@ -262,11 +264,37 @@ def report(results: dict[str, Tally], cases: list[Case]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--per-category", type=int, default=45)
+    parser.add_argument(
+        "--per-category",
+        type=int,
+        default=45,
+        help="cases per category (default 45). Lower this when running --live.",
+    )
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help=(
+            "call the model for real. Off by default: two policies consult the judge "
+            "on every case, so a full run is roughly 2x the corpus in API calls. "
+            "Pair with a small --per-category."
+        ),
+    )
     parser.add_argument("--json", action="store_true", help="emit machine-readable results")
     args = parser.parse_args()
 
     cases = build_corpus(n_per_category=args.per_category)
+
+    if not args.live:
+        # Default to no network. Once credentials exist, a bare `make bench` would
+        # otherwise fire roughly two model calls per case without being asked.
+        llm._live_client = lambda: None  # type: ignore[assignment]
+    else:
+        calls = len(cases) * 2
+        print(
+            f"\n  --live: about {calls} model calls across {len(cases)} cases.\n"
+            f"  Use --per-category to shrink this.\n"
+        )
+
     results = {name: run_policy(name, cases, None) for name in POLICIES}
 
     if args.json:
