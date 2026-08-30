@@ -307,6 +307,7 @@ console/         The control plane. A view onto the engine, never a second one.
 
 ---
 
+**[ARCHITECTURE.md](ARCHITECTURE.md)** — trust boundaries and the decision record.
 **[INCIDENTS.md](INCIDENTS.md)** — what broke, kept as it happened.
 
 Built for the Razorpay AI Buildathon, September 2026.
