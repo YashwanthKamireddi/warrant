@@ -18,7 +18,14 @@ dependencies = [
 warrant = "warrant.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "ruff>=0.8"]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+    # The browser gates are part of the build, so the browser driver is a
+    # declared dependency rather than something a reviewer has to already own.
+    "playwright>=1.48",
+]
 
 [build-system]
 requires = ["hatchling"]
