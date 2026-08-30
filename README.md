@@ -7,11 +7,17 @@ traces back to a scope a human signed — checked *before* settlement, provable
 *after* dispute.
 
 ```bash
-make install
-make demo      # the five-cart scenario, no API key, no network
-make bench     # 405 labelled sessions, four policies
+git clone … && cd warrant
+make demo      # the five-cart scenario. no API key, no network, no install step
+make bench     # 495 labelled sessions, four policies
 make console   # the control plane at http://127.0.0.1:8787
+make verify    # every gate, from a clean checkout
 ```
+
+`make demo` works on a bare clone — `uv` resolves the environment on first run.
+The console and browser targets install their own prerequisites, so there is no
+step to remember and no order to get right. Verified by cloning into a temp
+directory and running `make verify` cold.
 
 ---
 

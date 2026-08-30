@@ -12,7 +12,7 @@ CONSOLE_PORT ?= 8787
 
 .DEFAULT_GOAL := help
 .PHONY: help install demo bench console serve test lint typecheck build \
-        audit-secrets audit-tokens audit-contrast audit-overlap browser browser-razorpay verify clean open bench-live
+        audit-secrets audit-tokens audit-contrast audit-overlap browser browser-razorpay browsers verify clean open bench-live
 
 help:
 	@printf '\n  \033[1mWarrant\033[0m — authorization for agent-initiated payments\n\n'
@@ -20,10 +20,9 @@ help:
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 	@printf '\n'
 
-install: ## install python deps, console deps and the browser driver
+install: console/node_modules ## install python deps, console deps and the browser driver
 	uv sync
 	uv run playwright install chromium
-	cd console && npm install
 
 demo: ## run the five-cart scenario in the terminal
 	uv run warrant demo
@@ -35,7 +34,7 @@ bench-live: ## live-model run on only the categories a model can change (~30 cal
 	uv run python bench/run.py --live --per-category 5 \
 		--categories injection_subtle,semantic_drift,legitimate
 
-build: ## build the console
+build: console/node_modules ## build the console
 	cd console && npm run build
 
 console: build ## build the console and serve it at http://127.0.0.1:8787
@@ -65,7 +64,14 @@ test: ## run the python test suite
 lint: ## lint the python source
 	uv run ruff check engine bench tests
 
-typecheck: ## typecheck the console
+# A fresh clone has no node_modules, so every console target has to be able to
+# create it. `make verify` on a clean checkout failed at typecheck with exit 127
+# until this existed.
+console/node_modules: console/package-lock.json
+	cd console && npm ci --silent
+	@touch console/node_modules
+
+typecheck: console/node_modules ## typecheck the console
 	cd console && npm run typecheck
 
 audit-secrets: ## fail if any credential material is tracked or in history
@@ -106,7 +112,13 @@ _with-server:
 	done; \
 	uv run python $(SCRIPT) http://127.0.0.1:$(VERIFY_PORT)
 
-verify: audit-secrets lint test typecheck audit-tokens audit-contrast browser ## everything, in order
+# Chromium is a prerequisite of the browser gate, not a thing to remember.
+browsers:
+	@uv run python -c "import pathlib,sys; \
+		sys.exit(0 if any(pathlib.Path.home().joinpath('.cache/ms-playwright').glob('chromium*')) else 1)" \
+		|| uv run playwright install chromium
+
+verify: audit-secrets lint test typecheck audit-tokens audit-contrast browsers browser ## everything, in order
 	@printf '\n  \033[32mAll gates passed.\033[0m Screenshots in .verify/shots/\n\n'
 
 clean:
