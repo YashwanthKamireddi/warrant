@@ -66,7 +66,7 @@ export const api = {
     cosign: boolean,
     replayOf: number | null = null,
   ) =>
-    request<{ outcome: Outcome; scope: Scope; ledger: LedgerEntry[] }>(
+    request<{ outcome: Outcome; scope: Scope; ledger_added: LedgerEntry[] }>(
       `/sessions/${sessionId}/carts`,
       {
         method: "POST",
@@ -75,15 +75,16 @@ export const api = {
     ),
 
   settle: (sessionId: string) =>
-    request<{ settled: Outcome[]; scope: Scope; ledger: LedgerEntry[] }>(
+    request<{ settled: Outcome[]; scope: Scope; ledger_added: LedgerEntry[] }>(
       `/sessions/${sessionId}/settle`,
       { method: "POST" },
     ),
 
   revoke: (sessionId: string) =>
-    request<{ scope: Scope; ledger: LedgerEntry[] }>(`/sessions/${sessionId}/revoke`, {
-      method: "POST",
-    }),
+    request<{ scope: Scope; ledger_added: LedgerEntry[] }>(
+      `/sessions/${sessionId}/revoke`,
+      { method: "POST" },
+    ),
 
   chain: (sessionId: string) => request<ChainStatus>(`/sessions/${sessionId}/chain`),
 

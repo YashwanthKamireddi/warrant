@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 from .authorize import Authorizer, PendingIntent
 from .catalog import PRODUCTS, by_sku
 from .chain import EventKind, Ledger
-from .crypto import Signature, SigningKey
+from .crypto import SigningKey
 from .demo import STEPS, UTTERANCE, build_scenario
 from .evidence import assemble_evidence
 from .interop import to_ap2_chain
@@ -112,6 +112,14 @@ class Session:
     authorizer: Authorizer
     subject_key: SigningKey
     rail_kind: str = "simulated"
+    documents: list[tuple[CartMandate, DebitReceipt | None]] = field(default_factory=list)
+    """The signed documents behind each outcome.
+
+    Kept here rather than serialised into every response: the AP2 export needs the
+    real objects, and shipping a second copy of each cart to the browser added
+    several kilobytes per request for something the browser never reads.
+    """
+
     intent: IntentMandate | None = None
     pending: PendingIntent | None = None
     clock: int = 0
@@ -124,7 +132,26 @@ class Session:
         return self.clock
 
 
+MAX_SESSIONS = 64
+"""Demo sessions are held in memory, each owning a SQLite ledger. Without a
+bound they accumulate for the lifetime of the process -- fine for a five-minute
+demo, a leak in anything left running. Oldest out first; insertion order is
+creation order, which is what a dict already gives us."""
+
 SESSIONS: dict[str, Session] = {}
+
+
+def _remember(session: Session) -> None:
+    """Store a session, evicting the oldest once the cap is reached.
+
+    Dict insertion order is creation order, so the first key is the oldest. The
+    evicted session's ledger is closed rather than dropped, because it owns a
+    SQLite connection.
+    """
+    SESSIONS[session.id] = session
+    while len(SESSIONS) > MAX_SESSIONS:
+        oldest = next(iter(SESSIONS))
+        SESSIONS.pop(oldest).authorizer.ledger.close()
 
 
 def _session(session_id: str) -> Session:
@@ -199,7 +226,6 @@ def _scope_json(intent: IntentMandate, session: Session) -> dict[str, Any]:
 
 def _outcome_json(outcome, step_label: str | None = None) -> dict[str, Any]:
     return {
-        "cart_body": outcome.cart.body(),
         "cart": {
             "id": outcome.cart.id,
             "digest": outcome.cart.digest,
@@ -229,7 +255,16 @@ def _outcome_json(outcome, step_label: str | None = None) -> dict[str, Any]:
     }
 
 
-def _ledger_json(session: Session) -> list[dict[str, Any]]:
+def _ledger_json(session: Session, *, since: int = 0) -> list[dict[str, Any]]:
+    """Serialise ledger entries, optionally only those after ``since``.
+
+    Write endpoints return just what they added. Returning the whole ledger on
+    every write made each response carry a full copy of every prior decision --
+    a single cart_allowed entry is over 3KB because it embeds the cart envelope
+    and all sixteen checks -- so a five-basket session was re-sending tens of
+    kilobytes the client already had. The full ledger is available from its own
+    endpoint for a first load or a refresh.
+    """
     if session.intent is None:
         return []
     sid = session.authorizer.session_for(session.intent)
@@ -243,6 +278,7 @@ def _ledger_json(session: Session) -> list[dict[str, Any]]:
             "payload": e.payload,
         }
         for e in session.authorizer.ledger.entries(sid)
+        if e.seq > since
     ]
 
 
@@ -304,7 +340,7 @@ def start_session(body: StartRequest) -> dict[str, Any]:
     session.pending = session.authorizer.prepare_intent(
         body.utterance, subject="user_priya", agent="agent_claude", now=session.clock
     )
-    SESSIONS[session_id] = session
+    _remember(session)
 
     return {
         "session_id": session_id,
@@ -381,6 +417,8 @@ def submit_cart(session_id: str, body: CartRequest) -> dict[str, Any]:
             )
         )
 
+    before = session.authorizer.ledger.length
+
     if body.replay_of is not None:
         if body.replay_of > len(session.nonces):
             raise HTTPException(
@@ -413,6 +451,7 @@ def submit_cart(session_id: str, body: CartRequest) -> dict[str, Any]:
 
     payload = _outcome_json(outcome)
     payload["elapsed_us"] = round(elapsed_us, 1)
+    session.documents.append((outcome.cart, outcome.receipt))
     # The rail is a network call on the Razorpay path and would swamp the number
     # people actually want, which is what the gate itself costs.
     payload["rail_kind"] = session.rail_kind
@@ -421,7 +460,7 @@ def submit_cart(session_id: str, body: CartRequest) -> dict[str, Any]:
     return {
         "outcome": payload,
         "scope": _scope_json(session.intent, session),
-        "ledger": _ledger_json(session),
+        "ledger_added": _ledger_json(session, since=before),
     }
 
 
@@ -437,16 +476,18 @@ def settle(session_id: str) -> dict[str, Any]:
     if session.intent is None:
         raise HTTPException(status_code=409, detail="no intent in this session")
 
+    before = session.authorizer.ledger.length
     finished = session.authorizer.settle_pending(session.intent, now=session.tick())
     for outcome in finished:
         payload = _outcome_json(outcome)
         payload["label"] = "Settled asynchronously after the customer authorised."
         session.outcomes.append(payload)
+        session.documents.append((outcome.cart, outcome.receipt))
 
     return {
         "settled": [_outcome_json(o) for o in finished],
         "scope": _scope_json(session.intent, session),
-        "ledger": _ledger_json(session),
+        "ledger_added": _ledger_json(session, since=before),
     }
 
 
@@ -456,10 +497,14 @@ def revoke(session_id: str) -> dict[str, Any]:
     session = _session(session_id)
     if session.intent is None:
         raise HTTPException(status_code=409, detail="nothing to revoke")
+    before = session.authorizer.ledger.length
     session.authorizer.revoke(
         session.intent, now=session.tick(), reason="subject revoked from the console"
     )
-    return {"scope": _scope_json(session.intent, session), "ledger": _ledger_json(session)}
+    return {
+        "scope": _scope_json(session.intent, session),
+        "ledger_added": _ledger_json(session, since=before),
+    }
 
 
 @app.get("/api/sessions/{session_id}")
@@ -483,6 +528,13 @@ def _chain_status(session: Session) -> dict[str, Any]:
         "head": session.authorizer.ledger.head,
         "break": audit.model_dump(mode="json") if audit else None,
     }
+
+
+@app.get("/api/sessions/{session_id}/ledger")
+def ledger(session_id: str) -> dict[str, Any]:
+    """The full ledger, for a first load or a refresh."""
+    session = _session(session_id)
+    return {"ledger": _ledger_json(session)}
 
 
 @app.get("/api/sessions/{session_id}/chain")
@@ -538,32 +590,20 @@ def ap2_chain(session_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=409, detail="no intent in this session")
 
     settled = next(
-        (o for o in reversed(session.outcomes) if o.get("receipt")), None
+        ((c, r) for c, r in reversed(session.documents) if r is not None), None
     )
-    last = session.outcomes[-1] if session.outcomes else None
-    source = settled or last
+    latest = session.documents[-1] if session.documents else None
+    source = settled or latest
 
     cart = receipt = None
     decision = None
     if source is not None:
-        # Rebuild from the signed body and re-attach the signature. Signatures are
-        # excluded from body(), so validating the body alone produces a document
-        # that reports itself unsigned -- which would understate the integrity of
-        # the very thing this export exists to demonstrate.
-        cart = CartMandate.model_validate(source["cart_body"])
-        if source["cart"].get("signature"):
-            cart = cart.model_copy(
-                update={"signature": Signature.from_dict(source["cart"]["signature"])}
-            )
-        decision = {"verdict": source["verdict"], "checks": source["checks"]}
-        if source.get("receipt"):
-            receipt = DebitReceipt.model_validate(source["receipt"]["body"])
-            if source["receipt"].get("signature"):
-                receipt = receipt.model_copy(
-                    update={
-                        "signature": Signature.from_dict(source["receipt"]["signature"])
-                    }
-                )
+        cart, receipt = source
+        match = next(
+            (o for o in session.outcomes if o["cart"]["digest"] == cart.digest), None
+        )
+        if match is not None:
+            decision = {"verdict": match["verdict"], "checks": match["checks"]}
 
     return to_ap2_chain(
         session.intent,

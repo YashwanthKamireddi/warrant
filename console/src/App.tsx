@@ -132,7 +132,7 @@ export function App() {
       const result = await api.submitCart(sessionId, merchant, lines, cosign);
       setOutcomes((prev) => [...prev, result.outcome]);
       setScope(result.scope);
-      setLedger(result.ledger);
+      setLedger((prev) => [...prev, ...result.ledger_added]);
       setChain(await api.chain(sessionId));
       setQuantities({});
       setCosign(false);
@@ -158,7 +158,7 @@ export function App() {
           );
           setOutcomes((prev) => [...prev, { ...result.outcome, label: step.teaches }]);
           setScope(result.scope);
-          setLedger(result.ledger);
+          setLedger((prev) => [...prev, ...result.ledger_added]);
         } catch (e) {
           failures.push(`${step.label}: ${e instanceof Error ? e.message : String(e)}`);
         }
@@ -178,7 +178,7 @@ export function App() {
       if (result.settled.length > 0) {
         setOutcomes((prev) => [...prev, ...result.settled]);
         setScope(result.scope);
-        setLedger(result.ledger);
+        setLedger((prev) => [...prev, ...result.ledger_added]);
         setChain(await api.chain(sessionId));
         void refreshEvidence(sessionId);
         setTab("decisions");
@@ -201,7 +201,7 @@ export function App() {
       if (!sessionId) return;
       const result = await api.revoke(sessionId);
       setScope(result.scope);
-      setLedger(result.ledger);
+      setLedger((prev) => [...prev, ...result.ledger_added]);
       setChain(await api.chain(sessionId));
     });
 

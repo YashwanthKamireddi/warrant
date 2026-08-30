@@ -280,7 +280,7 @@ Runs, in order, and fails on the first problem:
 | `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
 | `docs-check` | every number in this README matches what the code measures |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 186 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
+| `test` | 198 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
 | `typecheck` | the console compiles under `strict` |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 31 rendered pairs meet WCAG AA, computed from the tokens |
