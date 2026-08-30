@@ -191,6 +191,31 @@ a user does not re-authenticate per purchase, and a chain demanding a user
 signature on every cart cannot express standing delegation at all. Above the
 threshold the two converge exactly.
 
+## What happens when this is unavailable
+
+A fair question about putting a gate in the payment path: fail open and it is
+decorative, fail closed and it is a single point of failure for a payments
+company.
+
+Warrant **fails closed** — no verdict, no debit — and that is safe because the
+binding path has **no external dependencies at all**. No network, no model, no
+database read, not even a clock it does not receive as an argument.
+`gate.evaluate()` is a pure function of `(intent, cart, state, now, key)`, so it
+cannot be down unless the merchant's own process is down, at which point there is
+no checkout to protect. It is designed to be embedded in-process, not called over
+a network.
+
+`tests/test_availability.py` holds that to account: it makes every socket call
+raise, then asserts verdicts still come back, every rule still fires, evaluation
+never mutates the state it is given, and the rail is never reached when no verdict
+exists.
+
+The model is advisory and degrades explicitly. The rail reports failures rather
+than raising them. The ledger is local and append-only. Nothing in the path that
+can say **no** depends on anything that can be unreachable.
+
+**Decision latency**: p50 252µs, p95 1.5ms, p99 2.4ms.
+
 ## Honest limits
 
 - **Disputes cannot be created through Razorpay's API** — they are bank-initiated.
@@ -234,8 +259,9 @@ Runs, in order, and fails on the first problem:
 
 | gate | what it proves |
 | --- | --- |
+| `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 155 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
+| `test` | 162 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
 | `typecheck` | the console compiles under `strict` |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 29 rendered pairs meet WCAG AA, computed from the tokens |

@@ -12,7 +12,7 @@ CONSOLE_PORT ?= 8787
 
 .DEFAULT_GOAL := help
 .PHONY: help install demo bench console serve test lint typecheck build \
-        audit-tokens audit-contrast audit-overlap browser browser-razorpay verify clean open bench-live
+        audit-secrets audit-tokens audit-contrast audit-overlap browser browser-razorpay verify clean open bench-live
 
 help:
 	@printf '\n  \033[1mWarrant\033[0m — authorization for agent-initiated payments\n\n'
@@ -68,6 +68,9 @@ lint: ## lint the python source
 typecheck: ## typecheck the console
 	cd console && npm run typecheck
 
+audit-secrets: ## fail if any credential material is tracked or in history
+	uv run python .verify/audit_secrets.py
+
 audit-tokens: ## fail on any colour outside the token system
 	uv run python .verify/audit_tokens.py
 
@@ -103,7 +106,7 @@ _with-server:
 	done; \
 	uv run python $(SCRIPT) http://127.0.0.1:$(VERIFY_PORT)
 
-verify: lint test typecheck audit-tokens audit-contrast browser ## everything, in order
+verify: audit-secrets lint test typecheck audit-tokens audit-contrast browser ## everything, in order
 	@printf '\n  \033[32mAll gates passed.\033[0m Screenshots in .verify/shots/\n\n'
 
 clean:
