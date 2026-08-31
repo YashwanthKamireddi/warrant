@@ -11,3 +11,6 @@ dist/
 out/
 
 shots/
+
+# Private strategy notes — never committed. Judges read this repo.
+notes/

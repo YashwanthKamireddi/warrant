@@ -1,97 +1,122 @@
+<div align="center">
+
 # Warrant
 
-**No agent spends without one.**
+### No agent spends without one.
 
-An authorization layer for agent-initiated payments. Every rupee an agent spends
-traces back to a scope a human signed — checked *before* settlement, provable
-*after* dispute.
+**An authorization layer for agent-initiated payments.**
+Every rupee an agent spends traces back to a scope a human signed —
+checked *before* settlement, provable *after* dispute.
 
-```bash
-git clone … && cd warrant
-make demo      # the five-cart scenario. no API key, no network, no install step
-make bench     # 540 labelled sessions, four policies
-make console   # the control plane at http://127.0.0.1:8787
-make verify    # every gate, from a clean checkout
-```
+<br>
 
-`make demo` works on a bare clone — `uv` resolves the environment on first run.
-The console and browser targets install their own prerequisites, so there is no
-step to remember and no order to get right. Verified by cloning into a temp
-directory and running `make verify` cold.
+[![tests](https://img.shields.io/badge/tests-211%20passing-0b6e54?style=flat-square)](#verifying-it)
+[![gates](https://img.shields.io/badge/gates-8%20green-0b6e54?style=flat-square)](#verifying-it)
+[![latency](https://img.shields.io/badge/p50-under%20300µs-16264f?style=flat-square)](#results)
+[![rail](https://img.shields.io/badge/rail-Razorpay%20test%20mode-16264f?style=flat-square)](#the-real-rail)
+[![python](https://img.shields.io/badge/python-3.12+-16264f?style=flat-square)](pyproject.toml)
+
+<br>
+
+*Built for the Razorpay AI Buildathon · Track 01, AI Growth & Agentic Commerce*
+
+</div>
 
 ---
 
 ## The problem
 
-Since February 2026, Razorpay and NPCI have run agentic UPI payments in
-production on Claude, with Zomato, Swiggy and Zepto. They use **UPI Reserve Pay**:
-the customer blocks funds once, and the agent debits against that block
-repeatedly with no further PIN.
+Since **February 2026**, Razorpay and NPCI have run agentic UPI payments in
+production on Claude — with Zomato, Swiggy and Zepto. They use **UPI Reserve Pay**:
+the customer blocks funds once, and the agent then debits against that block
+repeatedly **with no further PIN**.
 
 That leaves two holes, and both are open today.
 
-**Nothing checks the debit against the intent before the money moves.** The
-customer said "order chai and samosas for my team, under ₹1,000". The block is
-authorized. What stops a ₹499 charge for something nobody asked for?
+> **Nothing checks the debit against the intent before the money moves.**
+> The customer said *"chai and samosas for my team, under ₹1,000."* The block is
+> authorized. What stops a ₹499 charge for something nobody asked for?
 
-**When the dispute lands, the merchant has no evidence.** An agent-initiated
-payment has no device fingerprint, no browsing session, no click. Chargeback
-reason codes have no category for *correctly authorized agent, wrong outcome*.
-The merchant eats it.
+> **When the dispute lands, the merchant has no evidence.**
+> An agent-initiated payment has no device fingerprint, no browsing session, no
+> click. Chargeback reason codes have no category for *correctly authorized agent,
+> wrong outcome*. The merchant eats it.
 
-Warrant closes both with the same object: a signed chain from the words a person
-said to the rupee that moved.
+Warrant closes both with one object: **a signed chain from the words a person said
+to the rupee that moved.**
+
+<br>
+
+<div align="center">
+<img src="docs/screenshots/02-decisions.png" alt="Five baskets checked against a signed permission" width="100%">
+<br><em>Five baskets, one signed permission. Every verdict names the rule that produced it.</em>
+</div>
+
+---
+
+## How it works
 
 ```
-IntentMandate    signed by the USER's device key
-    │            "spend up to ₹1,000 at Zomato on food, for 2 hours"
+IntentMandate    signed by the PERSON's device key
+    │            "up to ₹1,000 at Zomato on food, for 2 hours"
     ▼
-CartMandate      signed by the AUTHORIZER
+CartMandate      signed by the AUTHORISER
     │            "I checked this basket against that intent. It fits."
     ▼
-DebitReceipt     signed by the AUTHORIZER
-                 "this payment settled that cart under that intent"
+DebitReceipt     signed by the AUTHORISER
+                 "this rail payment settled that cart under that intent"
 ```
 
-Only the human's key can *widen* what may be spent, so the authorizer cannot
-produce a chain that verifies as in-scope for a purchase nobody permitted.
+Each document binds to the one above it by **content address** — `im_a3f2…` *is*
+the first 16 hex of the intent's digest, so an id cannot be forged or reassigned.
 
-**Being precise about what that buys, because the tempting claim is wrong:** a
-compromised authorizer can still skip its own gate and call the rail directly.
-The rail enforces the blocked *amount*, not the category allowlist, so it could
-spend the remaining block on anything. The chain does not prevent that — it makes
-it provable afterwards, because the receipt names a cart, the cart names an
+**Only the person's key can widen what may be spent.** The authoriser can attest
+that something already permitted was checked; it cannot grant authority it was
+never given.
+
+<details>
+<summary><b>Being precise about what that buys — because the tempting claim is wrong</b></summary>
+
+<br>
+
+A compromised authoriser **can** still skip its own gate and call the rail. The
+rail enforces the blocked *amount*, not the category allowlist, so it could spend
+the remaining block on anything. The chain does not prevent that — it makes it
+**provable afterwards**, because the receipt names a cart, the cart names an
 intent, and anyone with the subject's public key can see the purchase fell
-outside what was signed. **Detection with attribution, not prevention.**
+outside what was signed.
+
+**Detection with attribution, not prevention.**
 
 Preventing it outright needs the *rail* to enforce scope, not just an amount —
-which is the layer NPCI's UAP is being designed to occupy. This is what that
-layer has to do; it runs merchant-side today because that is where it can run.
+which is the layer NPCI's UAP is being designed to occupy. This is what that layer
+has to do; it runs merchant-side today because that is where it can run.
+
+</details>
 
 ---
 
 ## Results
 
-540 labelled sessions, four policies, one seed. `make bench` reproduces this
+**540 labelled sessions, four policies, one seed.** `make bench` reproduces this
 exactly on any machine.
 
 | policy | violations caught | leaked | legitimate spend blocked |
-| --- | --- | --- | --- |
+| :--- | ---: | ---: | ---: |
 | `no_gate` — today's default | 0.0% | ₹281,635 | ₹0 |
 | `amount_only` — a ceiling and nothing else | 14.3% | ₹154,081 | ₹0 |
 | `model_only` — ask a model if the basket looks right | 1.4% | ₹278,142 | ₹0 |
 | **`warrant`** | **81.8%** | **₹27,700** | **₹0** |
 
-Measured, committed and checked on every build: `bench/RESULTS.json` is written by `make bench`,
-the table above quotes it, and `make docs-check` fails the build if the two
-disagree. The numbers in this document cannot drift away from the numbers the
-code produces.
+Measured, committed and checked on every build: `bench/RESULTS.json` is written by
+`make bench`, the table above quotes it, and **`make docs-check` fails the build if
+the two disagree.** The numbers in this document cannot drift away from the numbers
+the code produces.
 
 **Decision latency** — this sits in the payment path, so it is measured, not
-assumed: **p50 under 300µs and p99 under 3ms** across 540 in-process decisions
-with no model call. Stated as bounds rather than a point, because a hardware
-figure quoted to the microsecond is a claim about my laptop. A model call adds its own round trip and only ever runs on carts
-that already cleared every binding check.
+assumed: **p50 under 300µs and p99 under 3ms** across 540 in-process decisions with
+no model call. Stated as bounds rather than a point, because a hardware figure
+quoted to the microsecond is a claim about my laptop.
 
 ### Where this loses
 
@@ -99,81 +124,86 @@ Every number above is measured on data this repository generates. Discount it
 accordingly — and here is exactly where.
 
 **`injection_subtle`: 0 of 45. `semantic_drift`: 0 of 45.** Both sit inside every
-bound the subject signed — right merchant, right category, under every ceiling —
-so no arithmetic touches them, and the payload in `injection_subtle` is phrased to
+bound the subject signed — right merchant, right category, under every ceiling — so
+no arithmetic touches them, and the payload in `injection_subtle` is phrased to
 evade the instruction-text heuristic. Only reading the basket against the
-instruction catches either, and no model was reachable on this run. **These two
-rows are the only ones a live model moves.** Every other row is arithmetic.
+instruction catches either, and **no model was reachable on this run**. These two
+rows are the only ones a live model moves. Every other row is arithmetic.
 
-**`injection_oos` is scored separately on purpose.** Those payloads are blocked,
-but on the *category* bound — nothing recognised the payload. Folding them into an
-"injection caught" figure would be the flattering way to report this, and it is
-how most demos of this kind are reported.
+**`injection_oos` is scored separately on purpose.** Those payloads are blocked, but
+on the *category* bound — nothing recognised the payload. Folding them into an
+"injection caught" figure would be the flattering way to report this, and it is how
+most demos of this kind are reported.
 
 **`legitimate 45/45` and `friction ₹0` are close to circular.** This corpus defines
 a legitimate basket as one inside the scope, and the policy allows baskets inside
-the scope. Read that row as evidence the gate is not over-firing, and nothing
-more. It is not evidence real customers would not be blocked, because no real
-customer generated it.
+the scope. Read that row as evidence the gate is not over-firing, and nothing more.
 
-**The mechanical categories are exact by construction, not by cleverness.** A
-ceiling comparison cannot be 97% right. Read `scope_drift`, `replay`, `expired`
-and the rest as evidence the rules are wired up, not that the approach is smart.
-
-### Known limitations, stated plainly
-
-**Categories come from the merchant's own catalog. Half of that hole is now
-closed, and it is worth being exact about which half.**
-
-Card networks solved the first half decades ago: an acquirer assigns a merchant a
-**category code** at onboarding, and the merchant does not pick it. Razorpay does
-this today — it is the MCC on every account it underwrites. `merchants.py` holds
-that registry and `merchant.mcc_scope` is a binding rule, so a merchant cannot
-serve a mandate scoped to a category its acquirer never underwrote it for. An
-unregistered merchant fails closed: nothing is backed, rather than anything being
-allowed.
-
-What stays open is a merchant mislabelling *within* its own category. Zomato is
-MCC 5812; a power bank listed there as `food_beverage` still passes. Catching that
-needs the item actually purchased, which no metadata layer can see — it needs the
-rail. `test_the_known_gap_is_documented_by_a_test` asserts the gap so nobody later
-mistakes the MCC rule for a complete fix.
-
-**The heuristic that catches `injection_blunt` is shallow and beatable.** That is
-the point of `injection_subtle` scoring zero next to it. The heuristic is an
-early-warning signal, never the defence; the defence is that nothing a model
-emits can widen a signed scope.
+**The mechanical categories are exact by construction, not by cleverness.** A ceiling
+comparison cannot be 97% right.
 
 ---
 
-## Where the model is, and where it isn't
+## Where the model runs — and where it deliberately doesn't
 
-Razorpay's brief asks for *the right tool in the right place, and where you chose
-not to use one*. Here is the boundary, exactly.
+Razorpay's brief asks for *the right tool in the right place, **and where you chose
+not to use one***. Here is the boundary, exactly.
 
-A model runs in **two** places:
+| | job | authority | on failure |
+| :--- | :--- | :--- | :--- |
+| `derive.py` | utterance → checkable scope | **proposes only** — a hard envelope clamps it, a human approves it in plain English, the person's key signs it | deterministic fallback, narrowed hard, labelled |
+| `divergence.py` | is this basket what was asked for? | **advisory only** — can raise ALLOW to ESCALATE, nothing else | no opinion, recorded as skipped |
 
-1. **Scope derivation** — turning "order chai for my team, under ₹1,000" into a
-   machine-checkable scope. Wrapped in four constraints: a closed category
-   taxonomy, a hard envelope it can only narrow, human approval in plain English,
-   and the user's key. `tests/test_derive.py` feeds the narrowing step the output
-   a hostile model would produce — 10⁹-paise ceilings, invented merchants,
-   wildcard allowlists, year-long expiries — and asserts none of it escapes.
+Everything else is arithmetic: signatures, ceilings, counts, expiry, replay, MCC,
+the block/allow decision, the ledger.
 
-2. **Semantic divergence** — does this basket plausibly fulfil that instruction?
-   `DivergenceFinding.as_check()` hard-codes `binding=False`, so a divergent
-   finding escalates to a human and a consistent one adds nothing. **If an
-   injected product name convinces this judge to say "consistent", the outcome is
-   byte-identical to the judge never running.** There is no prompt that makes it
-   grant authority, because it holds none.
+> **`DivergenceFinding.as_check()` hard-codes `binding=False`.**
+> If an injected product name convinces the judge to return `consistent`, the
+> outcome is **byte-identical to the judge never running**. There is no prompt that
+> makes it grant authority, because it holds none.
 
-Everything else is deterministic code: signatures, ceilings, counts, expiry,
-replay, the block/allow decision, the ledger. The gate runs **first and alone** —
-a cart that already failed a binding check never reaches a model at all.
+The gate runs **first and alone** — a cart that already failed a binding check never
+reaches a model at all. The demo shows it: the injected cart is refused with
+`model_used=False`. **It is blocked on the category bound, not on having spotted the
+payload.** Delete the injection heuristic entirely and it still fails.
 
-The demo shows this working. The injected cart is refused with
-`model_used=False`; it is blocked on the category bound, not on having spotted
-the payload. Delete the injection heuristic entirely and it still fails.
+---
+
+## The real rail
+
+`--rail razorpay` creates **real Orders and Payment Links** in your test account and
+refuses to start against any key not beginning `rzp_test_`.
+
+<div align="center">
+<img src="docs/screenshots/07-razorpay.png" alt="A real Razorpay order and payment link" width="100%">
+<br><em>A real order in Razorpay test mode, with a live payment link.</em>
+</div>
+
+<br>
+
+It reports `settled=false` until the rail confirms a capture, because **a script
+cannot fake a customer authorising on their own device** — and that property is
+exactly what makes the rail trustworthy.
+
+> It is also what found a **double-spend** the simulator had hidden for days.
+> Replay protection consumed a cart's nonce on *settlement*; a real rail settles
+> asynchronously, leaving a window where the same cart could be presented again and
+> again, placing an order every time. See [INCIDENTS.md](INCIDENTS.md) §7.
+
+---
+
+## The console
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/03-ledger.png" alt="Hash-chained ledger"><br><em><b>Ledger</b> — refusals are entries, not silences.</em></td>
+<td width="50%"><img src="docs/screenshots/05-tampered.png" alt="Tamper detection"><br><em><b>Tampered</b> — entry 5 onward orphaned, with both hashes named.</em></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/04-evidence.png" alt="Dispute evidence pack"><br><em><b>Dispute evidence</b> — mapped to Razorpay's real contest schema.</em></td>
+<td width="50%"><img src="docs/screenshots/06-ap2.png" alt="AP2 export"><br><em><b>AP2 export</b> — with the divergences carried inside the document.</em></td>
+</tr>
+</table>
 
 ---
 
@@ -183,103 +213,55 @@ The fair criticism is that Google's AP2 already defines a chained mandate model 
 Intent, Cart, Payment — with 60-plus partners, and NPCI's UAP will do agent
 authorisation at the network level. So why a merchant-side implementation?
 
-**Because those specify what the credential is, not who checks it.** AP2
-standardises a signed, chained, non-repudiable record of what a user authorised.
-It does not say which rules a merchant evaluates before settlement, what happens
-when a basket sits inside every stated bound and is still wrong, or how a refusal
-is recorded. That gap is the gate, the judge and the ledger here.
+> **Because those specify what the credential *is*, not who *checks* it.**
+
+AP2 standardises a signed, chained, non-repudiable record of what a user authorised.
+It does not say which rules a merchant evaluates before settlement, what happens when
+a basket sits inside every stated bound and is still wrong, or how a refusal is
+recorded. **That gap is the gate, the judge and the ledger here.**
 
 `GET /api/sessions/{id}/ap2` emits the chain in AP2's vocabulary inside a W3C
-Verifiable-Credentials envelope, and the console's **AP2 export** tab renders it next to the divergences. `tests/test_interop.py` reconstructs a verifier's
-job from the exported document alone — canonicalise, check the proof against the
-published key, follow the digests — and confirms it holds.
+Verifiable-Credentials envelope, and the console's **AP2 export** tab renders it next
+to the divergences. `tests/test_interop.py` reconstructs a verifier's job from the
+exported document alone — canonicalise, check the proof against the published key,
+follow the digests — and confirms it holds.
 
-**It is shape-compatible, not certified interop**, and the three places the models
+It is **shape-compatible, not certified interop**, and the three places the models
 genuinely differ travel *inside* the document under a `warrant:` namespace rather
-than being left for someone to discover. The one that matters: AP2 has the user
-sign every Cart Mandate; Warrant has the authoriser sign it and requires the
-user's co-signature only above a step-up threshold — because Reserve Pay exists so
-a user does not re-authenticate per purchase, and a chain demanding a user
-signature on every cart cannot express standing delegation at all. Above the
-threshold the two converge exactly.
+than being left for someone to discover.
 
-## What happens when this is unavailable
+---
 
-A fair question about putting a gate in the payment path: fail open and it is
-decorative, fail closed and it is a single point of failure for a payments
-company.
+## Run it
 
-Warrant **fails closed** — no verdict, no debit — and that is safe because the
-binding path has **no external dependencies at all**. No network, no model, no
-database read, not even a clock it does not receive as an argument.
-`gate.evaluate()` is a pure function of `(intent, cart, state, now, key)`, so it
-cannot be down unless the merchant's own process is down, at which point there is
-no checkout to protect. It is designed to be embedded in-process, not called over
-a network.
+```bash
+git clone https://github.com/YashwanthKamireddi/warrant && cd warrant
 
-`tests/test_availability.py` holds that to account: it makes every socket call
-raise, then asserts verdicts still come back, every rule still fires, evaluation
-never mutates the state it is given, and the rail is never reached when no verdict
-exists.
+make demo      # the five-cart scenario. no API key, no network, no install step
+make bench     # 540 labelled sessions, four policies
+make console   # the control plane at http://127.0.0.1:8787
+make verify    # every gate, from a clean checkout
+```
 
-The model is advisory and degrades explicitly. The rail reports failures rather
-than raising them. The ledger is local and append-only. Nothing in the path that
-can say **no** depends on anything that can be unreachable.
+`make demo` works on a bare clone — `uv` resolves the environment on first run. The
+console and browser targets install their own prerequisites, so there is no step to
+remember and no order to get right. Verified by cloning into a temp directory and
+running `make verify` cold.
 
-**Decision latency**: p50 252µs, p95 1.5ms, p99 2.4ms.
+<details>
+<summary><b>Optional: run against real Razorpay test mode</b></summary>
 
-## Honest limits
+<br>
 
-- **Disputes cannot be created through Razorpay's API** — they are bank-initiated.
-  The evidence pack is assembled and verified in full, and maps onto the real
-  contest schema, but submitting it needs a real dispute.
-- **A real rail settles asynchronously, and the loop closes.** Razorpay issues an
-  order and a payment link; the customer authorises on their own device minutes
-  later. `settle_pending()` polls for that capture and turns it into a signed
-  receipt and a settled ledger entry — reconstructing pending work from the ledger
-  rather than memory, so a restarted process still finishes what it started. In
-  the console it is **Check the rail for settlement**.
-- **Replay protection consumes a nonce at authorisation, not settlement.** A real
-  rail reports `settled=False` until the customer authorises on their own device,
-  so consuming the nonce on settlement leaves a window in which the same cart can
-  be presented repeatedly, placing an order each time. Found by running against
-  Razorpay test mode; the simulator settles synchronously and never showed it.
-- **Authorisation is serialised per mandate.** Checking a ceiling and then
-  spending against it is a read-modify-write. Six carts arriving together each
-  read a budget nobody had claimed, all passed a ₹100 ceiling and settled ₹360
-  between them. The lock is per intent digest, so one customer's mandate
-  serialises while every other proceeds in parallel.
-- **Ledger reads are serialised too.** A sqlite3 connection is not safe for
-  interleaved cursor use across threads. Locking only the writes left readers
-  walking a cursor while an append moved underneath them — entries came back
-  with a `None` kind rather than an error, which is the worst way for an audit
-  trail to be wrong. Reads materialise inside the lock before yielding.
-- **Appends are serialised.** Deriving the next sequence number and the previous
-  hash, then inserting, is a read-modify-write. Under eight concurrent writers
-  the ledger lost 251 of 320 entries and broke its own chain. Every append now
-  runs inside a `BEGIN IMMEDIATE` transaction behind a process lock, and
-  sequence numbers derive from `MAX(seq)` rather than a count, which would
-  silently reuse a number after any deletion.
-- **Writes are ordered write-ahead.** `cart_allowed` is recorded before the rail
-  is called, so a crash between the two leaves something for reconciliation to
-  find. `debit_settled` is recorded before the running totals move, because those
-  totals are rebuilt from the ledger — a counter ahead of the record would survive
-  as a permanent overspend allowance, whereas a counter behind it is corrected by
-  the next replay. Both orderings are asserted by tests that fail the write on
-  purpose.
-- **A payment cannot be completed server to server.** `--rail razorpay` creates
-  **real** Orders and Payment Links in your test account and refuses to start
-  against a non-test key, but reports `settled=False` until the rail confirms a
-  capture. A script cannot fake a customer authorising on their own device, and
-  that property is what makes the rail trustworthy. The console offers the same
-  choice, and `make browser-razorpay` asserts a real `order_…` id and an
-  `https://rzp.io/…` link come back — deliberately outside `make verify`, which
-  must pass for anyone who clones the repo without credentials.
-- **The bundled transcript is authored, not captured.** With no API key, scope
-  derivation replays it so `make demo` works offline. Every interpretation is
-  labelled with the path it actually took — `live`, `transcript` or `fallback` —
-  in the ledger, the CLI and the console. A replayed interpretation is never
-  presented as a live one.
+```bash
+cp .env.example .env      # add your rzp_test_ key id and secret
+uv run warrant demo --rail razorpay
+make browser-razorpay     # asserts a real order_… and an https://rzp.io/… link
+```
+
+The rail refuses any key not beginning `rzp_test_`, so it cannot touch live money.
+
+</details>
 
 ---
 
@@ -289,15 +271,15 @@ can say **no** depends on anything that can be unreachable.
 make verify
 ```
 
-Runs, in order, and fails on the first problem:
+Runs in order, and fails on the first problem:
 
 | gate | what it proves |
-| --- | --- |
+| :--- | :--- |
 | `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
-| `docs-check` | every number in this README matches what the code measures |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 211 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering |
+| `test` | 211 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering, concurrency |
 | `typecheck` | the console compiles under `strict` |
+| `docs-check` | every number in this README matches what the code measures |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 31 rendered pairs meet WCAG AA, computed from the tokens |
 | `audit-overlap` | nothing spills outside its box or paints over a sibling, across 6 states |
@@ -305,19 +287,59 @@ Runs, in order, and fails on the first problem:
 
 Screenshots of every state land in `.verify/shots/`.
 
-Three of those gates exist because looking at the thing in a browser found bugs
-a green build could not:
+<details>
+<summary><b>Why these gates exist — each traces to a real bug a green build did not catch</b></summary>
 
-- the storefront had drifted by one SKU between two files while all the tests passed
-- the top bar reported "credentials configured" while actually replaying a transcript
-- a component rendered `className="signer seal"`, and `seal` was a standalone rule
+<br>
+
+- **The storefront had drifted by one SKU** between two files while all 75 tests passed
+- **The top bar reported "credentials configured"** while actually replaying a transcript
+- **A component rendered `className="signer seal"`**, and `seal` was a standalone rule
   elsewhere setting a 46px circle, so the label was clamped and its text spilled
-  across the content beneath it
+- **Four numbers in this README had stopped being true** — a corpus described as 405
+  sessions that had grown to 540, a headline figure of 13.3% where the code measured 81.8%
+- **The ledger forked under concurrent writes** — 320 appends produced 69 entries
+- **Concurrent carts overspent a mandate** — six baskets settled ₹360 against a ₹100 ceiling
+- **A test that was flaky 3 runs in 5** turned out to be the bug, not the harness: ledger
+  reads were returning rows with a `None` kind while a writer moved underneath them
 
-The last one is why `audit-overlap` checks *content spilling out of its box*, not
-just sibling overlap — sibling-box overlap does not catch a cascade collision,
-which was verified by reintroducing the bug and watching the detector name it:
-`span.link-signer.seal spills 145x0px outside its box`.
+The last one is worth reading in full. The first detector written for the CSS
+collision *did not work* — sibling-box overlap cannot catch a cascade collision,
+because overflowing text does not change its element's bounding box. The check that
+does catch it is *content larger than its own box while overflow is visible*,
+confirmed by reintroducing the bug and watching the detector name it:
+
+```
+span.link-signer.seal spills 145x0px outside its box
+```
+
+**If you change a detector, prove it the same way — break the thing on purpose and
+check that it fails.**
+
+</details>
+
+---
+
+## Honest limits
+
+- **Categories come from the merchant's own catalog.** Half of that hole is closed:
+  an acquirer assigns a merchant its category code and the merchant does not pick it,
+  so `merchant.mcc_scope` is binding and an unregistered merchant fails closed. What
+  stays open is a merchant mislabelling *within* its own category — Zomato is MCC 5812,
+  and a power bank listed there as `food_beverage` still passes. Catching that needs
+  the item actually purchased, which no metadata layer can see.
+  `test_the_known_gap_is_documented_by_a_test` asserts the gap so nobody later mistakes
+  the MCC rule for a complete fix.
+- **No live model has run in this repository.** Scope derivation replays a bundled
+  transcript, and every interpretation is labelled with the path it actually took —
+  `live`, `transcript` or `fallback` — in the ledger, the CLI and the console. A
+  replayed interpretation is never presented as a live one. It is the reason
+  `injection_subtle` and `semantic_drift` both read zero.
+- **Disputes cannot be created through Razorpay's API** — they are bank-initiated. The
+  evidence pack is assembled and verified in full and maps onto the real contest schema,
+  but submitting it needs a real dispute.
+- **A payment cannot be completed server to server**, so the Razorpay rail reports
+  `settled=false` until it confirms a capture.
 
 ---
 
@@ -328,22 +350,29 @@ engine/warrant/
   canon.py       RFC 8785 subset. Rejects floats — money is integer paise.
   crypto.py      Ed25519 over canonical bytes. Seeded keys for reproducibility.
   models.py      Intent → Cart → Receipt, bound by content address.
+  merchants.py   Acquirer-assigned MCC registry.
   gate.py        The only layer that can block. Pure, replayable, no model.
-  derive.py      Utterance → scope, narrowed by a hard envelope.
+  derive.py      Utterance → scope, clamped by a hard envelope.
   divergence.py  The advisory judge. Can escalate; cannot authorise.
-  authorize.py   Orchestration. Gate first, model second, ledger always.
+  authorize.py   Orchestration. Write-ahead ordering, serialised per mandate.
   chain.py       Append-only hash chain. Refusals are entries, not silences.
-  evidence.py    The mandate chain as a dispute submission.
+  evidence.py    The chain as a Razorpay dispute submission.
+  interop.py     The chain in AP2 vocabulary, W3C-VC shaped.
   rails/         Razorpay test mode, and a deterministic simulator.
 bench/           The labelled corpus, the four policies, the harness.
 console/         The control plane. A view onto the engine, never a second one.
-.verify/         Token, contrast, layout and browser gates.
+.verify/         Secrets, tokens, contrast, overlap, layout and browser gates.
 ```
 
 ---
 
-**[SUBMISSION.md](SUBMISSION.md)** — the form answers and the video script.
-**[ARCHITECTURE.md](ARCHITECTURE.md)** — trust boundaries and the decision record.
-**[INCIDENTS.md](INCIDENTS.md)** — what broke, kept as it happened.
+<div align="center">
 
-Built for the Razorpay AI Buildathon, September 2026.
+**[ARCHITECTURE.md](ARCHITECTURE.md)** — trust boundaries and the decision record
+· **[INCIDENTS.md](INCIDENTS.md)** — what broke, kept as it happened
+
+<br>
+
+*Warrant. No agent spends without one.*
+
+</div>
