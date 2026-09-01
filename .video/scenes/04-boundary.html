@@ -1,0 +1,14 @@
+<link rel="stylesheet" href="_scene.css">
+<div class="stage">
+  <span class="eyebrow in d1">Where the model runs — and where it doesn't</span>
+  <h2 class="in d2">Two model calls.<br>Neither can grant authority.</h2>
+  <div class="facts in d3" style="margin-top:16px">
+    <div class="fact"><span class="mark ok">1</span><span class="body"><b>Scope derivation.</b> Proposes only. A hard envelope clamps it, a human approves it in plain English, the person's key signs it.</span></div>
+    <div class="fact"><span class="mark ok">2</span><span class="body"><b>Semantic divergence.</b> Advisory only — can raise ALLOW to ESCALATE, nothing else.</span></div>
+  </div>
+  <div class="term in d4" style="font-size:29px;margin-top:10px"><span class="dim"># divergence.py</span>
+def as_check(self) -> Check:
+    return Check(..., <span class="ok">binding=False</span>)
+<span class="dim">                        # hard-coded. never blocks. never approves.</span></div>
+  <p class="lead in d5" style="max-width:58ch;font-size:31px">If an injected product name convinces the judge to say <b>"consistent"</b>, the outcome is <b>byte-identical to the judge never running.</b></p>
+</div>

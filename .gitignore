@@ -14,3 +14,8 @@ shots/
 
 # Private strategy notes — never committed. Judges read this repo.
 notes/
+
+# Video: the scripts and narration are source, the footage is build output.
+.video/clips/
+.video/work/
+.video/out/
