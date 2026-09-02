@@ -286,7 +286,12 @@ def cmd_api(args: argparse.Namespace, out: TextIO) -> int:
     import uvicorn
 
     from .client import Warrant
+    from .observability import configure as configure_logging
     from .service import NO_AUTH, ApiKeyAuth, create_app
+
+    # A library must not configure the root logger; an application must. This
+    # is the application.
+    configure_logging(args.log_level)
 
     auth = NO_AUTH if args.open else ApiKeyAuth.from_env()
     if auth is None:
@@ -388,6 +393,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--open",
         action="store_true",
         help="run with no authentication at all; for a local look only",
+    )
+    api.add_argument(
+        "--log-level",
+        default="INFO",
+        help="structured JSON logs on stderr; WARRANT_LOG_LEVEL overrides",
     )
     api.set_defaults(func=cmd_api)
 

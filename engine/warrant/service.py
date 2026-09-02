@@ -29,18 +29,21 @@ a comment nobody reads.
 from __future__ import annotations
 
 import hmac
+import logging
 import os
+import time
 from collections import OrderedDict
 from collections.abc import Callable, Iterable
 from threading import Lock
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import __version__
 from .client import ItemLike, Permission, Warrant, WarrantDecision
 from .models import Scope, Verdict
+from .observability import bind_request, emit
 
 __all__ = [
     "NO_AUTH",
@@ -273,7 +276,38 @@ def warrant_router(
         )
     guard: list[Any] = [] if auth == NO_AUTH else [Depends(auth)]
 
-    router = APIRouter(prefix=prefix, tags=["warrant"])
+    async def traced(request: Request, response: Response):
+        """Tie every log line from one request together.
+
+        Async on purpose. FastAPI runs a *sync* generator dependency in a
+        threadpool, so its setup and teardown land in different contexts and
+        resetting the context variable raises "created in a different Context".
+        An async dependency runs both halves in the caller's context, which is
+        the only place the reset is meaningful anyway.
+
+        An id the caller already has -- from a gateway, a mesh, another
+        service -- is honoured rather than replaced, so a trace that started
+        upstream stays one trace. It is echoed back so the caller can quote it
+        when they ask what happened.
+        """
+        incoming = request.headers.get("x-request-id")
+        with bind_request(incoming) as request_id:
+            response.headers["x-request-id"] = request_id
+            started = time.perf_counter()
+            try:
+                yield request_id
+            finally:
+                emit(
+                    logging.INFO,
+                    "request",
+                    method=request.method,
+                    path=request.url.path,
+                    duration_ms=round((time.perf_counter() - started) * 1000, 2),
+                )
+
+    router = APIRouter(
+        prefix=prefix, tags=["warrant"], dependencies=[Depends(traced)]
+    )
     store = store or PermissionStore()
 
     @router.get("/health")

@@ -73,6 +73,7 @@ from .models import (
     Scope,
     Verdict,
 )
+from .observability import log_decision
 from .rails.base import Rail
 
 __all__ = ["Permission", "Warrant", "WarrantDecision"]
@@ -434,12 +435,24 @@ class Warrant:
         idempotency_key: str | None,
     ) -> WarrantDecision:
         cart = self._cart(permission, merchant, items, now, idempotency_key)
+        started = time.perf_counter()
         outcome = self._authorizer.authorize(
             permission.intent, cart,
             subject_key=permission.signer.public,
             now=now or int(time.time()),
         )
-        return WarrantDecision(decision=outcome.decision, cart=cart, outcome=outcome)
+        decision = WarrantDecision(decision=outcome.decision, cart=cart, outcome=outcome)
+        log_decision(
+            verdict=decision.verdict.value,
+            cart_digest=cart.digest,
+            intent_digest=permission.intent.digest,
+            merchant=merchant,
+            total_paise=cart.total_paise,
+            failed_rules=tuple(c.rule for c in outcome.decision.failures),
+            settled=decision.settled,
+            duration_ms=(time.perf_counter() - started) * 1000,
+        )
+        return decision
 
     # --------------------------------------------------------------- evidence
 
