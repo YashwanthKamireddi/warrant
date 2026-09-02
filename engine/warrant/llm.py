@@ -25,6 +25,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import time
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Literal
 
@@ -162,26 +164,79 @@ def structured_call(
     except Exception:  # noqa: BLE001
         providers = []
 
+    failures: list[str] = []
+
     for provider in providers:
         chosen = model_for(provider.name, model)
-        try:
-            parsed = provider.structured(
-                output_format=output_format,
-                system=system,
-                content=content,
-                model=chosen,
-                max_tokens=max_tokens,
-            )
-            if os.environ.get("WARRANT_RECORD") == "1":
-                _record(output_format, content, parsed, f"{provider.name}/{chosen}")
-            return parsed, "live"
-        except Exception:  # noqa: BLE001 - try the next provider, then the transcript
-            continue
+        for attempt in range(_ATTEMPTS):
+            try:
+                parsed = provider.structured(
+                    output_format=output_format,
+                    system=system,
+                    content=content,
+                    model=chosen,
+                    max_tokens=max_tokens,
+                )
+                if os.environ.get("WARRANT_RECORD") == "1":
+                    _record(output_format, content, parsed, f"{provider.name}/{chosen}")
+                return parsed, "live"
+            except Exception as exc:  # noqa: BLE001 - report, then try the next one
+                # A second call moments after the first is the *normal* shape of
+                # this system -- the agent is refused and immediately tries
+                # again -- and a free-tier provider answers the second one with
+                # 429. Falling straight through to a canned basket made the most
+                # interesting moment in the demo degrade every single time.
+                if _is_transient(exc) and attempt + 1 < _ATTEMPTS:
+                    time.sleep(_BACKOFF * (attempt + 1))
+                    continue
+                failures.append(f"{provider.name}: {_describe(exc)}")
+                break
+
+    _LAST_FAILURE.set(" · ".join(failures) if failures else "no provider configured")
 
     try:
         return TranscriptClient().fetch(output_format, content), "transcript"
     except (KeyError, ValueError):
         return None, "fallback"
+
+
+#: A provider that answers "not right now" deserves a second ask before the
+#: whole run degrades. Two attempts, briefly apart -- enough for a rate limit
+#: window, short enough that nobody watching notices.
+_ATTEMPTS = 2
+_BACKOFF = 1.2
+
+#: Why the last call fell back, for a caller that wants to say so accurately.
+#: Context-local, so two concurrent runs cannot report each other's reason.
+_LAST_FAILURE: ContextVar[str] = ContextVar("warrant_llm_failure", default="")
+
+
+def last_failure() -> str:
+    """A short, honest reason the most recent call did not reach a model."""
+    return _LAST_FAILURE.get()
+
+
+def _is_transient(exc: Exception) -> bool:
+    text = f"{type(exc).__name__} {exc}".lower()
+    return any(
+        marker in text
+        for marker in ("429", "too many requests", "rate limit", "timeout", "overloaded", "503")
+    )
+
+
+def _describe(exc: Exception) -> str:
+    """One clause a person can act on. Never the provider's whole traceback."""
+    text = str(exc)
+    lowered = text.lower()
+    if "429" in text or "too many requests" in lowered or "rate limit" in lowered:
+        return "rate limited"
+    if "401" in text or "unauthor" in lowered or "credential" in lowered or "api key" in lowered:
+        return "credentials rejected"
+    if "timeout" in lowered or "timed out" in lowered:
+        return "timed out"
+    if "503" in text or "overloaded" in lowered:
+        return "temporarily unavailable"
+    return type(exc).__name__
 
 
 def _record(

@@ -23,7 +23,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from .catalog import PRODUCTS, by_sku
-from .llm import Mode, structured_call
+from .llm import Mode, last_failure, structured_call
 from .models import LineItem
 
 __all__ = ["AgentBasket", "AgentPick", "shop"]
@@ -98,13 +98,21 @@ def _render_catalog(merchant: str) -> str:
     return "\n".join(rows)
 
 
-def _fallback(merchant: str) -> AgentBasket:
-    """No model reachable: order the two things the demo instruction names."""
+def _fallback(merchant: str, why: str = "") -> AgentBasket:
+    """No usable model reply: order the two things the demo instruction names.
+
+    ``why`` carries the actual reason. It used to say "no model was reachable"
+    unconditionally, which appeared directly beneath a turn stamped *live* with
+    a millisecond timing -- the run contradicting itself one line later, which
+    reads as broken rather than as degraded.
+    """
+    reason = why or last_failure() or "no model was reachable"
     return AgentBasket(
         picks=(AgentPick(sku="chai-6", qty=6), AgentPick(sku="samosa-2", qty=2)),
         reasoning=(
-            "No model was reachable, so this is a fixed basket rather than a choice. "
-            "Set a provider key to watch an agent decide for itself."
+            f"The model did not answer ({reason}), so this is a fixed basket "
+            "rather than a choice. Everything after this is still the real gate: "
+            "the basket is checked exactly as a chosen one would be."
         ),
         merchant=merchant,
         source="fallback",
@@ -156,7 +164,9 @@ def shop(
             continue  # a hallucinated sku is simply not orderable
         picks.append(pick)
     if not picks:
-        return _fallback(merchant)
+        # The model answered and named products this merchant does not sell.
+        # That is a different failure from an unreachable model and has to say so.
+        return _fallback(merchant, "it named products this merchant does not sell")
 
     return AgentBasket(
         picks=tuple(picks),
