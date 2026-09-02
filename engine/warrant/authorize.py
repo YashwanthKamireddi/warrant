@@ -37,6 +37,7 @@ counter behind it is corrected by the next rebuild.
 
 from __future__ import annotations
 
+import copy
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -48,6 +49,7 @@ from .crypto import SigningKey, VerifyKey
 from .derive import Envelope, ScopeProposal, derive_scope, narrow_to_envelope
 from .divergence import DivergenceFinding, judge_divergence
 from .gate import MandateState, evaluate
+from .merchants import MerchantRegistry, active_registry
 from .models import (
     CartMandate,
     Check,
@@ -116,6 +118,7 @@ class Authorizer:
     authorizer_key: SigningKey
     ledger: Ledger
     envelope: Envelope = field(default_factory=Envelope)
+    registry: MerchantRegistry = field(default_factory=active_registry)
     rail: Rail = field(default_factory=SimulatedRail)
     model_client: object | None = None
     _states: dict[str, MandateState] = field(default_factory=dict, init=False)
@@ -215,6 +218,29 @@ class Authorizer:
 
     # -- the decision ------------------------------------------------------- #
 
+    def preview(
+        self,
+        intent: IntentMandate,
+        cart: CartMandate,
+        *,
+        subject_key: VerifyKey,
+        now: int,
+        registry: MerchantRegistry | None = None,
+    ) -> Decision:
+        """What would happen, without any of it happening.
+
+        Evaluated against a deep copy of the live state, so previewing consumes
+        no budget, burns no nonce and spends no attempt. It is the same
+        :func:`~warrant.gate.evaluate` the real path calls -- a preview that ran
+        different code would be a preview of nothing.
+        """
+        with self._lock_for(intent):
+            state = copy.deepcopy(self.state_for(intent))
+        return evaluate(
+            intent, cart, state, now=now, subject_key=subject_key,
+            registry=registry if registry is not None else self.registry,
+        )
+
     def authorize(
         self,
         intent: IntentMandate,
@@ -254,7 +280,10 @@ class Authorizer:
             ).seq
         )
 
-        decision = evaluate(intent, cart, state, now=now, subject_key=subject_key)
+        decision = evaluate(
+            intent, cart, state, now=now, subject_key=subject_key,
+            registry=self.registry,
+        )
 
         # A cart that already failed a binding check is never shown to a model.
         if decision.verdict is not Verdict.BLOCK and not skip_semantic:

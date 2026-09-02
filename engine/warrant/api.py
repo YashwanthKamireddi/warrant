@@ -562,13 +562,11 @@ def compare(session_id: str, body: CompareRequest) -> dict[str, Any]:
 
     # Evaluated against a copy of the live state, so previewing never consumes
     # budget, a nonce, or an attempt from the real mandate.
-    state = copy.deepcopy(session.authorizer.state_for(session.intent))
-    decision = evaluate(
+    decision = session.authorizer.preview(
         session.intent,
         cart,
-        state,
-        now=session.clock,
         subject_key=session.subject_key.public,
+        now=session.clock,
     )
 
     failures = [c for c in decision.checks if c.status is CheckStatus.FAIL]
