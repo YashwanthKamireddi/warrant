@@ -455,8 +455,16 @@ def _in_scope_basket(roles: dict[str, Any], scope: Scope) -> list[dict[str, Any]
     """
     first = roles["in_scope"]
     second = roles.get("in_scope_second")
+
+    # Under the co-signature threshold, so the first basket is an unqualified
+    # allow -- and small enough that the step-up basket still fits under the
+    # *running total* afterwards. Sizing to the threshold alone left Rs 415 plus
+    # a Rs 649 platter at Rs 1,064 against a Rs 1,000 ceiling, so the step that
+    # exists to demonstrate escalation blocked on the budget instead.
     ceiling = scope.step_up_over_paise or scope.max_per_txn_paise
-    target = int(ceiling * 0.9)
+    over = roles.get("over_threshold")
+    headroom = scope.max_total_paise - (over.unit_paise if over else 0)
+    target = int(min(ceiling, max(headroom, ceiling // 4)) * 0.9)
 
     if second is None:
         qty = max(1, min(6, target // first.unit_paise))
@@ -466,7 +474,13 @@ def _in_scope_basket(roles: dict[str, Any], scope: Scope) -> list[dict[str, Any]
     # basket reads as "a lot of the cheap thing and a few of the other".
     first_qty = max(1, min(6, int(target * 0.65) // first.unit_paise))
     spent = first_qty * first.unit_paise
-    second_qty = max(1, min(4, (target - spent) // second.unit_paise))
+    second_qty = min(4, (target - spent) // second.unit_paise)
+    if second_qty < 1:
+        # No room for the second product. Forcing one in anyway pushed the
+        # basket past the target by exactly the price of the thing that did not
+        # fit, which is how a Rs 356 basket ended up Rs 5 over a Rs 1,000
+        # ceiling three steps later.
+        return [{"sku": first.sku, "qty": max(1, min(6, target // first.unit_paise))}]
     return [
         {"sku": first.sku, "qty": first_qty},
         {"sku": second.sku, "qty": second_qty},
