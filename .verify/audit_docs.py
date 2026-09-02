@@ -188,6 +188,33 @@ for doc_name, text in (("README.md", readme), ("ARCHITECTURE.md", ARCHITECTURE))
     else:
         print(f"  ok   modules listed in {doc_name:<18} all {len(shipped)}")
 
+# -- screenshots ------------------------------------------------------------- #
+#
+# They were captured once by hand and then left behind by four days of redesign,
+# so the README showed a console that no longer existed. A reader scrolling
+# GitHub saw a different product from the one they would get.
+
+SHOTS = ROOT / "docs" / "screenshots"
+CONSOLE_SRC = ROOT / "console" / "src"
+if SHOTS.is_dir() and CONSOLE_SRC.is_dir():
+    newest_source = max(
+        (path.stat().st_mtime for path in CONSOLE_SRC.rglob("*") if path.is_file()),
+        default=0,
+    )
+    stale = sorted(
+        path.name
+        for path in SHOTS.glob("*.png")
+        if path.stat().st_mtime < newest_source
+    )
+    if stale:
+        failures.append(
+            f"screenshots older than the console source: {', '.join(stale)} "
+            "-- run `make screenshots`"
+        )
+        print(f"  FAIL screenshots                    {len(stale)} stale")
+    else:
+        print(f"  ok   screenshots                    {len(list(SHOTS.glob('*.png')))} current")
+
 print()
 if failures:
     print(f"{len(failures)} documentation drift(s):")

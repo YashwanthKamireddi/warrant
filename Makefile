@@ -77,6 +77,9 @@ typecheck: console/node_modules ## typecheck the console
 audit-secrets: ## fail if any credential material is tracked or in history
 	uv run python .verify/audit_secrets.py
 
+screenshots: build ## recapture the screenshots the README embeds
+	@$(MAKE) --no-print-directory _with-server SCRIPT=.verify/shots.py
+
 docs-examples: ## fail if any code example in the documentation does not run
 	uv run python .verify/audit_examples.py
 

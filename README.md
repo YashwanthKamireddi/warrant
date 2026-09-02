@@ -48,6 +48,13 @@ to the rupee that moved.**
 <br>
 
 <div align="center">
+<img src="docs/screenshots/08-evidence-numbers.png" alt="422 of 540 got through with an amount ceiling alone; 90 with Warrant" width="100%">
+<br><em>Over <b>540 labelled cases</b>: an amount ceiling on its own lets 422 through. Warrant lets 90 — and has never once stopped a purchase the person authorised.</em>
+</div>
+
+<br>
+
+<div align="center">
 <img src="docs/screenshots/02-decisions.png" alt="Five baskets checked against a signed permission" width="100%">
 <br><em>Five baskets, one signed permission. Every verdict names the rule that produced it.</em>
 </div>
