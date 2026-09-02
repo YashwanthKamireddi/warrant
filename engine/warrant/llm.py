@@ -32,7 +32,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from .providers import Provider, model_for, resolve_provider, resolve_providers
+from .providers import Provider, alternatives, model_for, resolve_provider, resolve_providers
 
 __all__ = [
     "Capability",
@@ -167,30 +167,40 @@ def structured_call(
     failures: list[str] = []
 
     for provider in providers:
-        chosen = model_for(provider.name, model)
-        for attempt in range(_ATTEMPTS):
-            try:
-                parsed = provider.structured(
-                    output_format=output_format,
-                    system=system,
-                    content=content,
-                    model=chosen,
-                    max_tokens=max_tokens,
-                )
-                if os.environ.get("WARRANT_RECORD") == "1":
-                    _record(output_format, content, parsed, f"{provider.name}/{chosen}")
-                return parsed, "live"
-            except Exception as exc:  # noqa: BLE001 - report, then try the next one
-                # A second call moments after the first is the *normal* shape of
-                # this system -- the agent is refused and immediately tries
-                # again -- and a free-tier provider answers the second one with
-                # 429. Falling straight through to a canned basket made the most
-                # interesting moment in the demo degrade every single time.
-                if _is_transient(exc) and attempt + 1 < _ATTEMPTS:
-                    time.sleep(_BACKOFF * (attempt + 1))
-                    continue
-                failures.append(f"{provider.name}: {_describe(exc)}")
+        preferred = model_for(provider.name, model)
+        # The preferred model, then smaller ones. A daily token cap is per model
+        # and per organisation, so when the large model is exhausted a smaller
+        # one usually is not -- and a smaller model choosing is still a model
+        # choosing, which is the thing being demonstrated.
+        for chosen in (preferred, *alternatives(provider.name, preferred)):
+            failed: Exception | None = None
+            for attempt in range(_ATTEMPTS):
+                try:
+                    parsed = provider.structured(
+                        output_format=output_format,
+                        system=system,
+                        content=content,
+                        model=chosen,
+                        max_tokens=max_tokens,
+                    )
+                    if os.environ.get("WARRANT_RECORD") == "1":
+                        _record(output_format, content, parsed, f"{provider.name}/{chosen}")
+                    return parsed, "live"
+                except Exception as exc:  # noqa: BLE001 - report, then try the next
+                    # A second call moments after the first is the *normal* shape
+                    # of this system: the agent is refused and immediately tries
+                    # again, and a free tier answers the second one with 429.
+                    failed = exc
+                    if _is_transient(exc) and attempt + 1 < _ATTEMPTS:
+                        time.sleep(_BACKOFF * (attempt + 1))
+                        continue
+                    break
+            if failed is not None and not _is_transient(failed):
+                # Wrong credentials will not be fixed by a smaller model.
+                failures.append(f"{provider.name}: {_describe(failed)}")
                 break
+            if failed is not None:
+                failures.append(f"{provider.name}/{chosen}: {_describe(failed)}")
 
     _LAST_FAILURE.set(" · ".join(failures) if failures else "no provider configured")
 

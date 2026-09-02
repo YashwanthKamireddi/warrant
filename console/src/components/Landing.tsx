@@ -117,15 +117,15 @@ export function Landing({ onEnter }: { onEnter: () => void }) {
         <div className="lp-scores">
           <div className="lp-score" data-reveal>
             <span className="lp-score-label">An amount ceiling, alone</span>
-            <span className="lp-score-n bad">422</span>
+            <span className="lp-score-n bad">416</span>
             <span className="lp-score-of">of 540 got through</span>
-            <span className="lp-score-money">₹1,55,923 spent outside what was agreed</span>
+            <span className="lp-score-money">₹1,69,825 spent outside what was agreed</span>
           </div>
           <div className="lp-score" data-reveal>
             <span className="lp-score-label">With Warrant in front</span>
             <span className="lp-score-n good">90</span>
             <span className="lp-score-of">of 540 got through</span>
-            <span className="lp-score-money">₹27,280, and not one wrongful refusal</span>
+            <span className="lp-score-money">₹30,208, and not one wrongful refusal</span>
           </div>
         </div>
         <p className="lp-note" data-reveal>

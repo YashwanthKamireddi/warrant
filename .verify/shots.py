@@ -38,18 +38,25 @@ def shoot(page, name: str, selector: str | None = None) -> None:
             # Pad the sides and the bottom, never the top: the element sits
             # under a sticky header, and reaching above it crops through the
             # header's own text.
+            #
+            # Everything is clamped to what is actually rendered. A disclosure
+            # that opens below the fold leaves a box the page does not fully
+            # cover, and Playwright answers a clip like that with "clipped area
+            # is either empty or outside the resulting image" rather than with
+            # a smaller picture.
             pad = 24
-            page.screenshot(
-                path=str(OUT / f"{name}.png"),
-                clip={
-                    "x": max(box["x"] - pad, 0),
-                    "y": box["y"],
-                    "width": min(box["width"] + pad * 2, VIEWPORT["width"]),
-                    "height": min(box["height"] + pad, VIEWPORT["height"] * 2),
-                },
-            )
-            print(f"  captured {name}.png")
-            return
+            page_height = page.evaluate("document.documentElement.scrollHeight")
+            x = max(box["x"] - pad, 0)
+            y = max(min(box["y"], page_height - 1), 0)
+            width = min(box["width"] + pad * 2, VIEWPORT["width"] - x)
+            height = min(box["height"] + pad, page_height - y)
+            if width > 1 and height > 1:
+                page.screenshot(
+                    path=str(OUT / f"{name}.png"),
+                    clip={"x": x, "y": y, "width": width, "height": height},
+                )
+                print(f"  captured {name}.png")
+                return
     page.screenshot(path=str(OUT / f"{name}.png"))
     print(f"  captured {name}.png (viewport)")
 

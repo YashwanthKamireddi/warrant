@@ -10,7 +10,7 @@ checked *before* settlement, provable *after* dispute.
 
 <br>
 
-[![tests](https://img.shields.io/badge/tests-375%20passing-0b6e54?style=flat-square)](#verifying-it)
+[![tests](https://img.shields.io/badge/tests-379%20passing-0b6e54?style=flat-square)](#verifying-it)
 [![gates](https://img.shields.io/badge/gates-11%20green-0b6e54?style=flat-square)](#verifying-it)
 [![latency](https://img.shields.io/badge/p50-under%20300µs-16264f?style=flat-square)](#results)
 [![rail](https://img.shields.io/badge/rail-Razorpay%20test%20mode-16264f?style=flat-square)](#the-real-rail)
@@ -48,8 +48,8 @@ to the rupee that moved.**
 <br>
 
 <div align="center">
-<img src="docs/screenshots/08-evidence-numbers.png" alt="422 of 540 got through with an amount ceiling alone; 90 with Warrant" width="100%">
-<br><em>Over <b>540 labelled cases</b>: an amount ceiling on its own lets 422 through. Warrant lets 90 — and has never once stopped a purchase the person authorised.</em>
+<img src="docs/screenshots/08-evidence-numbers.png" alt="416 of 540 got through with an amount ceiling alone; 90 with Warrant" width="100%">
+<br><em>Over <b>540 labelled cases</b>: an amount ceiling on its own lets 416 through. Warrant lets 90 — and has never once stopped a purchase the person authorised.</em>
 </div>
 
 <br>
@@ -192,10 +192,10 @@ exactly on any machine.
 
 | policy | violations caught | leaked | legitimate spend blocked |
 | :--- | ---: | ---: | ---: |
-| `no_gate` — today's default | 0.0% | ₹291,555 | ₹0 |
-| `amount_only` — a ceiling and nothing else | 14.8% | ₹155,923 | ₹0 |
-| `model_only` — ask a model if the basket looks right | 0.8% | ₹289,559 | ₹160 |
-| **`warrant`** | **81.8%** | **₹27,280** | **₹0** |
+| `no_gate` — today's default | 0.0% | ₹302,663 | ₹0 |
+| `amount_only` — a ceiling and nothing else | 16.0% | ₹169,825 | ₹0 |
+| `model_only` — ask a model if the basket looks right | 0.8% | ₹300,667 | ₹160 |
+| **`warrant`** | **81.8%** | **₹30,208** | **₹0** |
 
 **Reproducible without paying for anything.** The engine runs on Anthropic or on
 Groq's free tier — same interface, and the engine cannot tell which answered. A
@@ -406,7 +406,7 @@ Runs in order, and fails on the first problem:
 | :--- | :--- |
 | `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 375 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering, concurrency, merchant registry loading, mandate lifecycle, Shopify catalog boundary, the documented SDK example |
+| `test` | 379 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering, concurrency, merchant registry loading, mandate lifecycle, Shopify catalog boundary, the documented SDK example |
 | `typecheck` | the console compiles under `strict` |
 | `docs-check` | every number in this README matches what the code measures |
 | `docs-examples` | fail if any code example in the documentation does not run. Prose is not executed, so nothing else can catch a README that has quietly stopped being true |

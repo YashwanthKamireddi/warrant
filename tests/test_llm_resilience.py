@@ -160,3 +160,53 @@ def test_a_provider_that_answers_is_never_asked_twice(monkeypatch, reply_model):
 
 def test_the_provider_protocol_is_still_satisfied():
     assert hasattr(Provider, "structured") or True  # protocol, structural
+
+
+# ------------------------------------------------------- smaller models
+
+
+def test_a_rate_limited_model_falls_back_to_a_smaller_one_before_a_canned_basket():
+    """Groq's free tier caps tokens per day per organisation *per model*.
+
+    A fresh key on the same account changes nothing, so the large model stays
+    exhausted -- but a smaller one usually is not. A smaller model choosing a
+    basket is still a model choosing a basket, which is the thing being
+    demonstrated. A canned basket is not.
+    """
+    from warrant.providers import alternatives
+
+    smaller = alternatives("groq", "openai/gpt-oss-120b")
+    assert smaller, "there is nothing to fall back to"
+    assert "openai/gpt-oss-120b" not in smaller
+
+
+def test_an_explicit_model_choice_is_never_second_guessed(monkeypatch):
+    """Somebody who set WARRANT_GROQ_MODEL asked for that model."""
+    monkeypatch.setenv("WARRANT_GROQ_MODEL", "openai/gpt-oss-120b")
+    from warrant.providers import alternatives
+
+    assert alternatives("groq", "openai/gpt-oss-120b") == ()
+
+
+def test_the_fallback_models_are_ones_the_account_can_actually_reach():
+    """The llama ids everyone reaches for are not served on a free Groq account.
+
+    A fallback list full of models that 404 is not a fallback, so these were
+    taken from GET /openai/v1/models rather than from memory.
+    """
+    from warrant.providers import SMALLER_MODELS
+
+    assert "openai/gpt-oss-20b" in SMALLER_MODELS["groq"]
+    assert not any("llama-3" in m for m in SMALLER_MODELS["groq"])
+
+
+def test_a_smaller_model_is_not_tried_after_a_credentials_failure(monkeypatch, reply_model):
+    """Wrong credentials will not be fixed by asking a different model."""
+    provider = Flaky(failures=99, error=RuntimeError("401 unauthorized"))
+    monkeypatch.setattr("warrant.llm.resolve_providers", lambda client=None: [provider])
+    monkeypatch.setattr("warrant.llm.model_for", lambda name, model: "big")
+    monkeypatch.setattr("warrant.llm.alternatives", lambda name, chosen: ("small",))
+
+    structured_call(output_format=reply_model, system="s", content="c", max_tokens=10)
+
+    assert provider.calls == 1, "a bad key was retried against another model"

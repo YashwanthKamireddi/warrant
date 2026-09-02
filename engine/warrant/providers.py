@@ -74,6 +74,32 @@ DEFAULT_MODELS: dict[ProviderName, str] = {
     "groq": "openai/gpt-oss-120b",
 }
 
+#: Smaller models to fall back to when the preferred one is rate limited.
+#:
+#: Groq's free tier caps *tokens per day per organisation*, so a fresh key on the
+#: same account changes nothing -- and the cap is per model, so a smaller one is
+#: usually still available when the large one is exhausted. A smaller model
+#: choosing a basket is still a model choosing a basket, which is the thing being
+#: demonstrated; a canned basket is not. Ordered most to least capable.
+SMALLER_MODELS: dict[ProviderName, tuple[str, ...]] = {
+    "anthropic": ("claude-sonnet-5", "claude-haiku-4-5-20251001"),
+    # Verified against GET /openai/v1/models on a free account rather than
+    # guessed: the llama ids everyone reaches for are not served there, and a
+    # fallback list full of models the account cannot reach is not a fallback.
+    "groq": ("openai/gpt-oss-20b", "qwen/qwen3.8-27b"),
+}
+
+
+def alternatives(provider: ProviderName, chosen: str) -> tuple[str, ...]:
+    """Models to try after ``chosen`` fails for a reason a smaller one may not.
+
+    Never returns the one already tried, and never second-guesses an explicit
+    override: somebody who set WARRANT_GROQ_MODEL asked for that model.
+    """
+    if os.environ.get(f"WARRANT_{provider.upper()}_MODEL") or os.environ.get("WARRANT_MODEL"):
+        return ()
+    return tuple(m for m in SMALLER_MODELS.get(provider, ()) if m != chosen)
+
 
 class Provider(Protocol):
     """Anything that can turn a system prompt plus a message into a typed object."""

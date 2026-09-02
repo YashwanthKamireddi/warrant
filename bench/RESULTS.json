@@ -6,8 +6,8 @@
     "amount_only": {
       "false_stops": 0,
       "friction_paise": 0,
-      "leaked_paise": 15592300,
-      "misses": 422,
+      "leaked_paise": 16982500,
+      "misses": 416,
       "per_category": {
         "ceiling_breach": [
           45,
@@ -46,7 +46,7 @@
           45
         ],
         "scope_drift": [
-          16,
+          22,
           45
         ],
         "semantic_drift": [
@@ -58,12 +58,12 @@
           45
         ]
       },
-      "recall": 0.1475
+      "recall": 0.1596
     },
     "model_only": {
       "false_stops": 0,
       "friction_paise": 0,
-      "leaked_paise": 28955900,
+      "leaked_paise": 30066700,
       "misses": 491,
       "per_category": {
         "ceiling_breach": [
@@ -120,7 +120,7 @@
     "no_gate": {
       "false_stops": 0,
       "friction_paise": 0,
-      "leaked_paise": 29155500,
+      "leaked_paise": 30266300,
       "misses": 495,
       "per_category": {
         "ceiling_breach": [
@@ -177,7 +177,7 @@
     "warrant": {
       "false_stops": 0,
       "friction_paise": 0,
-      "leaked_paise": 2728000,
+      "leaked_paise": 3020800,
       "misses": 90,
       "per_category": {
         "ceiling_breach": [
