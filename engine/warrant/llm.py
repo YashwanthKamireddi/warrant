@@ -4,9 +4,14 @@ Warrant calls a model in exactly two places, and both must keep working when
 there is no API key -- a reviewer cloning the repo should get a working
 ``make demo`` without signing up for anything. That is handled by a transcript:
 
-  live       an API key or ``ant`` profile resolved; the model was really called
+  live       a provider resolved and the model was really called
   transcript a previously captured response was replayed from disk
   fallback   neither was available; the deterministic path ran and narrowed hard
+
+Two providers can serve ``live``: Anthropic by default, and Groq's free tier as a
+fallback so that **a reviewer can reproduce the benchmark without paying for
+anything**. Which one answered is recorded alongside the mode, because "a model
+ran" and "which model ran" are different claims.
 
 Which of the three ran is recorded on every proposal and finding, travels into
 the ledger, and is printed by the CLI. The system never presents a replayed or
@@ -24,6 +29,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel
+
+from .providers import DEFAULT_MODELS, Provider, resolve_provider
 
 __all__ = [
     "Capability",
@@ -83,12 +90,10 @@ class TranscriptClient:
         return output_format.model_validate(entry)
 
 
-def _live_client() -> Any | None:
-    """Build a real client if credentials resolve. The SDK checks env *and* profiles."""
+def _live_client(client: Any | None = None) -> Provider | None:
+    """Resolve whichever provider can actually be constructed, or None."""
     try:
-        import anthropic
-
-        return anthropic.Anthropic()
+        return resolve_provider(client=client)
     except Exception:  # noqa: BLE001 - no credentials is a normal state here
         return None
 
@@ -103,6 +108,7 @@ class Capability(BaseModel):
     """
 
     credentials_configured: bool
+    provider: str | None
     transcript_available: bool
     transcript_provenance: str
 
@@ -110,9 +116,9 @@ class Capability(BaseModel):
     def note(self) -> str:
         if self.credentials_configured:
             return (
-                "Credentials are configured. Every interpretation is still labelled "
-                "with the path it actually took, because a credential can be present "
-                "and expired."
+                f"Credentials are configured for {self.provider}. Every interpretation "
+                "is still labelled with the path it actually took, because a credential "
+                "can be present and expired."
             )
         if self.transcript_available:
             return (
@@ -125,8 +131,10 @@ class Capability(BaseModel):
 def describe_capability() -> Capability:
     """Report what is available. Never claims what a future call will do."""
     transcript = Transcript.load()
+    provider = _live_client()
     return Capability(
-        credentials_configured=_live_client() is not None,
+        credentials_configured=provider is not None,
+        provider=provider.name if provider else None,
         transcript_available=bool(transcript.entries),
         transcript_provenance=transcript.provenance,
     )
@@ -146,21 +154,20 @@ def structured_call(
     Returns ``(parsed, mode)``. A ``None`` parsed value means every path failed
     and the caller must use its own deterministic fallback.
     """
-    model = model or os.environ.get("WARRANT_MODEL") or "claude-opus-5"
-    live = client if client is not None else _live_client()
+    provider = _live_client(client)
 
-    if live is not None:
+    if provider is not None:
+        chosen = model or os.environ.get("WARRANT_MODEL") or DEFAULT_MODELS[provider.name]
         try:
-            response = live.messages.parse(  # type: ignore[attr-defined]
-                model=model,
-                max_tokens=max_tokens,
-                system=system,
-                messages=[{"role": "user", "content": content}],
+            parsed = provider.structured(
                 output_format=output_format,
+                system=system,
+                content=content,
+                model=chosen,
+                max_tokens=max_tokens,
             )
-            parsed = response.parsed_output
             if os.environ.get("WARRANT_RECORD") == "1":
-                _record(output_format, content, parsed, model)
+                _record(output_format, content, parsed, f"{provider.name}/{chosen}")
             return parsed, "live"
         except Exception:  # noqa: BLE001 - fall through to the transcript
             pass

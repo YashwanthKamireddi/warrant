@@ -284,9 +284,10 @@ def main() -> int:
         "--live",
         action="store_true",
         help=(
-            "call the model for real. Off by default: two policies consult the judge "
-            "on every case, so a full run is roughly 2x the corpus in API calls. "
-            "Pair with a small --per-category."
+            "call the model for real, on whichever provider resolves. Off by "
+            "default: two policies consult the judge on every case, so a full run "
+            "is roughly 2x the corpus in API calls. Pair with a small "
+            "--per-category, or use a free Groq key."
         ),
     )
     parser.add_argument("--json", action="store_true", help="emit machine-readable results")
@@ -315,7 +316,7 @@ def main() -> int:
     if not args.live:
         # Default to no network. Once credentials exist, a bare `make bench` would
         # otherwise fire roughly two model calls per case without being asked.
-        llm._live_client = lambda: None  # type: ignore[assignment]
+        llm._live_client = lambda client=None: None  # type: ignore[assignment]
     else:
         calls = len(cases) * 2
         print(

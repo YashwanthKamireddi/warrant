@@ -95,9 +95,10 @@ def make_cart(intent: IntentMandate):
 
 @pytest.fixture
 def no_llm(monkeypatch):
-    """Force the deterministic fallback: no live client, no transcript on disk."""
+    """Force the deterministic fallback: no provider, no transcript on disk."""
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.setattr(llm, "_live_client", lambda: None)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setattr(llm, "_live_client", lambda client=None: None)
     monkeypatch.setattr(llm, "TRANSCRIPT_PATH", Path("/nonexistent/transcript.json"))
     monkeypatch.setattr(
         llm.TranscriptClient,

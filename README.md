@@ -108,6 +108,13 @@ exactly on any machine.
 | `model_only` — ask a model if the basket looks right | 1.4% | ₹278,142 | ₹0 |
 | **`warrant`** | **81.8%** | **₹27,700** | **₹0** |
 
+**Reproducible without paying for anything.** The engine runs on Anthropic or on
+Groq's free tier — same interface, and the engine cannot tell which answered. A
+submission whose numbers can only be checked by someone holding a paid API key is
+a submission whose numbers cannot really be checked. Drop a free
+[Groq key](https://console.groq.com/keys) into `.env` and run `make bench-live`
+yourself.
+
 Measured, committed and checked on every build: `bench/RESULTS.json` is written by
 `make bench`, the table above quotes it, and **`make docs-check` fails the build if
 the two disagree.** The numbers in this document cannot drift away from the numbers
@@ -277,7 +284,7 @@ Runs in order, and fails on the first problem:
 | :--- | :--- |
 | `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 211 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering, concurrency |
+| `test` | 224 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering, concurrency |
 | `typecheck` | the console compiles under `strict` |
 | `docs-check` | every number in this README matches what the code measures |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
@@ -330,11 +337,11 @@ check that it fails.**
   the item actually purchased, which no metadata layer can see.
   `test_the_known_gap_is_documented_by_a_test` asserts the gap so nobody later mistakes
   the MCC rule for a complete fix.
-- **No live model has run in this repository.** Scope derivation replays a bundled
-  transcript, and every interpretation is labelled with the path it actually took —
-  `live`, `transcript` or `fallback` — in the ledger, the CLI and the console. A
-  replayed interpretation is never presented as a live one. It is the reason
-  `injection_subtle` and `semantic_drift` both read zero.
+- **The committed benchmark ran with no model reachable.** Every interpretation is
+  labelled with the path it actually took — `live`, `transcript` or `fallback` — in
+  the ledger, the CLI and the console, and a replayed one is never presented as
+  live. That is why `injection_subtle` and `semantic_drift` read zero in the table
+  above. Set either API key and rerun `make bench-live` to move them.
 - **Disputes cannot be created through Razorpay's API** — they are bank-initiated. The
   evidence pack is assembled and verified in full and maps onto the real contest schema,
   but submitting it needs a real dispute.
