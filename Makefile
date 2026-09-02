@@ -80,6 +80,9 @@ audit-secrets: ## fail if any credential material is tracked or in history
 screenshots: build ## recapture the screenshots the README embeds
 	@$(MAKE) --no-print-directory _with-server SCRIPT=.verify/shots.py
 
+docs-links: ## fail if any relative link or image in the documentation is broken
+	uv run python .verify/audit_links.py
+
 docs-examples: ## fail if any code example in the documentation does not run
 	uv run python .verify/audit_examples.py
 

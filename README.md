@@ -11,7 +11,7 @@ checked *before* settlement, provable *after* dispute.
 <br>
 
 [![tests](https://img.shields.io/badge/tests-361%20passing-0b6e54?style=flat-square)](#verifying-it)
-[![gates](https://img.shields.io/badge/gates-10%20green-0b6e54?style=flat-square)](#verifying-it)
+[![gates](https://img.shields.io/badge/gates-11%20green-0b6e54?style=flat-square)](#verifying-it)
 [![latency](https://img.shields.io/badge/p50-under%20300µs-16264f?style=flat-square)](#results)
 [![rail](https://img.shields.io/badge/rail-Razorpay%20test%20mode-16264f?style=flat-square)](#the-real-rail)
 [![python](https://img.shields.io/badge/python-3.12+-16264f?style=flat-square)](pyproject.toml)
@@ -410,6 +410,7 @@ Runs in order, and fails on the first problem:
 | `typecheck` | the console compiles under `strict` |
 | `docs-check` | every number in this README matches what the code measures |
 | `docs-examples` | fail if any code example in the documentation does not run. Prose is not executed, so nothing else can catch a README that has quietly stopped being true |
+| `docs-links` | fail if any relative link or image in the documentation is broken. A broken link is invisible to whoever wrote it and is the first thing a reviewer clicks |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 37 rendered pairs meet WCAG AA, computed from the tokens |
 | `audit-overlap` | nothing spills outside its box or paints over a sibling, across 6 states |
