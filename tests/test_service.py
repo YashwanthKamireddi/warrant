@@ -17,7 +17,13 @@ from fastapi.testclient import TestClient
 from warrant import Warrant
 from warrant.merchants import MerchantRecord, MerchantRegistry
 from warrant.models import Scope
-from warrant.service import PermissionStore, create_app, warrant_router
+from warrant.service import (
+    NO_AUTH,
+    ApiKeyAuth,
+    PermissionStore,
+    create_app,
+    warrant_router,
+)
 
 NOW = int(time.time())
 
@@ -42,9 +48,18 @@ SANDWICH = {"sku": "sandwich", "category": "food_beverage", "qty": 1, "unit_pais
 CABLE = {"sku": "cable", "category": "electronics", "qty": 1, "unit_paise": 29_900}
 
 
+KEY = "test-key-that-is-long-enough-to-be-real"
+
+
 @pytest.fixture
 def client():
-    with Warrant(merchants=GROCER) as w, TestClient(create_app(w)) as c:
+    """Authenticated by default, because everything else here is about what a
+    caller who is allowed in can do."""
+    with (
+        Warrant(merchants=GROCER) as w,
+        TestClient(create_app(w, auth=ApiKeyAuth([KEY]))) as c,
+    ):
+        c.headers["authorization"] = f"Bearer {KEY}"
         yield c
 
 
@@ -75,7 +90,7 @@ def test_ready_reports_what_it_actually_checked(client):
 def test_ready_fails_when_the_ledger_is_gone_rather_than_returning_ok():
     """A process with an unreachable ledger is alive and must not get traffic."""
     warrant = Warrant(merchants=GROCER)
-    with TestClient(create_app(warrant)) as client:
+    with TestClient(create_app(warrant, auth=NO_AUTH)) as client:
         warrant.ledger.close()
         r = client.get("/warrant/ready")
         assert r.status_code == 503
@@ -254,7 +269,7 @@ def test_the_router_mounts_into_an_existing_app_without_taking_it_over():
         return {"theirs": "untouched"}
 
     with Warrant(merchants=GROCER) as w:
-        app.include_router(warrant_router(w))
+        app.include_router(warrant_router(w, auth=NO_AUTH))
         with TestClient(app) as client:
             assert client.get("/orders").json() == {"theirs": "untouched"}
             assert client.get("/warrant/health").status_code == 200
@@ -264,8 +279,8 @@ def test_two_routers_in_one_process_are_two_independent_deployments():
     """No module-level state: one tenant's permissions are not another's."""
     app = FastAPI()
     with Warrant(merchants=GROCER) as a, Warrant(merchants=GROCER) as b:
-        app.include_router(warrant_router(a, prefix="/tenant-a"))
-        app.include_router(warrant_router(b, prefix="/tenant-b"))
+        app.include_router(warrant_router(a, auth=NO_AUTH, prefix="/tenant-a"))
+        app.include_router(warrant_router(b, auth=NO_AUTH, prefix="/tenant-b"))
         with TestClient(app) as client:
             created = client.post(
                 "/tenant-a/permissions",
@@ -283,3 +298,105 @@ def test_two_routers_in_one_process_are_two_independent_deployments():
 
             assert mine.status_code == 200
             assert theirs.status_code == 404
+
+
+# --------------------------------------------------------------------- auth
+
+
+def test_a_router_with_no_authentication_configured_refuses_to_exist(monkeypatch):
+    """Reachable must not mean usable because an argument was forgotten."""
+    monkeypatch.delenv("WARRANT_API_KEYS", raising=False)
+    with (
+        Warrant(merchants=GROCER) as w,
+        pytest.raises(RuntimeError, match="needs authentication"),
+    ):
+        warrant_router(w)
+
+
+def test_running_open_is_possible_and_has_to_be_spelled(monkeypatch):
+    monkeypatch.delenv("WARRANT_API_KEYS", raising=False)
+    with Warrant(merchants=GROCER) as w:
+        router = warrant_router(w, auth=NO_AUTH)
+        assert router is not None
+
+
+def test_keys_are_picked_up_from_the_environment(monkeypatch):
+    monkeypatch.setenv("WARRANT_API_KEYS", KEY)
+    with Warrant(merchants=GROCER) as w, TestClient(create_app(w)) as c:
+        anonymous = c.post(
+            "/warrant/permissions", json={"utterance": "x", "scope": SCOPE}
+        )
+        assert anonymous.status_code == 401
+
+        allowed = c.post(
+            "/warrant/permissions",
+            json={"utterance": "x", "scope": SCOPE},
+            headers={"authorization": f"Bearer {KEY}"},
+        )
+        assert allowed.status_code == 201
+
+
+def test_an_unauthenticated_caller_cannot_mint_or_spend():
+    with (
+        Warrant(merchants=GROCER) as w,
+        TestClient(create_app(w, auth=ApiKeyAuth([KEY]))) as c,
+    ):
+        for method, path in (
+            ("post", "/warrant/permissions"),
+            ("post", "/warrant/permissions/im_x/check"),
+            ("post", "/warrant/permissions/im_x/spend"),
+            ("post", "/warrant/permissions/im_x/revoke"),
+            ("get", "/warrant/permissions/im_x/evidence"),
+        ):
+            kwargs = (
+                {"json": {"merchant": "m", "items": [SANDWICH]}}
+                if method == "post"
+                else {}
+            )
+            r = getattr(c, method)(path, **kwargs)
+            assert r.status_code == 401, f"{path} was reachable without a token"
+            assert r.headers["www-authenticate"] == "Bearer"
+
+
+def test_the_probes_are_never_guarded():
+    """An orchestrator holds no credential. A probe that 401s reads as dead."""
+    with (
+        Warrant(merchants=GROCER) as w,
+        TestClient(create_app(w, auth=ApiKeyAuth([KEY]))) as c,
+    ):
+        assert c.get("/warrant/health").status_code == 200
+        assert c.get("/warrant/ready").status_code == 200
+
+
+def test_a_wrong_token_is_rejected_and_tells_the_caller_nothing_about_why():
+    with (
+        Warrant(merchants=GROCER) as w,
+        TestClient(create_app(w, auth=ApiKeyAuth([KEY]))) as c,
+    ):
+        for header in (
+            "Bearer wrong-key-entirely-but-long-enough",
+            f"Bearer {KEY[:-1]}",          # one character off
+            f"Basic {KEY}",                # right secret, wrong scheme
+            KEY,                           # no scheme at all
+            "",
+        ):
+            r = c.post(
+                "/warrant/permissions",
+                json={"utterance": "x", "scope": SCOPE},
+                headers={"authorization": header},
+            )
+            assert r.status_code == 401
+            # The response must not confirm any part of a real key.
+            assert KEY not in r.text
+
+
+def test_a_key_too_short_to_be_worth_having_is_refused():
+    with pytest.raises(ValueError, match="16 characters"):
+        ApiKeyAuth(["short"])
+
+
+def test_an_empty_key_list_is_refused_rather_than_silently_allowing_everyone():
+    with pytest.raises(ValueError, match="at least one key"):
+        ApiKeyAuth([])
+    with pytest.raises(ValueError, match="at least one key"):
+        ApiKeyAuth(["", "  "])

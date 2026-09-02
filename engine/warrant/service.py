@@ -28,18 +28,79 @@ a comment nobody reads.
 
 from __future__ import annotations
 
+import hmac
+import os
 from collections import OrderedDict
+from collections.abc import Callable, Iterable
 from threading import Lock
 from typing import Any, Literal
 
-from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import __version__
 from .client import ItemLike, Permission, Warrant, WarrantDecision
 from .models import Scope, Verdict
 
-__all__ = ["PermissionStore", "create_app", "warrant_router"]
+__all__ = [
+    "NO_AUTH",
+    "ApiKeyAuth",
+    "PermissionStore",
+    "create_app",
+    "warrant_router",
+]
+
+#: Passed as ``auth`` to run with no authentication at all. It has to be typed:
+#: a service that mints spending permissions must not become open to the
+#: internet because somebody forgot an argument.
+NO_AUTH = "none"
+
+
+class ApiKeyAuth:
+    """Bearer tokens, compared in constant time.
+
+    Deliberately small. This is the floor -- enough that the service is not open
+    the moment it is reachable -- and anyone with an identity provider should
+    pass their own callable instead. What it does not do is as important as what
+    it does: it never logs a key, never echoes one back, and never reports
+    whether a rejected key was close to a real one.
+    """
+
+    def __init__(self, keys: Iterable[str]) -> None:
+        self._keys = tuple(k for k in (k.strip() for k in keys) if k)
+        if not self._keys:
+            raise ValueError(
+                "ApiKeyAuth needs at least one key. Pass auth=NO_AUTH to run "
+                "without authentication."
+            )
+        if any(len(k) < 16 for k in self._keys):
+            raise ValueError(
+                "an API key shorter than 16 characters is not worth having; "
+                "use secrets.token_urlsafe(32)"
+            )
+
+    @classmethod
+    def from_env(cls, var: str = "WARRANT_API_KEYS") -> ApiKeyAuth | None:
+        """Read comma-separated keys from the environment, or None if unset."""
+        raw = os.environ.get(var, "")
+        keys = [k for k in raw.split(",") if k.strip()]
+        return cls(keys) if keys else None
+
+    def __call__(self, request: Request) -> None:
+        header = request.headers.get("authorization", "")
+        scheme, _, credential = header.partition(" ")
+        # compare_digest on every key rather than returning at the first match,
+        # so a rejection takes the same time whichever key it was measured
+        # against.
+        ok = scheme.lower() == "bearer" and any(
+            hmac.compare_digest(credential, key) for key in self._keys
+        )
+        if not ok:
+            raise HTTPException(
+                401,
+                detail="a valid bearer token is required",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
 #: How many live permissions a single process keeps. Old ones are evicted
 #: oldest-first: a permission whose window has expired cannot authorise anything
@@ -183,6 +244,7 @@ def _as_response(decision: WarrantDecision) -> DecisionResponse:
 def warrant_router(
     warrant: Warrant,
     *,
+    auth: Callable[[Request], Any] | str | None = None,
     prefix: str = "/warrant",
     store: PermissionStore | None = None,
 ) -> APIRouter:
@@ -190,7 +252,27 @@ def warrant_router(
 
     Holds no global state: the Warrant and the store are captured here, so two
     routers in one process are two independent deployments.
+
+    ``auth`` guards every endpoint that can mint or spend a permission. Omit it
+    and WARRANT_API_KEYS is used; with neither, construction raises. A service
+    that authorises payments should not become reachable-means-usable because an
+    argument was forgotten, so running open is possible and has to be spelled:
+    ``auth=NO_AUTH``.
+
+    The health and readiness probes are never guarded. An orchestrator cannot
+    hold a credential, and a probe that 401s is a probe that reports the process
+    as dead.
     """
+    if auth is None:
+        auth = ApiKeyAuth.from_env()
+    if auth is None:
+        raise RuntimeError(
+            "warrant_router needs authentication. Set WARRANT_API_KEYS, pass "
+            "auth=ApiKeyAuth([...]) or your own callable, or pass auth=NO_AUTH "
+            "to run open on purpose."
+        )
+    guard: list[Any] = [] if auth == NO_AUTH else [Depends(auth)]
+
     router = APIRouter(prefix=prefix, tags=["warrant"])
     store = store or PermissionStore()
 
@@ -217,7 +299,12 @@ def warrant_router(
             "ledger_head": head,
         }
 
-    @router.post("/permissions", response_model=PermissionResponse, status_code=201)
+    @router.post(
+        "/permissions",
+        response_model=PermissionResponse,
+        status_code=201,
+        dependencies=guard,
+    )
     def create_permission(body: PermitRequest) -> PermissionResponse:
         """Sign what the person approved. Everything else is checked against it."""
         try:
@@ -237,7 +324,11 @@ def warrant_router(
             key_custody="in_process",
         )
 
-    @router.post("/permissions/{permission_id}/check", response_model=DecisionResponse)
+    @router.post(
+        "/permissions/{permission_id}/check",
+        response_model=DecisionResponse,
+        dependencies=guard,
+    )
     def check(permission_id: str, body: BasketRequest) -> DecisionResponse:
         """Would this basket be allowed? Spends nothing, records nothing.
 
@@ -250,7 +341,11 @@ def warrant_router(
             warrant.check(permission, body.merchant, _as_items(body.items))
         )
 
-    @router.post("/permissions/{permission_id}/spend", response_model=DecisionResponse)
+    @router.post(
+        "/permissions/{permission_id}/spend",
+        response_model=DecisionResponse,
+        dependencies=guard,
+    )
     def spend(permission_id: str, body: BasketRequest) -> DecisionResponse:
         """Decide, and place the debit if it clears.
 
@@ -268,12 +363,12 @@ def warrant_router(
             detail=payload.model_dump(mode="json"),
         )
 
-    @router.post("/permissions/{permission_id}/revoke", status_code=204)
+    @router.post("/permissions/{permission_id}/revoke", status_code=204, dependencies=guard)
     def revoke(permission_id: str) -> None:
         """Stop this permission being spendable. Recorded in the ledger."""
         warrant.revoke(store.get(permission_id))
 
-    @router.get("/permissions/{permission_id}/evidence")
+    @router.get("/permissions/{permission_id}/evidence", dependencies=guard)
     def evidence(permission_id: str) -> dict[str, Any]:
         """What a merchant files when a customer disputes one of these charges."""
         permission = store.get(permission_id)

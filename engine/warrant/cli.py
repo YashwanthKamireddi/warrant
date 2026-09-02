@@ -271,13 +271,30 @@ def cmd_api(args: argparse.Namespace, out: TextIO) -> int:
     import uvicorn
 
     from .client import Warrant
-    from .service import create_app
+    from .service import NO_AUTH, ApiKeyAuth, create_app
+
+    auth = NO_AUTH if args.open else ApiKeyAuth.from_env()
+    if auth is None:
+        out.write(
+            "\n  Refusing to start without authentication.\n\n"
+            "  Set WARRANT_API_KEYS to one or more comma-separated tokens:\n"
+            "    export WARRANT_API_KEYS=$(python -c "
+            "'import secrets; print(secrets.token_urlsafe(32))')\n\n"
+            "  Or pass --open to run without any, which is for a local look "
+            "and nothing else.\n\n"
+        )
+        return 2
 
     warrant = Warrant(merchants=args.merchants, ledger=args.ledger)
     base = f"http://{args.host}:{args.port}"
     out.write(f"\n  Warrant API on {CYAN(base)}\n")
     out.write(f"  {len(warrant.registry)} merchants · ledger {args.ledger or 'in memory'}\n")
-    out.write(f"  openapi at {base}/docs\n\n")
+    out.write(f"  openapi at {base}/docs\n")
+    out.write(
+        "  auth: open — anyone who can reach this can spend\n\n"
+        if args.open
+        else "  auth: bearer token required\n\n"
+    )
 
     if args.ledger is None:
         out.write(
@@ -286,7 +303,10 @@ def cmd_api(args: argparse.Namespace, out: TextIO) -> int:
         )
 
     uvicorn.run(
-        create_app(warrant), host=args.host, port=args.port, log_level="warning"
+        create_app(warrant, auth=auth),
+        host=args.host,
+        port=args.port,
+        log_level="warning",
     )
     return 0
 
@@ -348,6 +368,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--ledger",
         default=None,
         help="path to the SQLite ledger; in memory if omitted",
+    )
+    api.add_argument(
+        "--open",
+        action="store_true",
+        help="run with no authentication at all; for a local look only",
     )
     api.set_defaults(func=cmd_api)
 

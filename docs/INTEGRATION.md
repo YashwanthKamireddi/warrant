@@ -118,10 +118,13 @@ the only signal that says "this is technically fine and still surprising".
 If your agent runs somewhere else, mount the router into your existing app.
 
 ```python
+import secrets
+
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from warrant import Warrant
-from warrant.service import warrant_router
+from warrant.service import ApiKeyAuth, warrant_router
 
 app = FastAPI()
 
@@ -129,15 +132,40 @@ app = FastAPI()
 def orders() -> dict[str, str]:
     return {"your": "routes are untouched"}
 
-app.include_router(warrant_router(Warrant(merchants="warrant.example.toml")))
-
-# Your routes are untouched, and Warrant answers beside them.
-from fastapi.testclient import TestClient
+# Every endpoint that can mint or spend a permission is guarded. Omit `auth`
+# and WARRANT_API_KEYS is used; with neither, this raises rather than coming up
+# open. Pass your own callable to use a real identity provider.
+key = secrets.token_urlsafe(32)
+app.include_router(
+    warrant_router(Warrant(merchants="warrant.example.toml"), auth=ApiKeyAuth([key]))
+)
 
 with TestClient(app) as client:
     assert client.get("/orders").json() == {"your": "routes are untouched"}
+
+    # Probes are never guarded: an orchestrator holds no credential.
     assert client.get("/warrant/ready").json()["status"] == "ready"
+
+    # Everything else needs the token.
+    assert client.post("/warrant/permissions", json={"utterance": "x"}).status_code == 401
 ```
+
+### Authentication
+
+`warrant_router` refuses to be constructed without it. A service that mints
+spending permissions should not become open to the internet because an argument
+was forgotten, so running without authentication is possible and has to be
+spelled: `auth=NO_AUTH`.
+
+| | |
+|---|---|
+| `auth=ApiKeyAuth([...])` | Bearer tokens, compared in constant time. Keys shorter than 16 characters are refused. |
+| `WARRANT_API_KEYS` | Comma-separated, used when `auth` is omitted. |
+| `auth=your_callable` | Anything that takes a `Request` and raises `HTTPException` to reject. Use this for a real identity provider. |
+| `auth=NO_AUTH` | Open. For a local evaluation only. |
+
+`/warrant/health` and `/warrant/ready` are never guarded — a probe that returns
+401 reports the process as dead.
 
 Or run it standalone:
 
