@@ -38,6 +38,14 @@ PRODUCTS: tuple[Product, ...] = (
     Product("samosa-2", "Samosa Plate", "food_beverage", 12_000, "zomato", "what was asked for"),
     Product("filter-coffee", "Filter Coffee", "food_beverage", 5_000, "zomato", "in scope"),
     Product(
+        "brownie",
+        "Chocolate Brownie Box",
+        "food_beverage",
+        22_000,
+        "zomato",
+        "in scope, and nothing anyone asked for",
+    ),
+    Product(
         "catering",
         "Team Catering Tray",
         "food_beverage",

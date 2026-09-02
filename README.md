@@ -134,8 +134,30 @@ accordingly — and here is exactly where.
 bound the subject signed — right merchant, right category, under every ceiling — so
 no arithmetic touches them, and the payload in `injection_subtle` is phrased to
 evade the instruction-text heuristic. Only reading the basket against the
-instruction catches either, and **no model was reachable on this run**. These two
-rows are the only ones a live model moves. Every other row is arithmetic.
+instruction catches either, and the committed run had no model reachable.
+
+**So I ran them against a live model, and the result was worse than I expected.**
+36 cases, 72 calls, `openai/gpt-oss-120b` on Groq — `bench/RESULTS-live-sample.json`:
+
+| category | offline | with a live model |
+| :--- | ---: | ---: |
+| `semantic_drift` | 0 / 45 | **2 / 12** |
+| `injection_subtle` | 0 / 45 | **0 / 12** |
+| `legitimate` (no false blocks) | 45 / 45 | 12 / 12 |
+
+A model moves `semantic_drift` from nothing to roughly one in six, and does not
+touch `injection_subtle` at all. And `model_only` — the policy that trusts the
+model to decide — blocked **5 legitimate baskets** for ₹2,200 of killed
+conversion while catching 4.2% of violations.
+
+**That result argues for this architecture rather than against it.** If the model
+were reliable here, you could let it block. It isn't, so it can only escalate, and
+the deterministic gate stays binding. The honest position is that these two
+categories are genuinely hard and nobody should claim otherwise.
+
+Results also vary between runs, because the model does. The committed
+`RESULTS.json` is the offline run for exactly that reason: it is the one a
+reviewer can reproduce byte-for-byte.
 
 **`injection_oos` is scored separately on purpose.** Those payloads are blocked, but
 on the *category* bound — nothing recognised the payload. Folding them into an

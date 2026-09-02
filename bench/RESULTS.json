@@ -6,8 +6,8 @@
     "amount_only": {
       "false_stops": 0,
       "friction_paise": 0,
-      "leaked_paise": 15408100,
-      "misses": 424,
+      "leaked_paise": 15592300,
+      "misses": 422,
       "per_category": {
         "ceiling_breach": [
           45,
@@ -34,7 +34,7 @@
           45
         ],
         "mcc_mismatch": [
-          11,
+          12,
           45
         ],
         "merchant_swap": [
@@ -46,7 +46,7 @@
           45
         ],
         "scope_drift": [
-          15,
+          16,
           45
         ],
         "semantic_drift": [
@@ -58,13 +58,13 @@
           45
         ]
       },
-      "recall": 0.1434
+      "recall": 0.1475
     },
     "model_only": {
       "false_stops": 0,
       "friction_paise": 0,
-      "leaked_paise": 27814200,
-      "misses": 488,
+      "leaked_paise": 28955900,
+      "misses": 491,
       "per_category": {
         "ceiling_breach": [
           0,
@@ -91,7 +91,7 @@
           45
         ],
         "mcc_mismatch": [
-          4,
+          1,
           45
         ],
         "merchant_swap": [
@@ -115,12 +115,12 @@
           45
         ]
       },
-      "recall": 0.0141
+      "recall": 0.0081
     },
     "no_gate": {
       "false_stops": 0,
       "friction_paise": 0,
-      "leaked_paise": 28163500,
+      "leaked_paise": 29155500,
       "misses": 495,
       "per_category": {
         "ceiling_breach": [
@@ -177,7 +177,7 @@
     "warrant": {
       "false_stops": 0,
       "friction_paise": 0,
-      "leaked_paise": 2770000,
+      "leaked_paise": 2728000,
       "misses": 90,
       "per_category": {
         "ceiling_breach": [

@@ -255,9 +255,14 @@ def build_corpus(n_per_category: int = 45, seed: int = 20260901) -> list[Case]:
 
             else:  # semantic_drift
                 should = Verdict.ESCALATE
-                # In scope by every bound: right merchant, right category, under
-                # every ceiling -- and nothing the instruction asked for.
-                items = (line_item("filter-coffee", _qty_below(scope, 5_000)),)
+                # In scope by every bound -- right merchant, right category, under
+                # every ceiling -- and nothing any instruction in _ASKS mentions.
+                #
+                # This used to be filter coffee, which several of the asks name
+                # explicitly. Those cases were not drift at all, and the corpus was
+                # scoring a correct "consistent" as a miss. A benchmark that
+                # mislabels correct behaviour measures nothing.
+                items = (line_item("brownie", _qty_below(scope, 22_000)),)
 
             cases.append(
                 Case(

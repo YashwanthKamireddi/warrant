@@ -30,7 +30,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from .providers import DEFAULT_MODELS, Provider, resolve_provider
+from .providers import Provider, model_for, resolve_provider, resolve_providers
 
 __all__ = [
     "Capability",
@@ -154,10 +154,16 @@ def structured_call(
     Returns ``(parsed, mode)``. A ``None`` parsed value means every path failed
     and the caller must use its own deterministic fallback.
     """
-    provider = _live_client(client)
+    # Try each constructible provider in turn. A credential that exists but no
+    # longer works must not shadow one that does -- which it did, until this
+    # loop replaced a single-provider lookup.
+    try:
+        providers = resolve_providers(client=client)
+    except Exception:  # noqa: BLE001
+        providers = []
 
-    if provider is not None:
-        chosen = model or os.environ.get("WARRANT_MODEL") or DEFAULT_MODELS[provider.name]
+    for provider in providers:
+        chosen = model_for(provider.name, model)
         try:
             parsed = provider.structured(
                 output_format=output_format,
@@ -169,8 +175,8 @@ def structured_call(
             if os.environ.get("WARRANT_RECORD") == "1":
                 _record(output_format, content, parsed, f"{provider.name}/{chosen}")
             return parsed, "live"
-        except Exception:  # noqa: BLE001 - fall through to the transcript
-            pass
+        except Exception:  # noqa: BLE001 - try the next provider, then the transcript
+            continue
 
     try:
         return TranscriptClient().fetch(output_format, content), "transcript"

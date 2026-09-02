@@ -30,14 +30,48 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ValidationError
 
-__all__ = ["Provider", "ProviderName", "resolve_provider", "AnthropicProvider", "GroqProvider"]
+__all__ = [
+    "AnthropicProvider",
+    "model_for",
+    "GroqProvider",
+    "Provider",
+    "ProviderName",
+    "resolve_provider",
+    "resolve_providers",
+]
 
 ProviderName = Literal["anthropic", "groq"]
 
+def model_for(provider: ProviderName, override: str | None = None) -> str:
+    """The model id to use for one provider.
+
+    Model names are provider-specific, so a single ``WARRANT_MODEL`` applied
+    across providers is a bug waiting to happen -- and was one: a leftover
+    ``WARRANT_MODEL=claude-sonnet-5`` was handed to Groq, which 404s, and the
+    engine silently fell through to a transcript rather than using a working key.
+
+    So the generic override is only honoured when a single provider is pinned.
+    Otherwise each provider reads its own ``WARRANT_<PROVIDER>_MODEL``.
+    """
+    scoped = os.environ.get(f"WARRANT_{provider.upper()}_MODEL")
+    if scoped:
+        return scoped
+    if override:
+        return override
+    pinned = (os.environ.get("WARRANT_PROVIDER") or "").lower() == provider
+    generic = os.environ.get("WARRANT_MODEL")
+    if pinned and generic:
+        return generic
+    return DEFAULT_MODELS[provider]
+
+
 DEFAULT_MODELS: dict[ProviderName, str] = {
     "anthropic": "claude-opus-5",
-    # 70B, free tier, and strong enough for the two narrow jobs asked of it.
-    "groq": "llama-3.3-70b-versatile",
+    # Groq rotates which open-weights models it serves, so this is a default and
+    # not a guarantee -- GET /openai/v1/models lists what an account can actually
+    # reach, and WARRANT_MODEL overrides. 120B is comfortably strong enough for
+    # the two narrow jobs asked of it.
+    "groq": "openai/gpt-oss-120b",
 }
 
 
@@ -154,30 +188,40 @@ class GroqProvider:
             ) from exc
 
 
+def resolve_providers(
+    preferred: str | None = None, *, client: Any | None = None
+) -> list[Provider]:
+    """Every provider that can be constructed, in the order they should be tried.
+
+    A list rather than a single choice, because constructing a client proves a
+    credential was *found*, not that it works -- an expired token builds a client
+    happily and only fails when it is used. Returning one provider meant a stale
+    Anthropic profile shadowed a working Groq key and the fallback never ran.
+    The caller tries them in order and moves on when one actually fails.
+
+    ``WARRANT_PROVIDER`` pins a single provider. Otherwise Anthropic leads -- it
+    enforces the schema server-side and is the stack Razorpay itself uses -- with
+    Groq behind it, so a reviewer holding only a free key still gets a live run.
+    """
+    if client is not None:
+        return [AnthropicProvider(client=client)]
+
+    wanted = (preferred or os.environ.get("WARRANT_PROVIDER") or "auto").lower()
+    pinned = wanted in ("anthropic", "groq")
+    order: list[ProviderName] = [wanted] if pinned else ["anthropic", "groq"]  # type: ignore[list-item]
+
+    built: list[Provider] = []
+    for name in order:
+        try:
+            built.append(AnthropicProvider() if name == "anthropic" else GroqProvider())
+        except Exception:  # noqa: BLE001 - an unavailable provider is a normal state
+            continue
+    return built
+
+
 def resolve_provider(
     preferred: str | None = None, *, client: Any | None = None
 ) -> Provider | None:
-    """Return the first provider that can actually be constructed.
-
-    ``WARRANT_PROVIDER`` pins one explicitly. Otherwise Anthropic is tried first
-    -- it enforces the schema server-side and is the stack Razorpay itself uses --
-    and Groq is the fallback, so a reviewer with no paid key still gets a live run.
-    """
-    if client is not None:
-        return AnthropicProvider(client=client)
-
-    wanted = (preferred or os.environ.get("WARRANT_PROVIDER") or "auto").lower()
-    order: list[ProviderName]
-    if wanted == "anthropic":
-        order = ["anthropic"]
-    elif wanted == "groq":
-        order = ["groq"]
-    else:
-        order = ["anthropic", "groq"]
-
-    for name in order:
-        try:
-            return AnthropicProvider() if name == "anthropic" else GroqProvider()
-        except Exception:  # noqa: BLE001 - an unavailable provider is a normal state
-            continue
-    return None
+    """The first constructible provider, for callers that only need to report one."""
+    providers = resolve_providers(preferred, client=client)
+    return providers[0] if providers else None

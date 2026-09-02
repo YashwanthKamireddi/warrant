@@ -52,7 +52,12 @@ def test_the_demo_says_which_path_the_interpretation_took():
     _, output = _run(["demo"])
     assert any(
         phrase in output
-        for phrase in ("live model call", "bundled transcript", "no model available")
+        for phrase in (
+            "pinned",
+            "live model call",
+            "bundled transcript",
+            "no model available",
+        )
     )
 
 

@@ -49,4 +49,5 @@ known-local-folder = ["corpus", "policies"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["live: needs a real model provider; excluded from the default run"]
 pythonpath = ["engine", "."]

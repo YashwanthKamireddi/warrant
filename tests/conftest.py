@@ -93,6 +93,21 @@ def make_cart(intent: IntentMandate):
     return _make
 
 
+@pytest.fixture(autouse=True)
+def _no_network_by_default(monkeypatch, request):
+    """Tests never call a real provider.
+
+    A GROQ_API_KEY or ANTHROPIC_API_KEY in .env is loaded on import, so without
+    this the suite starts making live calls -- slow, flaky, and billable. Any test
+    that genuinely wants a provider opts in with @pytest.mark.live.
+    """
+    if request.node.get_closest_marker("live"):
+        return
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setattr(llm, "_live_client", lambda client=None: None)
+
+
 @pytest.fixture
 def no_llm(monkeypatch):
     """Force the deterministic fallback: no provider, no transcript on disk."""

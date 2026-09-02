@@ -4,6 +4,14 @@ Every step is fixed and seeded, so this produces identical output -- identical
 ledger hashes included -- on any machine. That is deliberate: a reviewer can run
 it and check the hashes against the ones in the README.
 
+Which is why the scenario's scope is **pinned, not derived**. Derivation is a real
+feature and it is exercised in the console, in the tests and under ``--derive``,
+but a live model is entitled to read "for my team" as one order rather than two --
+and when it did, the fifth step stopped demonstrating step-up and started
+demonstrating the transaction cap instead. A teaching scenario whose lesson
+changes because a model changed its mind is a bad teaching scenario, and a
+reproducibility claim that a model can break is a false one.
+
 The five carts are chosen to demonstrate the three verdicts and, more
 importantly, *why* each one happened:
 
@@ -18,12 +26,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .authorize import Authorizer
+from .authorize import Authorizer, PendingIntent
 from .catalog import line_item
 from .chain import Ledger
 from .crypto import SigningKey
-from .derive import Envelope
-from .models import IntentMandate, LineItem, RailBinding
+from .derive import Envelope, ScopeProposal
+from .models import IntentMandate, LineItem, RailBinding, Scope
 
 __all__ = ["DemoStep", "Scenario", "build_scenario", "UTTERANCE"]
 
@@ -117,13 +125,35 @@ class Scenario:
     t0: int = T0
 
 
+PINNED_PROMPT = (
+    "Allow up to Rs 1,000 at Zomato for food and drink, across at most 2 orders, "
+    "for the next 2 hours."
+)
+
+PINNED_SCOPE = Scope(
+    merchants=("zomato",),
+    categories=("food_beverage",),
+    max_total_paise=100_000,
+    max_per_txn_paise=100_000,
+    max_txns=2,
+    step_up_over_paise=50_000,
+    not_before=T0,
+    expires_at=T0 + 2 * 3_600,
+)
+
+
 def build_scenario(
     *,
     ledger: Ledger | None = None,
     rail=None,
     model_client: object | None = None,
+    derive: bool = False,
 ) -> Scenario:
-    """Wire up the demo. Seeded keys, fixed clock, everything reproducible."""
+    """Wire up the demo.
+
+    ``derive=False`` pins the scope so the run is byte-identical everywhere.
+    ``derive=True`` runs the real derivation, which is what the console does.
+    """
     subject_key = SigningKey.from_seed("warrant/demo/subject/priya")
     authorizer_key = SigningKey.from_seed("warrant/demo/authorizer")
 
@@ -145,9 +175,29 @@ def build_scenario(
         **({"rail": rail} if rail is not None else {}),
     )
 
-    pending = authorizer.prepare_intent(
-        UTTERANCE, subject="user_priya", agent="agent_claude", now=T0
-    )
+    if derive:
+        pending = authorizer.prepare_intent(
+            UTTERANCE, subject="user_priya", agent="agent_claude", now=T0
+        )
+    else:
+        pending = PendingIntent(
+            utterance=UTTERANCE,
+            proposal=ScopeProposal(
+                merchants=("zomato",),
+                categories=("food_beverage",),
+                max_total_paise=100_000,
+                max_per_txn_paise=100_000,
+                max_txns=2,
+                duration_seconds=2 * 3_600,
+                plain_english=PINNED_PROMPT,
+                ambiguities=("team size not stated, so the per-order ceiling is the "
+                             "full budget",),
+                source="pinned",
+            ),
+            scope=PINNED_SCOPE,
+            subject="user_priya",
+            agent="agent_claude",
+        )
     intent = authorizer.issue_intent(
         pending,
         subject_key=subject_key,

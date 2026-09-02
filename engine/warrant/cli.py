@@ -80,7 +80,7 @@ def cmd_demo(args: argparse.Namespace, out: TextIO) -> int:
             return 2
 
     ledger = Ledger(args.ledger) if args.ledger else Ledger()
-    scenario = build_scenario(ledger=ledger, rail=rail)
+    scenario = build_scenario(ledger=ledger, rail=rail, derive=args.derive)
     intent, scope = scenario.intent, scenario.intent.scope
 
     out.write("\n" + BOLD("WARRANT") + DIM("  ·  no agent spends without one") + "\n")
@@ -90,10 +90,11 @@ def cmd_demo(args: argparse.Namespace, out: TextIO) -> int:
 
     _heading(out, "2  It becomes a permission, and they approve it")
     source_note = {
+        "pinned": "pinned, so this run is byte-identical everywhere (--derive to interpret)",
         "live": "interpreted by a live model call",
-        "transcript": "replayed from the bundled transcript (no API key present)",
+        "transcript": "replayed from the bundled transcript (no credentials present)",
         "fallback": "no model available; narrowed to the deterministic minimum",
-    }[scenario.derivation_source]
+    }.get(scenario.derivation_source, scenario.derivation_source)
     out.write(f"  {scenario.approval_prompt}\n")
     out.write(DIM(f"  scope {source_note}\n"))
     out.write(
@@ -280,6 +281,15 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("--ledger", help="persist the ledger to this SQLite file")
     demo.add_argument("-v", "--verbose", action="store_true", help="show failed checks per cart")
     demo.add_argument("--all-checks", action="store_true", help="show passing checks too")
+    demo.add_argument(
+        "--derive",
+        action="store_true",
+        help=(
+            "derive the scope with a live model instead of using the pinned one. "
+            "Shows the real feature; the run is no longer byte-identical, because "
+            "a model may read the same sentence differently."
+        ),
+    )
     demo.set_defaults(func=cmd_demo)
 
     verify = sub.add_parser("verify", help="recompute a ledger's hash chain")

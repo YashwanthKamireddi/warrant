@@ -15,25 +15,23 @@
       "verdict": "divergent"
     },
     "7c8a149a63751943a94a86f215010173": {
-      "reasoning": "Six chai and two samosa plates from Zomato is a direct fulfilment of an order for chai and samosas for a team.",
+      "reasoning": "The cart contains only chai and samosas as requested and stays under the \u20b91000 limit.",
       "unexpected_items": [],
       "verdict": "consistent"
     },
     "b222a16ea76e128356c8f0c81538665f": {
-      "ambiguities": [
-        "team size not stated, so the per-order ceiling is the full budget"
-      ],
+      "ambiguities": [],
       "categories": [
         "food_beverage"
       ],
-      "duration_seconds": 7200,
+      "duration_seconds": 3600,
       "max_per_txn_paise": 100000,
       "max_total_paise": 100000,
-      "max_txns": 2,
+      "max_txns": 1,
       "merchants": [
         "zomato"
       ],
-      "plain_english": "Allow up to Rs 1,000 at Zomato for food and drink, across at most 2 orders, for the next 2 hours."
+      "plain_english": "Allow up to Rs 1,000 at Zomato for food, for the next 1 hour."
     },
     "cb4e3969f746cfa4a23e16fd387efcfd": {
       "reasoning": "A team catering tray is a reasonable way to fulfil an order of chai and samosas for a team.",
@@ -41,8 +39,8 @@
       "verdict": "consistent"
     }
   },
-  "model": null,
+  "model": "groq/openai/gpt-oss-120b",
   "note": "Bundled so `make demo` runs with no API key. These are authored responses, not captured from a live call -- warrant labels every replayed interpretation as `transcript` so a viewer is never shown a fabricated result as a real one. Run WARRANT_RECORD=1 with credentials to replace this with a real capture.",
-  "recorded_at": null,
-  "source": "authored"
+  "recorded_at": "2026-09-02",
+  "source": "recorded"
 }

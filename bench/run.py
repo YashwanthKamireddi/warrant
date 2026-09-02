@@ -314,9 +314,12 @@ def main() -> int:
         cases = [c for c in cases if c.category in wanted]
 
     if not args.live:
-        # Default to no network. Once credentials exist, a bare `make bench` would
-        # otherwise fire roughly two model calls per case without being asked.
+        # Default to no network. Once credentials exist -- and .env is loaded on
+        # import -- a bare `make bench` would otherwise fire roughly two model
+        # calls per case without being asked.
         llm._live_client = lambda client=None: None  # type: ignore[assignment]
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        os.environ.pop("GROQ_API_KEY", None)
     else:
         calls = len(cases) * 2
         print(

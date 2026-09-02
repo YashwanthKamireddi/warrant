@@ -25,6 +25,7 @@ that field travels into the ledger.
 from __future__ import annotations
 
 import re
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -93,7 +94,7 @@ class ScopeProposal(BaseModel):
         default=(),
         description="What the utterance left open. Surfaced to the human, not resolved silently.",
     )
-    source: Mode = "live"
+    source: Mode | Literal["pinned"] = "live"
     """Which path produced this: a real call, a replayed transcript, or the fallback."""
 
 
