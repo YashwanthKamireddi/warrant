@@ -6,6 +6,7 @@ Four commands, each answering one question a reviewer will actually ask:
     warrant verify   can the ledger be trusted?
     warrant trace    why did it decide that?
     warrant serve    run the console
+    warrant api      run the authorization service
 
 Output is plain ANSI with no rendering dependency, and degrades to unstyled text
 when stdout is not a terminal, so piping to a file produces something readable.
@@ -261,6 +262,35 @@ def cmd_serve(args: argparse.Namespace, out: TextIO) -> int:
     return 0
 
 
+def cmd_api(args: argparse.Namespace, out: TextIO) -> int:
+    """Run the product service: the router a company would mount, standalone.
+
+    Deliberately not the console. `warrant serve` hands you a demonstration
+    with a tamper button; this is the thing that goes in front of money.
+    """
+    import uvicorn
+
+    from .client import Warrant
+    from .service import create_app
+
+    warrant = Warrant(merchants=args.merchants, ledger=args.ledger)
+    base = f"http://{args.host}:{args.port}"
+    out.write(f"\n  Warrant API on {CYAN(base)}\n")
+    out.write(f"  {len(warrant.registry)} merchants · ledger {args.ledger or 'in memory'}\n")
+    out.write(f"  openapi at {base}/docs\n\n")
+
+    if args.ledger is None:
+        out.write(
+            "  Note: no --ledger given, so the record is in memory and dies with "
+            "this process.\n\n"
+        )
+
+    uvicorn.run(
+        create_app(warrant), host=args.host, port=args.port, log_level="warning"
+    )
+    return 0
+
+
 # --------------------------------------------------------------------------- #
 
 
@@ -305,6 +335,21 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8787)
     serve.set_defaults(func=cmd_serve)
+
+    api = sub.add_parser("api", help="run the authorization service")
+    api.add_argument("--host", default="127.0.0.1")
+    api.add_argument("--port", type=int, default=8080)
+    api.add_argument(
+        "--merchants",
+        default=None,
+        help="path to a merchant registry TOML; defaults to WARRANT_MERCHANTS",
+    )
+    api.add_argument(
+        "--ledger",
+        default=None,
+        help="path to the SQLite ledger; in memory if omitted",
+    )
+    api.set_defaults(func=cmd_api)
 
     return parser
 

@@ -306,9 +306,10 @@ Runs in order, and fails on the first problem:
 | :--- | :--- |
 | `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 307 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering, concurrency, merchant registry loading, mandate lifecycle, Shopify catalog boundary, the documented SDK example |
+| `test` | 309 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering, concurrency, merchant registry loading, mandate lifecycle, Shopify catalog boundary, the documented SDK example |
 | `typecheck` | the console compiles under `strict` |
 | `docs-check` | every number in this README matches what the code measures |
+| `docs-examples` | fail if any code example in the documentation does not run. Prose is not executed, so nothing else can catch a README that has quietly stopped being true |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 37 rendered pairs meet WCAG AA, computed from the tokens |
 | `audit-overlap` | nothing spills outside its box or paints over a sibling, across 6 states |

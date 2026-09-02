@@ -77,6 +77,9 @@ typecheck: console/node_modules ## typecheck the console
 audit-secrets: ## fail if any credential material is tracked or in history
 	uv run python .verify/audit_secrets.py
 
+docs-examples: ## fail if any code example in the documentation does not run
+	uv run python .verify/audit_examples.py
+
 docs-check: ## fail if any number in the README drifts from what the code measures
 	uv run python .verify/audit_docs.py
 

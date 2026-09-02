@@ -54,3 +54,19 @@ def test_the_public_api_is_importable_from_the_top_level():
 
 def test_nothing_in_the_public_api_is_private():
     assert not [n for n in warrant.__all__ if n.startswith("_") and n != "__version__"]
+
+
+def test_the_cli_exposes_both_the_console_and_the_service():
+    """`serve` is the demonstration; `api` is the thing that goes near money."""
+    from warrant.cli import build_parser
+
+    actions = build_parser()._subparsers._group_actions[0].choices  # type: ignore[attr-defined]
+    assert "serve" in actions
+    assert "api" in actions
+
+
+def test_the_integration_guide_exists_and_is_executable_by_the_build():
+    """Prose is not executed, so a doc gate is the only thing holding it true."""
+    assert (ROOT / "docs" / "INTEGRATION.md").is_file()
+    makefile = (ROOT / "Makefile").read_text()
+    assert "docs-examples" in makefile
