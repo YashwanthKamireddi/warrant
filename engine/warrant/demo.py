@@ -123,6 +123,16 @@ class Scenario:
     derivation_source: str
     steps: tuple[DemoStep, ...] = STEPS
     t0: int = T0
+    pending: PendingIntent | None = None
+
+    def pending_for(self, utterance: str) -> PendingIntent:
+        """The pinned permission, restated for whatever the person typed.
+
+        The scope stays fixed so a scripted run is reproducible; only the recorded
+        utterance changes, which is what the ledger and the evidence pack quote.
+        """
+        assert self.pending is not None
+        return self.pending.model_copy(update={"utterance": utterance})
 
 
 PINNED_PROMPT = (
@@ -212,4 +222,5 @@ def build_scenario(
         subject_key=subject_key,
         approval_prompt=pending.approval_prompt,
         derivation_source=pending.proposal.source,
+        pending=pending,
     )

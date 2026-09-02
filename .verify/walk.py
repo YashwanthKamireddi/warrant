@@ -48,8 +48,10 @@ with sync_playwright() as pw:
 
     print("running the five scripted baskets")
     page.get_by_role("button", name="Run five scripted baskets").click()
-    page.wait_for_selector(".decision", timeout=20_000)
-    page.wait_for_timeout(900)
+    page.wait_for_function(
+        "document.querySelectorAll('.decision').length === 5", timeout=30_000
+    )
+    page.wait_for_timeout(400)
     shot(page, "04-decisions")
 
     verdicts = page.locator(".decision .verdict").all_inner_texts()

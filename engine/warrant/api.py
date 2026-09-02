@@ -197,6 +197,15 @@ def _session(session_id: str) -> Session:
 class StartRequest(BaseModel):
     utterance: str = Field(default=UTTERANCE, max_length=400)
     rail: Literal["simulated", "razorpay"] = "simulated"
+    derive: bool = Field(
+        default=False,
+        description=(
+            "Interpret the utterance with a live model instead of using the pinned "
+            "scope. Off by default so the scripted run is reproducible: a model is "
+            "entitled to read 'for my team' as one order rather than two, and when "
+            "it did, the fifth basket stopped demonstrating step-up."
+        ),
+    )
 
 
 class ApproveRequest(BaseModel):
@@ -365,9 +374,12 @@ def start_session(body: StartRequest) -> dict[str, Any]:
         clock=scenario.t0,
         rail_kind=body.rail,
     )
-    session.pending = session.authorizer.prepare_intent(
-        body.utterance, subject="user_priya", agent="agent_claude", now=session.clock
-    )
+    if body.derive:
+        session.pending = session.authorizer.prepare_intent(
+            body.utterance, subject="user_priya", agent="agent_claude", now=session.clock
+        )
+    else:
+        session.pending = build_scenario(derive=False).pending_for(body.utterance)
     _remember(session)
 
     return {

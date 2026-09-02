@@ -163,8 +163,10 @@ with sync_playwright() as pw:
     scan(STATES[2])
 
     page.get_by_role("button", name="Run five scripted baskets").click()
-    page.wait_for_selector(".decision", timeout=25_000)
-    page.wait_for_timeout(600)
+    page.wait_for_function(
+        "document.querySelectorAll('.decision').length === 5", timeout=30_000
+    )
+    page.wait_for_timeout(400)
     scan(STATES[3])
 
     page.get_by_role("tab", name="Ledger").click()

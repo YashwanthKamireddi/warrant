@@ -103,10 +103,10 @@ exactly on any machine.
 
 | policy | violations caught | leaked | legitimate spend blocked |
 | :--- | ---: | ---: | ---: |
-| `no_gate` — today's default | 0.0% | ₹281,635 | ₹0 |
-| `amount_only` — a ceiling and nothing else | 14.3% | ₹154,081 | ₹0 |
-| `model_only` — ask a model if the basket looks right | 1.4% | ₹278,142 | ₹0 |
-| **`warrant`** | **81.8%** | **₹27,700** | **₹0** |
+| `no_gate` — today's default | 0.0% | ₹291,555 | ₹0 |
+| `amount_only` — a ceiling and nothing else | 14.8% | ₹155,923 | ₹0 |
+| `model_only` — ask a model if the basket looks right | 0.8% | ₹289,559 | ₹160 |
+| **`warrant`** | **81.8%** | **₹27,280** | **₹0** |
 
 **Reproducible without paying for anything.** The engine runs on Anthropic or on
 Groq's free tier — same interface, and the engine cannot tell which answered. A
@@ -143,7 +143,7 @@ instruction catches either, and the committed run had no model reachable.
 | :--- | ---: | ---: |
 | `semantic_drift` | 0 / 45 | **2 / 12** |
 | `injection_subtle` | 0 / 45 | **0 / 12** |
-| `legitimate` (no false blocks) | 45 / 45 | 12 / 12 |
+| `legitimate`, no false blocks | 45 / 45 | 12 / 12 |
 
 A model moves `semantic_drift` from nothing to roughly one in six, and does not
 touch `injection_subtle` at all. And `model_only` — the policy that trusts the

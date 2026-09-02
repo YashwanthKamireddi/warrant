@@ -30,8 +30,12 @@ with sync_playwright() as pw:
         page.get_by_role("button", name="Approve and sign with the subject's key").click()
         page.wait_for_selector(".storefront", timeout=10_000)
         page.get_by_role("button", name="Run five scripted baskets").click()
-        page.wait_for_selector(".decision", timeout=25_000)
-        page.wait_for_timeout(500)
+        # Wait for every decision, not for the first one plus a guessed delay.
+        # The scripted run issues five sequential requests, so a fixed timeout
+        # races them and fails intermittently on a slower machine.
+        page.wait_for_function(
+            "document.querySelectorAll('.decision').length === 5", timeout=30_000
+        )
 
         checks = page.evaluate(
             """() => {
