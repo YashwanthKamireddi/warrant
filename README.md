@@ -10,8 +10,8 @@ checked *before* settlement, provable *after* dispute.
 
 <br>
 
-[![tests](https://img.shields.io/badge/tests-211%20passing-0b6e54?style=flat-square)](#verifying-it)
-[![gates](https://img.shields.io/badge/gates-8%20green-0b6e54?style=flat-square)](#verifying-it)
+[![tests](https://img.shields.io/badge/tests-341%20passing-0b6e54?style=flat-square)](#verifying-it)
+[![gates](https://img.shields.io/badge/gates-10%20green-0b6e54?style=flat-square)](#verifying-it)
 [![latency](https://img.shields.io/badge/p50-under%20300µs-16264f?style=flat-square)](#results)
 [![rail](https://img.shields.io/badge/rail-Razorpay%20test%20mode-16264f?style=flat-square)](#the-real-rail)
 [![python](https://img.shields.io/badge/python-3.12+-16264f?style=flat-square)](pyproject.toml)
@@ -93,6 +93,88 @@ which is the layer NPCI's UAP is being designed to occupy. This is what that lay
 has to do; it runs merchant-side today because that is where it can run.
 
 </details>
+
+---
+
+## Use it in your own product
+
+Warrant is not a demo of a payment flow — it is a layer you put in front of one.
+Nothing in it knows about any particular merchant, country or rail.
+
+```python
+import time
+
+from warrant import Warrant
+from warrant.models import Scope
+
+now = int(time.time())
+warrant = Warrant(merchants="warrant.example.toml")
+
+# Once, when the person approves. These bounds normally come from a form.
+permission = warrant.permit("lunch for the team", scope=Scope(
+    merchants=("acme-grocers",),
+    categories=("food_beverage",),
+    max_total_paise=100_000,
+    max_per_txn_paise=50_000,
+    max_txns=3,
+    not_before=now,
+    expires_at=now + 7200,
+))
+
+# Every time the agent proposes a basket.
+sandwich = {"sku": "sandwich", "category": "food_beverage", "qty": 2, "unit_paise": 24_000}
+cable = {"sku": "cable", "category": "electronics", "qty": 1, "unit_paise": 29_900}
+
+assert warrant.check(permission, "acme-grocers", [sandwich]).allowed
+assert not warrant.check(permission, "acme-grocers", [cable]).allowed
+
+# Charge it. Pass an idempotency key to anything that can be retried.
+paid = warrant.spend(permission, "acme-grocers", [sandwich], idempotency_key="order-4417")
+assert paid.settled
+
+warrant.close()
+```
+
+Or mount the service into an app you already have:
+
+```python
+import secrets
+
+from fastapi import FastAPI
+
+from warrant import Warrant
+from warrant.service import ApiKeyAuth, warrant_router
+
+app = FastAPI()
+app.include_router(
+    warrant_router(
+        Warrant(merchants="warrant.example.toml"),
+        auth=ApiKeyAuth([secrets.token_urlsafe(32)]),
+    )
+)
+```
+
+`warrant_router` **refuses to be constructed without authentication**. A service
+that mints spending permissions should not become usable-because-reachable
+because an argument was forgotten; running open is possible and has to be
+spelled `auth=NO_AUTH`.
+
+### Everything is a file you supply
+
+| | | |
+|---|---|---|
+| Merchants and their ISO 18245 codes | `WARRANT_MERCHANTS` | [`warrant.example.toml`](warrant.example.toml) |
+| Products | `WARRANT_CATALOG` | [`catalog.example.toml`](catalog.example.toml) |
+| API keys | `WARRANT_API_KEYS` | — |
+
+The bundled Indian merchants and their chai exist so a clone runs with nothing
+configured, and so the benchmark measures the same thing on every machine. They
+are a default, not a dependency: start the console with `WARRANT_CATALOG` set
+and it sells whatever you sell.
+
+**[Full integration guide →](docs/INTEGRATION.md)** — three calls, the verdict
+table, retries, endpoints, and a production-notes section that says plainly
+which defaults are wrong for a deployment.
 
 ---
 
@@ -268,9 +350,20 @@ git clone https://github.com/YashwanthKamireddi/warrant && cd warrant
 
 make demo      # the five-cart scenario. no API key, no network, no install step
 make bench     # 540 labelled sessions, four policies
-make console   # the control plane at http://127.0.0.1:8787
+make console   # the walkthrough at http://127.0.0.1:8787
 make verify    # every gate, from a clean checkout
 ```
+
+To run the authorization service rather than the console:
+
+```bash
+export WARRANT_API_KEYS=$(python -c 'import secrets; print(secrets.token_urlsafe(32))')
+uv run warrant api --port 8080 --ledger ./warrant.db --merchants ./warrant.toml
+```
+
+`warrant serve` is the demonstration and has a button that tampers with its own
+ledger. `warrant api` is the thing that goes in front of money. They are
+different commands on purpose.
 
 `make demo` works on a bare clone — `uv` resolves the environment on first run. The
 console and browser targets install their own prerequisites, so there is no step to
@@ -377,10 +470,13 @@ check that it fails.**
 
 ```
 engine/warrant/
+  client.py      The front door. Warrant.permit / check / spend.
+  service.py     The router a company mounts. Auth required to construct.
   canon.py       RFC 8785 subset. Rejects floats — money is integer paise.
   crypto.py      Ed25519 over canonical bytes. Seeded keys for reproducibility.
   models.py      Intent → Cart → Receipt, bound by content address.
-  merchants.py   Acquirer-assigned MCC registry.
+  merchants.py   Acquirer-assigned MCC registry, loaded from your TOML.
+  catalog.py     The products, loaded from your TOML.
   gate.py        The only layer that can block. Pure, replayable, no model.
   derive.py      Utterance → scope, clamped by a hard envelope.
   divergence.py  The advisory judge. Can escalate; cannot authorise.
@@ -388,17 +484,22 @@ engine/warrant/
   chain.py       Append-only hash chain. Refusals are entries, not silences.
   evidence.py    The chain as a Razorpay dispute submission.
   interop.py     The chain in AP2 vocabulary, W3C-VC shaped.
-  rails/         Razorpay test mode, and a deterministic simulator.
+  py.typed       PEP 561. Without it every annotation here is invisible.
+  rails/         Razorpay test mode, a real UPI mandate, and a simulator.
 bench/           The labelled corpus, the four policies, the harness.
-console/         The control plane. A view onto the engine, never a second one.
-.verify/         Secrets, tokens, contrast, overlap, layout and browser gates.
+console/         The walkthrough. A view onto the engine, never a second one.
+docs/            The integration guide. Its examples are run by the build.
+.verify/         Secrets, tokens, contrast, overlap, layout, docs and browser gates.
+warrant.example.toml   Merchants and their MCCs. Yours goes here.
+catalog.example.toml   Products. Half of them exist to be refused.
 ```
 
 ---
 
 <div align="center">
 
-**[ARCHITECTURE.md](ARCHITECTURE.md)** — trust boundaries and the decision record
+**[INTEGRATION.md](docs/INTEGRATION.md)** — how to put this in your own product
+· **[ARCHITECTURE.md](ARCHITECTURE.md)** — trust boundaries and the decision record
 · **[INCIDENTS.md](INCIDENTS.md)** — what broke, kept as it happened
 
 <br>

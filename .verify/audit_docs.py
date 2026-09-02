@@ -32,6 +32,7 @@ RESULTS = ROOT / "bench" / "RESULTS.json"
 
 failures: list[str] = []
 readme = README.read_text()
+MAKEFILE = (ROOT / "Makefile").read_text()
 
 
 def check(label: str, claimed: object, actual: object) -> None:
@@ -114,6 +115,22 @@ pytest_out = subprocess.run(
 ).stdout
 actual_tests = re.search(r"(\d+) passed", pytest_out)
 claimed_tests = re.search(r"\*\*(\d+) tests\*\*|\| `test` \| (\d+) tests", readme)
+
+# The badge is the most-read number on the page and this gate never looked at
+# it: the table said 341 while the badge said 211 and the build was green.
+# Anything shaped like a shields.io count is checked against the same source.
+badge_tests = re.search(r"badge/tests-(\d+)%20passing", readme)
+check(
+    "test count (badge)",
+    badge_tests.group(1) if badge_tests else None,
+    actual_tests.group(1) if actual_tests else "unknown",
+)
+
+badge_gates = re.search(r"badge/gates-(\d+)%20green", readme)
+gate_targets = len(
+    re.findall(r"^(test|lint|typecheck|audit-\w+|docs-\w+|browser):", MAKEFILE, re.M)
+)
+check("gate count (badge)", badge_gates.group(1) if badge_gates else None, str(gate_targets))
 check(
     "test count",
     (claimed_tests.group(1) or claimed_tests.group(2)) if claimed_tests else None,
