@@ -449,6 +449,21 @@ export function App() {
               >
                 {agentRunning ? "The agent is shopping…" : "Run the agent"}
               </button>
+              {/* This screen promises that a model reads the instruction. Whether
+                  one is actually reachable belongs next to the button that
+                  claims it, not in a chip in the corner -- and a clone with no
+                  key should find out before clicking, not after. */}
+              {meta && (
+                <span className="act-note" title={meta.capability_note}>
+                  {meta.capability.credentials_configured
+                    ? "A live model call."
+                    : meta.capability.transcript_available
+                      ? "No model configured, so this replays a captured response — " +
+                        meta.capability.transcript_provenance
+                      : "No model configured and no transcript, so the scope stays at " +
+                        "the deterministic minimum."}
+                </span>
+              )}
             </div>
             <AgentRun attempts={attempts} running={agentRunning} />
           </section>

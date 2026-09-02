@@ -2736,8 +2736,17 @@ a {
 
 @media (max-width: 720px) {
   .budget { display: none; }
-  .stepbtn-label { display: none; }
-  .stepbtn { padding: 13px 14px; }
+  .stepbtn { padding: 13px 12px; }
+
+  /* Four bare numbers tell a reader nothing about where they are or what is
+     next. Hiding every label saved room and cost all of the meaning, so the
+     step you are on keeps its name and the others shrink to their number. */
+  .stepbtn:not(.on) .stepbtn-label {
+    display: none;
+  }
+  .stepbtn.on {
+    padding-right: 16px;
+  }
 }
 
 .terms-more > summary {
@@ -2790,4 +2799,13 @@ a.btn {
   display: inline-flex;
   align-items: center;
   text-decoration: none;
+}
+
+/* Sits beside a primary action and qualifies it, so it must be legible and
+   must not compete. */
+.act-note {
+  max-width: 42ch;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-3);
 }

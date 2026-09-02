@@ -61,6 +61,12 @@ with sync_playwright() as pw:
                     bodyScrollsX: document.documentElement.scrollWidth > window.innerWidth + 1,
                     stageOverflowsX: stage.scrollWidth > stage.clientWidth + 1,
                     stepsVisible: !!q('.stepbtn') && inView(q('.steps')),
+                    // Four bare numbers are not navigation. Whatever else the
+                    // stepper drops on a narrow screen, the step you are on
+                    // keeps its name.
+                    currentStepNamed:
+                        (q('.stepbtn.on')?.innerText || '').replace(/[0-9\s]/g, '')
+                            .length > 0,
                     navVisible: inView(q('.stagenav')),
                     nextInView: inView(q('.stagenav .btn-primary')),
                     // A line of text wider than about 90 characters stops being
@@ -82,6 +88,8 @@ with sync_playwright() as pw:
             problems.append("the stage overflows horizontally")
         if not checks["stepsVisible"]:
             problems.append("the walkthrough steps are not visible")
+        if not checks["currentStepNamed"]:
+            problems.append("the current step shows only a number, not its name")
         if not checks["navVisible"]:
             problems.append("the stage nav is not visible")
         if not checks["nextInView"]:
