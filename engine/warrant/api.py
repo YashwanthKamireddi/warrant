@@ -27,14 +27,15 @@ from pydantic import BaseModel, Field
 
 from .agent import shop
 from .authorize import Authorizer, PendingIntent
-from .catalog import active_catalog, by_sku
+from .catalog import active_catalog, by_sku, teaching_roles
 from .chain import EventKind, Ledger
 from .crypto import SigningKey
-from .demo import STEPS, UTTERANCE, build_scenario
+from .demo import PINNED_SCOPE, UTTERANCE, build_scenario
 from .evidence import assemble_evidence
 from .gate import evaluate
 from .interop import to_ap2_chain
 from .llm import describe_capability
+from .merchants import active_registry
 from .models import (
     CartMandate,
     CheckStatus,
@@ -42,6 +43,7 @@ from .models import (
     IntentMandate,
     LineItem,
     RailBinding,
+    Scope,
     Verdict,
 )
 from .rails.razorpay_rail import RazorpayNotConfigured, RazorpayRail
@@ -348,22 +350,161 @@ def meta() -> dict[str, Any]:
         "rails": _available_rails(),
         "catalog": list(CATALOG),
         "default_utterance": UTTERANCE,
-        "scripted_steps": [
-            {
-                "label": step.label,
-                "expect": step.expect,
-                "teaches": step.teaches,
-                "merchant": step.merchant,
-                "lines": [{"sku": i.sku, "qty": i.qty} for i in step.items],
-                # A step reusing an earlier step's nonce is a replay by construction.
-                "replay_of": next(
-                    (j + 1 for j, e in enumerate(STEPS[:i]) if e.nonce == step.nonce),
-                    None,
-                ),
-            }
-            for i, step in enumerate(STEPS)
-        ],
+        "scripted_steps": _scripted_steps(),
     }
+
+
+def console_merchant() -> str:
+    """The merchant the console demonstrates against.
+
+    The scope was pinned to zomato, so a console pointed at a grocer's catalogue
+    had a permission for a merchant none of its products belonged to and a
+    scripted run with nothing in it. The primary merchant is whichever one has
+    the most products in the active catalogue -- which is the bundled zomato
+    when nothing is configured, and yours when something is.
+    """
+    catalog = active_catalog()
+    counts: dict[str, int] = {}
+    for product in catalog:
+        counts[product.merchant] = counts.get(product.merchant, 0) + 1
+    if not counts:
+        return PINNED_SCOPE.merchants[0]
+    return max(counts, key=lambda m: (counts[m], m))
+
+
+def console_scope() -> Scope:
+    """The pinned demo scope, retargeted at whatever catalogue is loaded.
+
+    The bounds are the demonstration and stay fixed; only the merchant, and the
+    categories its acquirer underwrote it for, follow the configuration.
+    """
+    merchant = console_merchant()
+    if merchant == PINNED_SCOPE.merchants[0]:
+        return PINNED_SCOPE
+
+    permitted = active_registry().assigned_categories(merchant)
+    categories = tuple(sorted(permitted)) or PINNED_SCOPE.categories
+    return PINNED_SCOPE.model_copy(
+        update={"merchants": (merchant,), "categories": categories}
+    )
+
+
+def _retarget(pending: PendingIntent) -> PendingIntent:
+    """Point a pinned permission at the catalogue that is actually loaded.
+
+    The permission said zomato while the products said acme-grocers, so a
+    configured console signed a mandate for a merchant none of its products
+    belonged to and refused its own scripted run on the merchant bound. The
+    numbers are the demonstration and stay fixed; the merchant and its
+    underwritten categories follow the configuration, and so does the sentence
+    the person is asked to approve.
+    """
+    scope = console_scope()
+    if scope is PINNED_SCOPE:
+        return pending
+
+    where = ", ".join(scope.merchants)
+    what = ", ".join(c.replace("_", " and ") for c in scope.categories)
+    prompt = (
+        f"Allow up to Rs {scope.max_total_paise / 100:,.0f} at {where} for {what}, "
+        f"across at most {scope.max_txns} orders, for the next 2 hours."
+    )
+    return pending.model_copy(update={
+        "scope": scope,
+        "proposal": pending.proposal.model_copy(update={
+            "merchants": scope.merchants,
+            "categories": scope.categories,
+            "plain_english": prompt,
+        }),
+    })
+
+
+def _scripted_steps() -> list[dict[str, Any]]:
+    """The five-basket run, built from whatever catalogue is loaded.
+
+    It used to name skus straight out of the bundled products, so a console
+    started with WARRANT_CATALOG set asked a grocer for `chai-6` and got a 400.
+    The run asks for roles instead -- something in scope, something in the wrong
+    category, something carrying an injected instruction, something over the
+    step-up threshold -- and a role nothing can fill is left out rather than
+    faked.
+    """
+    scope = console_scope()
+    merchant = scope.merchants[0]
+    roles = teaching_roles(
+        active_catalog(),
+        merchant=merchant,
+        permitted=frozenset(scope.categories),
+        step_up_paise=scope.step_up_over_paise,
+    )
+
+    def basket(*skus: str) -> list[dict[str, Any]]:
+        return [{"sku": sku, "qty": 1} for sku in skus]
+
+    steps: list[dict[str, Any]] = []
+    legit = roles.get("in_scope")
+
+    if legit:
+        steps.append({
+            "label": "What was asked for",
+            "expect": "allow",
+            "teaches": "Every bound the subject signed is satisfied, so the debit proceeds.",
+            "merchant": merchant,
+            "lines": basket(legit.sku),
+            "replay_of": None,
+        })
+    if legit and (drift := roles.get("wrong_category")):
+        steps.append({
+            "label": "An extra nobody asked for",
+            "expect": "block",
+            "teaches": (
+                "The basket is under every ceiling and at the right merchant. It "
+                f"still fails, because '{drift.category}' is not a category the "
+                "subject authorized."
+            ),
+            "merchant": merchant,
+            "lines": basket(legit.sku, drift.sku),
+            "replay_of": None,
+        })
+    if injected := roles.get("injection"):
+        steps.append({
+            "label": "An injected instruction",
+            "expect": "block",
+            "teaches": (
+                "The payload is blocked on a bound the subject signed, not on having "
+                "spotted the payload. Delete every injection heuristic and this still "
+                "fails."
+            ),
+            "merchant": merchant,
+            "lines": basket(injected.sku),
+            "replay_of": None,
+        })
+    if legit:
+        steps.append({
+            "label": "The same cart, replayed",
+            "expect": "block",
+            "teaches": (
+                "A settled cart's nonce cannot be presented twice, so a replay is "
+                "refused."
+            ),
+            "merchant": merchant,
+            "lines": basket(legit.sku),
+            "replay_of": 1,
+        })
+    if over := roles.get("over_threshold"):
+        steps.append({
+            "label": "Over the step-up threshold",
+            "expect": "escalate",
+            "teaches": (
+                "Nothing is violated. The amount crosses the threshold the subject "
+                "set for a second signature, so it stops for a human rather than "
+                "proceeding quietly."
+            ),
+            "merchant": merchant,
+            "lines": basket(over.sku),
+            "replay_of": None,
+        })
+    return steps
 
 
 @app.post("/api/sessions")
@@ -393,7 +534,9 @@ def start_session(body: StartRequest) -> dict[str, Any]:
             body.utterance, subject="user_priya", agent="agent_claude", now=session.clock
         )
     else:
-        session.pending = build_scenario(derive=False).pending_for(body.utterance)
+        session.pending = _retarget(
+            build_scenario(derive=False).pending_for(body.utterance)
+        )
     _remember(session)
 
     return {

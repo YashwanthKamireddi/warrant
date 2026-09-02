@@ -44,7 +44,7 @@ def _item(sku: str, qty: int):
     return line_item(sku, qty, catalog=_DEMO_CATALOG)
 
 
-__all__ = ["DemoStep", "Scenario", "build_scenario", "UTTERANCE"]
+__all__ = ["DemoStep", "PINNED_SCOPE", "Scenario", "UTTERANCE", "build_scenario"]
 
 UTTERANCE = "order chai and samosas for my team from zomato, keep it under 1000"
 

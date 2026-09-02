@@ -39,6 +39,7 @@ __all__ = [
     "bundled_catalog",
     "by_sku",
     "line_item",
+    "teaching_roles",
     "load_catalog",
     "use_catalog",
 ]
@@ -206,6 +207,87 @@ class Catalog:
         if not path.exists():
             raise FileNotFoundError(f"no catalog at {path}")
         return cls.from_mapping(tomllib.loads(path.read_text(encoding="utf-8")))
+
+
+#: Phrases that mark a product name as carrying an instruction aimed at whatever
+#: reads it. Used only to *find* the teaching example in a catalogue -- never to
+#: decide anything. The gate refuses these on the category bound, and would
+#: refuse them just the same if this list were empty.
+_INJECTION_MARKERS = (
+    "ignore all previous",
+    "system:",
+    "already been cleared",
+    "no further checks",
+    "pre-approved",
+)
+
+
+def teaching_roles(
+    catalog: Catalog,
+    *,
+    merchant: str,
+    permitted: frozenset[str],
+    step_up_paise: int | None = None,
+) -> dict[str, Product]:
+    """Find, in any catalogue, the products that demonstrate each outcome.
+
+    The console's scripted run used to name skus, so pointing WARRANT_CATALOG at
+    a different shop left it asking for `chai-6` from a grocer that has never
+    heard of chai. It asks for a *role* now -- something in scope, something in
+    the wrong category, something carrying an injected instruction, something
+    over the step-up threshold -- and any catalogue that has them can drive it.
+
+    Roles that nothing fills are absent from the result rather than guessed at.
+    A demonstration missing a case is honest; a demonstration inventing one is
+    not.
+    """
+    here = [p for p in catalog if p.merchant == merchant]
+    clean = [p for p in here if not _looks_injected(p.name)]
+
+    roles: dict[str, Product] = {}
+
+    in_scope = [p for p in clean if p.category in permitted]
+    if in_scope:
+        roles["in_scope"] = min(in_scope, key=lambda p: p.unit_paise)
+
+    out_of_category = [p for p in clean if p.category not in permitted]
+    if out_of_category:
+        roles["wrong_category"] = min(out_of_category, key=lambda p: p.unit_paise)
+
+    injected = [p for p in here if _looks_injected(p.name)]
+
+    # The scripted run's injection step teaches that the payload is refused on a
+    # bound the subject signed, not on having been spotted -- so it needs an
+    # injected product that is *also* out of scope. Picking the subtle in-scope
+    # one instead made the step allow, which is the correct verdict for that
+    # product and the wrong lesson for that step, and the extra purchase then
+    # exhausted the mandate's transaction count and broke the step after it.
+    blockable = [p for p in injected if p.category not in permitted]
+    if blockable:
+        roles["injection"] = min(blockable, key=lambda p: p.unit_paise)
+
+    # The one that survives every deterministic bound. Nothing in the scripted
+    # run buys it: it is the case the gate cannot decide alone, and it is here
+    # so a catalogue can be asked whether it has one.
+    subtle = [p for p in injected if p.category in permitted]
+    if subtle:
+        roles["injection_in_scope"] = max(subtle, key=lambda p: len(p.name))
+
+    if step_up_paise is not None:
+        over = [p for p in clean if p.category in permitted and p.unit_paise > step_up_paise]
+        if over:
+            roles["over_threshold"] = min(over, key=lambda p: p.unit_paise)
+
+    elsewhere = [p for p in catalog if p.merchant != merchant]
+    if elsewhere:
+        roles["wrong_merchant"] = min(elsewhere, key=lambda p: p.unit_paise)
+
+    return roles
+
+
+def _looks_injected(name: str) -> bool:
+    lowered = name.lower()
+    return any(marker in lowered for marker in _INJECTION_MARKERS)
 
 
 def bundled_catalog() -> Catalog:
