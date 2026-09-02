@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -1042,9 +1042,22 @@ if _CONSOLE.is_dir():
     app.mount("/", StaticFiles(directory=_CONSOLE, html=True), name="console")
 else:  # pragma: no cover - depends on whether the console has been built
 
-    @app.get("/")
-    def console_missing() -> dict[str, str]:
+    @app.get("/", status_code=503)
+    def console_missing(response: Response) -> dict[str, str]:
+        """The console is a build artifact and does not ship in the wheel.
+
+        This used to answer 200 with an error message in the body, which tells
+        every client the request succeeded, and it advised `make console` --
+        useless to somebody who installed the package and has no Makefile.
+        """
+        response.status_code = 503
         return {
-            "detail": "Console not built. Run `make console`, or use the API directly.",
-            "api": "/docs",
+            "detail": (
+                "The console has not been built. It ships with the repository, "
+                "not with the package: clone the repo and run `make console`. "
+                "To use Warrant from an installed package, run `warrant api` for "
+                "the authorization service, or import it directly."
+            ),
+            "service": "warrant api --help",
+            "openapi": "/docs",
         }

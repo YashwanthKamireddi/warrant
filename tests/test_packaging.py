@@ -70,3 +70,22 @@ def test_the_integration_guide_exists_and_is_executable_by_the_build():
     assert (ROOT / "docs" / "INTEGRATION.md").is_file()
     makefile = (ROOT / "Makefile").read_text()
     assert "docs-examples" in makefile
+
+
+def test_the_console_fallback_reports_a_failure_not_a_success():
+    """An error message returned as 200 tells every client it worked.
+
+    The console is a build artifact and is not in the wheel, so an installed
+    package serves this route. It used to answer 200 with an error in the body,
+    and advise `make console` -- meaningless to somebody who has no Makefile.
+    """
+    import warrant.api as api
+
+    source = (Path(api.__file__)).read_text()
+    assert "status_code=503" in source
+    assert "warrant api" in source, "the fallback must point at something installable"
+
+
+def test_the_package_declares_the_entry_point_the_docs_promise():
+    scripts = PYPROJECT["project"]["scripts"]
+    assert scripts["warrant"] == "warrant.cli:main"

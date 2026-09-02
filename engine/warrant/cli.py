@@ -257,6 +257,21 @@ def cmd_trace(args: argparse.Namespace, out: TextIO) -> int:
 def cmd_serve(args: argparse.Namespace, out: TextIO) -> int:
     import uvicorn
 
+    from .api import _CONSOLE
+
+    # The console is a build artifact and is not in the wheel. Starting a server
+    # that answers every request with "not built" wastes the reader's time; say
+    # it here, where they can still do something about it.
+    if not _CONSOLE.is_dir():
+        out.write(
+            "\n  The console has not been built.\n\n"
+            "  It ships with the repository rather than the package. From a "
+            "clone:\n    make console\n\n"
+            "  From an installed package, run the authorization service "
+            "instead:\n    warrant api --help\n\n"
+        )
+        return 2
+
     out.write(f"\n  Console on {CYAN(f'http://{args.host}:{args.port}')}\n\n")
     uvicorn.run("warrant.api:app", host=args.host, port=args.port, log_level="warning")
     return 0
