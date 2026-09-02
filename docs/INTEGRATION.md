@@ -39,6 +39,28 @@ categories = ["grocery", "food_beverage"]
 A merchant that is not in this file permits **nothing**. Unregistered fails
 closed, never open.
 
+## Your products
+
+The console and the scripted demo read a catalogue the same way. Copy
+`catalog.example.toml`, point `WARRANT_CATALOG` at it, and the console shows
+your products instead of the bundled ones.
+
+```toml
+[[product]]
+sku = "sandwich"
+name = "Chicken Sandwich"
+category = "food_beverage"
+unit_paise = 24_000          # integer paise, never a float
+merchant = "acme-grocers"    # must match an id in your registry
+```
+
+Half of a useful demo catalogue exists to be **refused** — wrong category,
+wrong merchant, over a threshold, and a product name carrying an injected
+instruction. A gate you can only show allowing things demonstrates nothing.
+
+`warrant demo` deliberately ignores this and reads the bundled products, so its
+output is identical on every machine whatever you have configured.
+
 ---
 
 ## In your code

@@ -27,11 +27,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .authorize import Authorizer, PendingIntent
-from .catalog import line_item
+from .catalog import bundled_catalog, line_item
 from .chain import Ledger
 from .crypto import SigningKey
 from .derive import Envelope, ScopeProposal
 from .models import IntentMandate, LineItem, RailBinding, Scope
+
+# The scripted demo is a fixture: identical output on every machine, whatever
+# WARRANT_CATALOG happens to point at. It reads the bundled products directly
+# rather than the active catalogue, which also means `warrant demo` keeps
+# working for somebody who has configured their own.
+_DEMO_CATALOG = bundled_catalog()
+
+
+def _item(sku: str, qty: int):
+    return line_item(sku, qty, catalog=_DEMO_CATALOG)
+
 
 __all__ = ["DemoStep", "Scenario", "build_scenario", "UTTERANCE"]
 
@@ -57,7 +68,7 @@ STEPS: tuple[DemoStep, ...] = (
     DemoStep(
         label="What was asked for",
         merchant="zomato",
-        items=(line_item("chai-6", 6), line_item("samosa-2", 2)),
+        items=(_item("chai-6", 6), _item("samosa-2", 2)),
         nonce="cart-legit-1",
         expect="allow",
         teaches="Every bound the subject signed is satisfied, so the debit proceeds.",
@@ -66,7 +77,7 @@ STEPS: tuple[DemoStep, ...] = (
     DemoStep(
         label="An extra nobody asked for",
         merchant="zomato",
-        items=(line_item("chai-6", 2), line_item("powerbank", 1)),
+        items=(_item("chai-6", 2), _item("powerbank", 1)),
         nonce="cart-drift-1",
         expect="block",
         teaches=(
@@ -78,7 +89,7 @@ STEPS: tuple[DemoStep, ...] = (
     DemoStep(
         label="An injected instruction",
         merchant="zomato",
-        items=(line_item("promo", 1),),
+        items=(_item("promo", 1),),
         nonce="cart-inject-1",
         expect="block",
         teaches=(
@@ -90,7 +101,7 @@ STEPS: tuple[DemoStep, ...] = (
     DemoStep(
         label="The same cart, replayed",
         merchant="zomato",
-        items=(line_item("chai-6", 6), line_item("samosa-2", 2)),
+        items=(_item("chai-6", 6), _item("samosa-2", 2)),
         nonce="cart-legit-1",
         expect="block",
         teaches="A settled cart's nonce cannot be presented twice, so a replay is refused.",
@@ -99,7 +110,7 @@ STEPS: tuple[DemoStep, ...] = (
     DemoStep(
         label="A large legitimate order",
         merchant="zomato",
-        items=(line_item("catering", 1),),
+        items=(_item("catering", 1),),
         nonce="cart-stepup-1",
         expect="escalate",
         teaches=(

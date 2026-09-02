@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field
 
 from .agent import shop
 from .authorize import Authorizer, PendingIntent
-from .catalog import PRODUCTS, by_sku
+from .catalog import active_catalog, by_sku
 from .chain import EventKind, Ledger
 from .crypto import SigningKey
 from .demo import STEPS, UTTERANCE, build_scenario
@@ -66,7 +66,10 @@ app.add_middleware(
 # console cannot drift apart. They did once, by exactly one SKU.
 # --------------------------------------------------------------------------- #
 
-CATALOG: tuple[dict[str, Any], ...] = tuple(p._asdict() for p in PRODUCTS)
+# Read from the active catalog rather than the bundled tuple, so a console
+# started with WARRANT_CATALOG set shows that merchant's products. The bundled
+# ones are a demonstration; they are not what an adopter is supposed to sell.
+CATALOG: tuple[dict[str, Any], ...] = tuple(p._asdict() for p in active_catalog())
 
 
 def _available_rails() -> list[dict[str, Any]]:
