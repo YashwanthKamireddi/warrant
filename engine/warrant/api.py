@@ -25,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .agent import shop
 from .authorize import Authorizer, PendingIntent
 from .catalog import PRODUCTS, by_sku
 from .chain import EventKind, Ledger
@@ -616,6 +617,104 @@ def compare(session_id: str, body: CompareRequest) -> dict[str, Any]:
                 "cardholder's own public key."
             ),
         },
+    }
+
+
+class AgentRunRequest(BaseModel):
+    merchant: str = "zomato"
+    attempts: int = Field(default=3, ge=1, le=5)
+
+
+@app.post("/api/sessions/{session_id}/agent-run")
+def agent_run(session_id: str, body: AgentRunRequest) -> dict[str, Any]:
+    """Let the agent shop, and gate whatever it decides.
+
+    This is the product as it actually runs. A model reads the instruction and
+    the merchant's catalog, picks a basket and says why; Warrant checks it before
+    any payment exists; and if it is refused, the agent is told the reason and
+    tries again.
+
+    Nothing tells the agent to misbehave and nothing tells it the customer's
+    limits -- it does not have them, which is the entire situation this exists
+    for. An agent being generous with someone else's money is the common failure,
+    not an agent being malicious.
+    """
+    session = _session(session_id)
+    if session.intent is None:
+        raise HTTPException(status_code=409, detail="intent has not been approved yet")
+
+    attempts: list[dict[str, Any]] = []
+    rejected: list[str] = []
+
+    for _ in range(body.attempts):
+        basket = shop(
+            session.intent.utterance,
+            merchant=body.merchant,
+            rejected=tuple(rejected),
+            client=session.authorizer.model_client,
+        )
+        items = basket.line_items()
+        now = session.tick()
+        cart = session.authorizer.propose_cart(
+            session.intent,
+            merchant=basket.merchant,
+            items=items,
+            now=now,
+            nonce=session.next_nonce(),
+        )
+        # Timed twice, because one number would be a lie. The deterministic gate
+        # is what sits in the payment path and it runs in microseconds; the
+        # advisory judge is a network round trip and only runs on carts that
+        # already cleared every binding check. Reporting the total as "the gate"
+        # would make a sub-millisecond decision look like a second.
+        gate_started = time.perf_counter()
+        gate_only = evaluate(
+            session.intent,
+            cart,
+            copy.deepcopy(session.authorizer.state_for(session.intent)),
+            now=now,
+            subject_key=session.subject_key.public,
+        )
+        gate_us = (time.perf_counter() - gate_started) * 1_000_000
+        del gate_only
+
+        started = time.perf_counter()
+        outcome = session.authorizer.authorize(
+            session.intent, cart, subject_key=session.subject_key.public, now=now
+        )
+        elapsed_us = (time.perf_counter() - started) * 1_000_000
+
+        payload = _outcome_json(outcome)
+        payload["elapsed_us"] = round(elapsed_us, 1)
+        payload["gate_us"] = round(gate_us, 1)
+        payload["rail_kind"] = session.rail_kind
+        payload["label"] = basket.reasoning
+        session.record(payload, outcome.cart, outcome.receipt)
+
+        attempts.append(
+            {
+                "agent": {
+                    "reasoning": basket.reasoning,
+                    "source": basket.source,
+                    "picks": [
+                        {"sku": p.sku, "qty": p.qty, "name": by_sku(p.sku).name}
+                        for p in basket.picks
+                    ],
+                    "total_paise": basket.total_paise,
+                },
+                "outcome": payload,
+            }
+        )
+
+        if outcome.verdict is Verdict.ALLOW:
+            break
+        # The agent is told why, not what the limits are. It has to infer.
+        rejected.extend(outcome.decision.reasons)
+
+    return {
+        "attempts": attempts,
+        "scope": _scope_json(session.intent, session),
+        "ledger_added": _ledger_json(session, since=0),
     }
 
 

@@ -5,6 +5,7 @@ import { Certificate } from "./components/Certificate";
 import { ChainDiagram } from "./components/ChainDiagram";
 import { DecisionCard } from "./components/DecisionCard";
 import { EvidenceView } from "./components/EvidenceView";
+import { AgentRun } from "./components/AgentRun";
 import { Counterfactual } from "./components/Counterfactual";
 import { LedgerView } from "./components/LedgerView";
 import { StandardsView } from "./components/StandardsView";
@@ -12,6 +13,7 @@ import { Storefront } from "./components/Storefront";
 import { Basket, Rows, ShieldMark } from "./components/icons";
 import { Badge, Empty, Gauge, Hash, Role } from "./components/primitives";
 import type {
+  AgentAttempt,
   ChainStatus,
   Comparison,
   EvidencePack,
@@ -23,7 +25,7 @@ import type {
   Signature,
 } from "./types";
 
-type Tab = "stakes" | "decisions" | "ledger" | "evidence" | "standards";
+type Tab = "run" | "stakes" | "decisions" | "ledger" | "evidence" | "standards";
 
 /** Every path an interpretation can take gets a label. A missing case rendered
  *  an empty chip, which is worse than a wrong one -- it looks like a bug. */
@@ -35,6 +37,7 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 const TABS: { key: Tab; label: string }[] = [
+  { key: "run", label: "The agent shopping" },
   { key: "stakes", label: "What it prevents" },
   { key: "decisions", label: "Decisions" },
   { key: "ledger", label: "Ledger" },
@@ -57,8 +60,10 @@ export function App() {
   const [merchant, setMerchant] = useState("zomato");
   const [rail, setRail] = useState<"simulated" | "razorpay">("simulated");
   const [cosign, setCosign] = useState(false);
-  const [tab, setTab] = useState<Tab>("decisions");
+  const [tab, setTab] = useState<Tab>("run");
   const [comparison, setComparison] = useState<Comparison | null>(null);
+  const [attempts, setAttempts] = useState<AgentAttempt[]>([]);
+  const [agentRunning, setAgentRunning] = useState(false);
   const [evidence, setEvidence] = useState<EvidencePack | null>(null);
   const [evidenceError, setEvidenceError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -215,6 +220,26 @@ export function App() {
         setTab("decisions");
       } else {
         throw new Error("Nothing has been captured yet. Pay the link, then check again.");
+      }
+    });
+
+  /** Let the model shop. It is never told Priya's limits — only, if refused,
+   *  the reason. Watching it work that out is the demonstration. */
+  const runAgent = () =>
+    run(async () => {
+      if (!sessionId) return;
+      setAttempts([]);
+      setTab("run");
+      setAgentRunning(true);
+      try {
+        const result = await api.agentRun(sessionId, merchant);
+        setAttempts(result.attempts);
+        setScope(result.scope);
+        setLedger(result.ledger_added);
+        setChain(await api.chain(sessionId));
+        if (result.attempts.some((a) => a.outcome.receipt)) void refreshEvidence(sessionId);
+      } finally {
+        setAgentRunning(false);
       }
     });
 
@@ -470,8 +495,9 @@ export function App() {
                 hint="spending her permission"
               />
               <p className="agent-brief">
-                <b>Try to get away with something.</b> Everything below is at the right
-                merchant — but only some of it is what she asked for.
+                <b>A model does the shopping.</b> It reads her instruction and this
+                catalog, and it is never told her limits. You can also pick items
+                yourself to try something specific.
               </p>
               <div className="step-head">
                 <span className="step-index done">3</span>
@@ -525,10 +551,17 @@ export function App() {
               <div className="rail-actions">
                 <button
                   className="btn btn-primary btn-block"
+                  onClick={runAgent}
+                  disabled={busy}
+                >
+                  {agentRunning ? "The agent is shopping…" : "Let the agent shop"}
+                </button>
+                <button
+                  className="btn btn-secondary btn-block"
                   onClick={authorize}
                   disabled={busy || lines.length === 0}
                 >
-                  {busy ? "Checking…" : "Authorise this basket"}
+                  {busy ? "Checking…" : "Or authorise this basket yourself"}
                 </button>
                 {rail === "razorpay" && (
                   <button className="btn btn-secondary" onClick={settle} disabled={busy}>
@@ -590,6 +623,16 @@ export function App() {
 
           <div className="pane" role="tabpanel">
             <div className="pane-inner">
+              {/* Before a permission exists there is nothing to watch, so the
+                  first screen explains the architecture a viewer is about to
+                  see rather than showing an empty transcript. */}
+              {tab === "run" &&
+                (approved ? (
+                  <AgentRun attempts={attempts} running={agentRunning} />
+                ) : (
+                  <ChainDiagram />
+                ))}
+
               {tab === "stakes" && (
                 <Counterfactual
                   comparison={comparison}
@@ -603,18 +646,11 @@ export function App() {
 
               {tab === "decisions" &&
                 (outcomes.length === 0 ? (
-                  /* Before anything has run, the pane earns its space by
-                     explaining the architecture a reviewer is about to watch,
-                     rather than showing an empty box. */
-                  approved ? (
-                    <Empty icon={<Basket />} title="No baskets authorised yet">
-                      Every basket the agent proposes is checked against the signed permission
-                      before any money moves. The verdict, the rule that produced it, and the
-                      numbers behind that rule all appear here.
-                    </Empty>
-                  ) : (
-                    <ChainDiagram />
-                  )
+                  <Empty icon={<Basket />} title="No baskets authorised yet">
+                    Every basket the agent proposes is checked against the signed permission
+                    before any money moves. The verdict, the rule that produced it, and the
+                    numbers behind that rule all appear here.
+                  </Empty>
                 ) : (
                   outcomes.map((outcome, i) => (
                     <DecisionCard key={`${outcome.cart.id}-${i}`} outcome={outcome} index={i} />

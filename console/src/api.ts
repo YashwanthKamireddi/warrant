@@ -1,4 +1,5 @@
 import type {
+  AgentAttempt,
   ChainStatus,
   Comparison,
   EvidencePack,
@@ -80,6 +81,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ merchant, lines }),
     }),
+
+  agentRun: (sessionId: string, merchant: string) =>
+    request<{ attempts: AgentAttempt[]; scope: Scope; ledger_added: LedgerEntry[] }>(
+      `/sessions/${sessionId}/agent-run`,
+      { method: "POST", body: JSON.stringify({ merchant, attempts: 3 }) },
+    ),
 
   settle: (sessionId: string) =>
     request<{ settled: Outcome[]; scope: Scope; ledger_added: LedgerEntry[] }>(

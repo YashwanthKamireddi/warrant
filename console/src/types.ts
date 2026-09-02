@@ -65,8 +65,10 @@ export interface Outcome {
   rail: RailResult | null;
   ledger_seqs: number[];
   label: string | null;
-  /** Wall time for the whole authorisation, including the rail call. */
+  /** Wall time for the whole authorisation, including any model call. */
   elapsed_us?: number;
+  /** The deterministic gate alone — the part that sits in the payment path. */
+  gate_us?: number;
   rail_kind?: string;
 }
 
@@ -211,4 +213,15 @@ export interface Comparison {
     evidence: EvidenceItem[];
     on_dispute: string;
   };
+}
+
+
+export interface AgentAttempt {
+  agent: {
+    reasoning: string;
+    source: string;
+    picks: { sku: string; qty: number; name: string }[];
+    total_paise: number;
+  };
+  outcome: Outcome;
 }
