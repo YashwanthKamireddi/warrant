@@ -24,7 +24,7 @@ with sync_playwright() as pw:
     browser = pw.chromium.launch()
     for width, height in VIEWPORTS:
         page = browser.new_page(viewport={"width": width, "height": height})
-        page.goto(BASE, wait_until="networkidle")
+        page.goto(f"{BASE}/#workspace", wait_until="networkidle")
         page.get_by_role("button", name="Derive the permission").click()
         page.wait_for_selector(".certificate", timeout=10_000)
         page.get_by_role("button", name="Approve and sign with the subject's key").click()

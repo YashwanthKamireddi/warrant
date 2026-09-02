@@ -30,8 +30,19 @@ with sync_playwright() as pw:
             if m.type in ("error", "warning") else None)
     page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
 
-    print(f"opening {BASE}")
+    print("the landing page")
     page.goto(BASE, wait_until="networkidle")
+    page.wait_for_selector(".hero h1", timeout=10_000)
+    page.wait_for_timeout(400)
+    shot(page, "00-landing")
+    for required in (".proof-cols", ".where-flow", ".who-grid", ".numbers-grid"):
+        if page.locator(required).count() == 0:
+            errors.append(f"landing page is missing {required}")
+    page.get_by_role("button", name="Open the workspace").first.click()
+    page.wait_for_selector(".shell", timeout=10_000)
+
+    print(f"opening {BASE}")
+    page.goto(f"{BASE}/#workspace", wait_until="networkidle")
     page.wait_for_selector(".brand-words b", timeout=10_000)
     shot(page, "01-initial")
 

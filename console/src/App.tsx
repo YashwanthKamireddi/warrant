@@ -7,6 +7,7 @@ import { DecisionCard } from "./components/DecisionCard";
 import { EvidenceView } from "./components/EvidenceView";
 import { AgentRun } from "./components/AgentRun";
 import { Counterfactual } from "./components/Counterfactual";
+import { Landing } from "./components/Landing";
 import { LedgerView } from "./components/LedgerView";
 import { StandardsView } from "./components/StandardsView";
 import { Storefront } from "./components/Storefront";
@@ -46,6 +47,12 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 export function App() {
+  // The landing page is the default. #workspace goes straight in, which is also
+  // how the browser gates reach the console without clicking through.
+  const [entered, setEntered] = useState(
+    () => window.location.hash === "#workspace",
+  );
+
   const [meta, setMeta] = useState<Meta | null>(null);
   const [utterance, setUtterance] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -268,6 +275,17 @@ export function App() {
   );
   const needsCosign =
     scope?.step_up_over_paise != null && basketTotal > scope.step_up_over_paise;
+
+  if (!entered) {
+    return (
+      <Landing
+        onEnter={() => {
+          window.location.hash = "workspace";
+          setEntered(true);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="shell">

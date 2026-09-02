@@ -149,7 +149,7 @@ with sync_playwright() as pw:
         else:
             print(f"  ok   {label}")
 
-    page.goto(BASE, wait_until="networkidle")
+    page.goto(f"{BASE}/#workspace", wait_until="networkidle")
     page.wait_for_selector(".explainer", timeout=10_000)
     scan(STATES[0])
 
