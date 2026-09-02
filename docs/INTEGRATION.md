@@ -294,6 +294,9 @@ It does not catch a merchant mislabelling its own catalogue. A merchant whose
 MCC permits food, listing a power bank as food, passes. Catching that needs the
 purchased item as the rail sees it, which no metadata layer can reach.
 
-It does not stop everything. Over 540 labelled cases it lets 90 through. It
-also never once stopped a purchase the person actually authorised, which is the
-number a merchant cares about.
+It is a deterministic gate, not an oracle. Over 540 labelled cases it refuses
+every basket the signed permission excludes on an arithmetic bound, and the 90
+that survive are the ones only reading the basket against the instruction can
+catch — which is what the advisory judge is for, and why it can escalate and
+never authorise. It has never once stopped a purchase the person actually
+authorised, which is the number a merchant lives with.

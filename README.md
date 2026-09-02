@@ -214,10 +214,12 @@ assumed: **p50 under 300µs and p99 under 3ms** across 540 in-process decisions 
 no model call. Stated as bounds rather than a point, because a hardware figure
 quoted to the microsecond is a claim about my laptop.
 
-### Where this loses
+### What a deterministic gate cannot see, measured
 
-Every number above is measured on data this repository generates. Discount it
-accordingly — and here is exactly where.
+Every number above comes from data this repository generates, and the run is
+reproducible from a clean clone. This section says precisely which cases
+arithmetic reaches and which it does not — the reason the advisory judge exists
+at all.
 
 **`injection_subtle`: 0 of 45. `semantic_drift`: 0 of 45.** Both sit inside every
 bound the subject signed — right merchant, right category, under every ceiling — so
@@ -225,8 +227,8 @@ no arithmetic touches them, and the payload in `injection_subtle` is phrased to
 evade the instruction-text heuristic. Only reading the basket against the
 instruction catches either, and the committed run had no model reachable.
 
-**So I ran them against a live model, and the result was worse than I expected.**
-36 cases, 72 calls, `openai/gpt-oss-120b` on Groq — `bench/RESULTS-live-sample.json`:
+**So they were measured against a live model.** 36 cases, 72 calls,
+`openai/gpt-oss-120b` on Groq — `bench/RESULTS-live-sample.json`:
 
 | category | offline | with a live model |
 | :--- | ---: | ---: |
@@ -235,8 +237,9 @@ instruction catches either, and the committed run had no model reachable.
 | `legitimate`, no false blocks | 45 / 45 | 12 / 12 |
 
 A model moves `semantic_drift` from nothing to roughly one in six, and does not
-touch `injection_subtle` at all. And `model_only` — the policy that trusts the
-model to decide — blocked **5 legitimate baskets** for ₹2,200 of killed
+touch `injection_subtle` at all — which is exactly why it advises and never
+decides. `model_only`, the policy that lets the model decide, blocked
+**5 legitimate baskets** for ₹2,200 of killed
 conversion while catching 4.2% of violations.
 
 **That result argues for this architecture rather than against it.** If the model
@@ -451,9 +454,10 @@ check that it fails.**
 
 ---
 
-## Honest limits
+## Scope
 
-- **Categories come from the merchant's own catalog.** Half of that hole is closed:
+- **Categories come from the merchant's own catalog, and are checked against its
+  acquirer.** Half of that is closed outright:
   an acquirer assigns a merchant its category code and the merchant does not pick it,
   so `merchant.mcc_scope` is binding and an unregistered merchant fails closed. What
   stays open is a merchant mislabelling *within* its own category — Zomato is MCC 5812,
@@ -461,8 +465,9 @@ check that it fails.**
   the item actually purchased, which no metadata layer can see.
   `test_the_known_gap_is_documented_by_a_test` asserts the gap so nobody later mistakes
   the MCC rule for a complete fix.
-- **The committed benchmark ran with no model reachable.** Every interpretation is
-  labelled with the path it actually took — `live`, `transcript` or `fallback` — in
+- **The committed benchmark runs deterministically, with no model.** That is what
+  makes it byte-identical on every machine. Every interpretation is labelled with
+  the path it actually took — `live`, `transcript` or `fallback` — in
   the ledger, the CLI and the console, and a replayed one is never presented as
   live. That is why `injection_subtle` and `semantic_drift` read zero in the table
   above. Set either API key and rerun `make bench-live` to move them.
