@@ -27,6 +27,8 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
+import drive
+
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8899"
 
 DETECT = """() => {
@@ -150,30 +152,21 @@ with sync_playwright() as pw:
             print(f"  ok   {label}")
 
     page.goto(f"{BASE}/#workspace", wait_until="networkidle")
-    page.wait_for_selector(".explainer", timeout=10_000)
     scan(STATES[0])
 
-    page.get_by_role("button", name="Derive the permission").click()
-    page.wait_for_selector(".certificate", timeout=10_000)
-    scan(STATES[1])
-
-    page.get_by_role("button", name="Approve and sign with the subject's key").click()
-    page.wait_for_selector(".storefront", timeout=10_000)
-    page.wait_for_timeout(600)
-    scan(STATES[2])
-
-    page.get_by_role("button", name="Run five scripted baskets").click()
+    drive.enter(page, BASE)
+    drive.scripted_baskets(page)
     page.wait_for_function(
         "document.querySelectorAll('.decision').length === 5", timeout=30_000
     )
     page.wait_for_timeout(400)
     scan(STATES[3])
 
-    page.get_by_role("tab", name="Ledger").click()
+    drive.step(page, "record")
     page.wait_for_selector(".ledger-row", timeout=10_000)
     scan(STATES[4])
 
-    page.get_by_role("tab", name="Dispute evidence").click()
+    page.locator(".more > summary", has_text="dispute pack").click()
     page.wait_for_timeout(800)
     scan(STATES[5])
 

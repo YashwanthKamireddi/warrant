@@ -15,6 +15,8 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
+import drive
+
 errs = []
 with sync_playwright() as pw:
     b = pw.chromium.launch()
@@ -22,8 +24,10 @@ with sync_playwright() as pw:
     p.on("pageerror", lambda e: errs.append(str(e)))
     p.goto(sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8842", wait_until="networkidle")
     p.wait_for_selector(".rail-choice", timeout=10_000)
+    drive.enter(p, BASE)
+    p.locator(".tryown > summary").click()
     p.get_by_role("radio", name="Razorpay test mode").click()
-    p.get_by_role("button", name="Derive the permission").click()
+    p.get_by_role("button", name="Derive a new permission").click()
     p.wait_for_selector(".certificate", timeout=15_000)
     p.get_by_role("button", name="Approve and sign with the subject's key").click()
     p.wait_for_selector(".storefront", timeout=10_000)

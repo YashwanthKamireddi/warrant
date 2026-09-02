@@ -4,9 +4,10 @@ Layout bugs are the ones a build cannot catch and a single screenshot hides. The
 invariants below are the ones that would actually cost someone a demo:
 
   * the page itself never scrolls -- this is an app frame, not a document
-  * the primary action is always reachable without scrolling to find it
-  * long content scrolls inside its own pane rather than pushing the frame
-  * nothing overflows horizontally
+  * nothing overflows horizontally, at any width a reviewer might open it at
+  * long content scrolls inside the stage rather than pushing the frame
+  * the walkthrough and its next/back control are always reachable
+  * the act being read is never wider than its measure
 """
 
 from __future__ import annotations
@@ -15,8 +16,25 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
+import drive
+
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8805"
-VIEWPORTS = ((1920, 1080), (1580, 960), (1440, 900), (1366, 768), (1280, 720))
+# The console shipped a horizontal scrollbar below 860px for weeks because
+# this tuple started at 1280. A reviewer opens things on a laptop with a
+# sidebar, or a phone; the narrow end is where layout actually breaks.
+VIEWPORTS = (
+    (1920, 1080),
+    (1580, 960),
+    (1440, 900),
+    (1366, 768),
+    (1280, 720),
+    (1024, 768),
+    (900, 900),
+    (820, 1180),
+    (768, 1024),
+    (430, 932),
+    (390, 844),
+)
 
 failures: list[str] = []
 
@@ -24,18 +42,11 @@ with sync_playwright() as pw:
     browser = pw.chromium.launch()
     for width, height in VIEWPORTS:
         page = browser.new_page(viewport={"width": width, "height": height})
-        page.goto(f"{BASE}/#workspace", wait_until="networkidle")
-        page.get_by_role("button", name="Derive the permission").click()
-        page.wait_for_selector(".certificate", timeout=10_000)
-        page.get_by_role("button", name="Approve and sign with the subject's key").click()
-        page.wait_for_selector(".storefront", timeout=10_000)
-        page.get_by_role("button", name="Run five scripted baskets").click()
+        drive.enter(page, BASE)
         # Wait for every decision, not for the first one plus a guessed delay.
         # The scripted run issues five sequential requests, so a fixed timeout
         # races them and fails intermittently on a slower machine.
-        page.wait_for_function(
-            "document.querySelectorAll('.decision').length === 5", timeout=30_000
-        )
+        drive.scripted_baskets(page)
 
         checks = page.evaluate(
             """() => {
@@ -44,14 +55,18 @@ with sync_playwright() as pw:
                     const r = el.getBoundingClientRect();
                     return r.top >= 0 && r.bottom <= window.innerHeight;
                 };
-                const authorise = [...document.querySelectorAll('.rail-actions .btn-primary')][0];
+                const stage = q('.stage');
                 return {
                     bodyScrollsY: document.documentElement.scrollHeight > window.innerHeight + 1,
                     bodyScrollsX: document.documentElement.scrollWidth > window.innerWidth + 1,
-                    railOverflows: q('.rail').scrollHeight > q('.rail').clientHeight + 1,
-                    authoriseInView: authorise ? inView(authorise) : false,
-                    paneScrolls: q('.pane').scrollHeight > q('.pane').clientHeight,
-                    statusVisible: inView(q('.statusbar')),
+                    stageOverflowsX: stage.scrollWidth > stage.clientWidth + 1,
+                    stepsVisible: !!q('.stepbtn') && inView(q('.steps')),
+                    navVisible: inView(q('.stagenav')),
+                    nextInView: inView(q('.stagenav .btn-primary')),
+                    // A line of text wider than about 90 characters stops being
+                    // readable. The measure is the whole reason for the column.
+                    actTooWide: q('.act').getBoundingClientRect().width > 820,
+                    stageScrolls: stage.scrollHeight > stage.clientHeight,
                     decisions: document.querySelectorAll('.decision').length,
                 };
             }"""
@@ -63,12 +78,16 @@ with sync_playwright() as pw:
             problems.append("the page itself scrolls vertically")
         if checks["bodyScrollsX"]:
             problems.append("the page scrolls horizontally")
-        if checks["railOverflows"]:
-            problems.append("the rail overflows instead of scrolling its panes")
-        if not checks["authoriseInView"]:
+        if checks["stageOverflowsX"]:
+            problems.append("the stage overflows horizontally")
+        if not checks["stepsVisible"]:
+            problems.append("the walkthrough steps are not visible")
+        if not checks["navVisible"]:
+            problems.append("the stage nav is not visible")
+        if not checks["nextInView"]:
             problems.append("the primary action is not in the viewport")
-        if not checks["statusVisible"]:
-            problems.append("the status bar is not visible")
+        if checks["actTooWide"]:
+            problems.append("the act is wider than a readable measure")
         if checks["decisions"] != 5:
             problems.append(f"expected 5 decisions, rendered {checks['decisions']}")
 
@@ -76,7 +95,7 @@ with sync_playwright() as pw:
             failures.extend(f"{label}: {p}" for p in problems)
             print(f"  FAIL {label}  " + "; ".join(problems))
         else:
-            print(f"  ok   {label}  frame holds, pane scrolls: {checks['paneScrolls']}")
+            print(f"  ok   {label}  frame holds, stage scrolls: {checks['stageScrolls']}")
         page.close()
     browser.close()
 

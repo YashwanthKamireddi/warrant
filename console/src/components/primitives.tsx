@@ -5,10 +5,12 @@ import { rupees, shortHash } from "../format";
  *  this — so it carries four characters of that key id. Two different signers
  *  are visibly different rather than both being "signed". */
 export function Seal({ keyId, stamping }: { keyId: string | null; stamping?: boolean }) {
+  // A lone dash in an empty circle reads as a failed render, not as a state.
+  // The unsigned seal says what it is.
   if (!keyId) {
     return (
       <div className="seal unsigned" aria-label="Not yet signed" title="Not yet signed">
-        <span>—</span>
+        <span>unsigned</span>
       </div>
     );
   }

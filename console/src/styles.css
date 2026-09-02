@@ -188,14 +188,9 @@ a {
 
 .shell {
   display: grid;
-  grid-template-rows: var(--appbar) auto 1fr var(--statusbar);
+  grid-template-rows: var(--appbar) auto 1fr auto;
   height: 100%;
-}
-
-.workspace {
-  display: grid;
-  grid-template-columns: var(--rail) 1fr;
-  min-height: 0;
+  min-width: 0;
 }
 
 /* ==========================================================================
@@ -686,23 +681,22 @@ a {
   }
 }
 
+/* Separators are drawn by the grid gap rather than by nth-child borders, so
+   the card is correct for three terms or for eight. The old parity rules left
+   a hole and a dangling divider the moment the count became odd. */
 .terms {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 1px;
   border-top: 1px solid var(--line);
+  background: var(--line);
 }
 .term {
-  padding: 10px var(--s-5);
-  border-bottom: 1px solid var(--line);
+  padding: 11px var(--s-5) 13px;
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-.term:nth-child(odd) {
-  border-right: 1px solid var(--line);
-}
-.term:nth-last-child(-n + 2) {
-  border-bottom: none;
 }
 .term dt {
   font: var(--t-micro);
@@ -1889,7 +1883,7 @@ a {
   font-size: 40px;
   font-weight: 700;
   letter-spacing: -0.035em;
-  line-height: 1.05;
+  line-height: 1.22;
   color: var(--ink);
 }
 .cf-amount.bad {
@@ -2571,4 +2565,236 @@ a {
   .proof-cols {
     grid-template-columns: 1fr;
   }
+}
+
+
+/* ==========================================================================
+   Walkthrough — one act per screen
+   --------------------------------------------------------------------------
+   The console replaced a two-pane cockpit. There is no operator to give a
+   cockpit to: in a real integration Warrant is a call inside the payment path,
+   so the only honest surface is a demonstration. One idea per screen, one
+   primary action, and the reader is only ever one person at a time.
+   ========================================================================== */
+
+.steps {
+  display: flex;
+  gap: 2px;
+  padding: 0 clamp(16px, 4vw, 40px);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.steps::-webkit-scrollbar { display: none; }
+
+.stepbtn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 18px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: 13.5px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.14s ease, border-color 0.14s ease;
+}
+.stepbtn:hover { color: var(--ink); }
+.stepbtn.on {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+  font-weight: 600;
+}
+
+.stepbtn-n {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.stepbtn.on .stepbtn-n {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--on-brand);
+}
+.stepbtn.done .stepbtn-n {
+  border-color: var(--brand-soft);
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+/* ------------------------------------------------------------------ stage */
+
+.stage {
+  min-height: 0;
+  overflow-y: auto;
+  padding: clamp(28px, 5vw, 52px) clamp(16px, 4vw, 40px) 40px;
+}
+
+.act {
+  max-width: 760px;          /* a measure, not a column of a grid */
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.stage-who {
+  max-width: 760px;
+  margin: 0 auto 14px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+
+/* The one line that carries the screen. Nothing else competes with it. */
+.act-head {
+  margin: 0;
+  font-size: clamp(21px, 2.6vw, 29px);
+  line-height: 1.28;
+  letter-spacing: -0.021em;
+  font-weight: 600;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.act-wait { margin: 0; color: var(--ink-3); }
+
+.act-do {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* What she actually said, given the weight of a quotation rather than of a
+   form field, because it is the root of every other artefact on screen. */
+.said-big {
+  margin: 0;
+  padding: 18px 22px;
+  border-left: 3px solid var(--brand);
+  background: var(--brand-soft);
+  border-radius: 0 10px 10px 0;
+  font-size: 16.5px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.decisions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cosign {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.stage-error {
+  max-width: 760px;
+  margin: 18px auto 0;
+  padding: 11px 15px;
+  border: 1px solid var(--stop-line);
+  border-radius: 9px;
+  background: var(--stop-bg);
+  font-size: 13px;
+  color: var(--stop);
+}
+
+/* Configuration is for the one visitor in twenty who wants to drive. It does
+   not get to occupy the screen for the other nineteen. */
+.tryown,
+.more {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.tryown > summary,
+.more > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink-3);
+  list-style: none;
+}
+.tryown > summary::-webkit-details-marker,
+.more > summary::-webkit-details-marker { display: none; }
+.tryown > summary::before,
+.more > summary::before {
+  content: "+ ";
+  font-variant-numeric: tabular-nums;
+}
+.tryown[open] > summary::before,
+.more[open] > summary::before { content: "− "; }
+.tryown > summary:hover,
+.more > summary:hover { color: var(--ink); }
+.tryown > *:not(summary),
+.more > *:not(summary) { margin-top: 14px; }
+
+/* --------------------------------------------------------------- stage nav */
+
+.stagenav {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px clamp(16px, 4vw, 40px);
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.budget {
+  display: flex;
+  gap: 18px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 720px) {
+  .budget { display: none; }
+  .stepbtn-label { display: none; }
+  .stepbtn { padding: 13px 14px; }
+}
+
+.terms-more > summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  list-style: none;
+  padding: 11px var(--s-5);
+  border-top: 1px solid var(--line);
+}
+.terms-more > summary::-webkit-details-marker { display: none; }
+.terms-more > summary::before { content: "+ "; }
+.terms-more[open] > summary::before { content: "− "; }
+.terms-more > summary:hover { color: var(--ink); }
+
+/* The unsigned seal carries a word, so it needs to be a pill rather than the
+   46px disc a four-character key id fits into. */
+.seal.unsigned {
+  width: auto;
+  min-width: 46px;
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.btn-amount {
+  margin-left: 8px;
+  padding-left: 9px;
+  border-left: 1px solid var(--on-brand);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.86;
 }

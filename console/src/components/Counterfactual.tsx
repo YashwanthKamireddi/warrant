@@ -48,9 +48,12 @@ export function Counterfactual({
       <div className="cf-columns">
         <section className="cf-col cf-without">
           <h3>Without Warrant</h3>
+          {/* A tick inside a red disc, sitting opposite a cross inside a
+              green one, inverts for anyone who reads the glyph before the
+              colour -- which is everyone. The left column is a warning. */}
           <p className="cf-headline">
             <span className="cf-mark bad" aria-hidden>
-              ✓
+              !
             </span>
             Payment captured
           </p>

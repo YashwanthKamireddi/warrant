@@ -10,6 +10,8 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
+import drive
+
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8801"
 OUT = Path(__file__).parent / "shots"
 OUT.mkdir(exist_ok=True)
@@ -42,26 +44,21 @@ with sync_playwright() as pw:
     page.wait_for_selector(".shell", timeout=10_000)
 
     print(f"opening {BASE}")
-    page.goto(f"{BASE}/#workspace", wait_until="networkidle")
-    page.wait_for_selector(".brand-words b", timeout=10_000)
+    drive.enter(page, BASE)
+    page.wait_for_timeout(500)
     shot(page, "01-initial")
 
-    print("deriving the permission")
-    page.get_by_role("button", name="Derive the permission").click()
-    page.wait_for_selector(".certificate", timeout=10_000)
+    # Step 1 must open on a signed permission with no clicking. A visitor who
+    # has to operate a form before seeing anything real has already left.
+    if page.locator(".seal.unsigned").count():
+        errors.append("step 1 opened unsigned; the bootstrap did not sign")
     shot(page, "02-derived")
-
-    print("approving and signing")
-    page.get_by_role("button", name="Approve and sign with the subject's key").click()
-    page.wait_for_selector(".storefront", timeout=10_000)
-    page.wait_for_timeout(600)
+    page.locator(".terms-more > summary").click()
+    page.wait_for_timeout(250)
     shot(page, "03-signed")
 
     print("running the five scripted baskets")
-    page.get_by_role("button", name="Run five scripted baskets").click()
-    page.wait_for_function(
-        "document.querySelectorAll('.decision').length === 5", timeout=30_000
-    )
+    drive.scripted_baskets(page)
     page.wait_for_timeout(400)
     shot(page, "04-decisions")
 
@@ -72,7 +69,7 @@ with sync_playwright() as pw:
         errors.append(f"verdicts {verdicts} != {expected} printed by `warrant demo`")
 
     print("opening what it prevents")
-    page.get_by_role("tab", name="What it prevents").click()
+    drive.step(page, "prevents")
     page.get_by_role("button", name="Add one Fast Power Bank 10000mAh").click()
     page.wait_for_selector(".cf-columns", timeout=15_000)
     page.wait_for_timeout(700)
@@ -81,17 +78,17 @@ with sync_playwright() as pw:
         errors.append("counterfactual did not render the loss figure")
 
     print("opening the ledger")
-    page.get_by_role("tab", name="Ledger").click()
+    drive.step(page, "record")
     page.wait_for_selector(".ledger-row", timeout=10_000)
     shot(page, "05-ledger")
 
     print("opening the dispute evidence")
-    page.get_by_role("tab", name="Dispute evidence").click()
+    page.locator(".more > summary", has_text="dispute pack").click()
     page.wait_for_timeout(900)
     shot(page, "06-evidence")
 
     print("opening the AP2 export")
-    page.get_by_role("tab", name="AP2 export").click()
+    page.locator(".more > summary", has_text="AP2").click()
     page.wait_for_selector(".cred", timeout=10_000)
     page.wait_for_timeout(500)
     shot(page, "08-standards")
@@ -106,7 +103,7 @@ with sync_playwright() as pw:
         errors.append("AP2 export does not show the subject and authorizer as different signers")
 
     print("tampering with the ledger")
-    page.get_by_role("button", name="Tamper with the ledger").click()
+    page.get_by_role("button", name="Try to rewrite the ledger").click()
     page.wait_for_selector(".notice.stop, .ledger-row.orphaned", timeout=10_000)
     page.wait_for_timeout(500)
     shot(page, "07-tampered")

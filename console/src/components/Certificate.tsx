@@ -37,46 +37,53 @@ export function Certificate({ pending, scope, signature, justSigned }: Props) {
         <Seal keyId={signature?.key_id ?? null} stamping={justSigned} />
       </div>
 
+      {/* A person approving a spend needs three answers: how much, where, how
+          long. The remaining terms are real and enforced, but they are the
+          engine's business until someone asks. */}
       <dl className="terms">
         <div className="term">
-          <dt>Total ceiling</dt>
+          <dt>How much</dt>
           <dd>{rupees(s.max_total_paise, { compact: true })}</dd>
         </div>
         <div className="term">
-          <dt>Per order</dt>
-          <dd>{rupees(s.max_per_txn_paise, { compact: true })}</dd>
-        </div>
-        <div className="term">
-          <dt>Orders permitted</dt>
-          <dd>{s.max_txns}</dd>
-        </div>
-        <div className="term">
-          <dt>Expires in</dt>
-          <dd>{relativeWindow(s.not_before, s.expires_at)}</dd>
-        </div>
-        <div className="term">
-          <dt>Merchants</dt>
+          <dt>Where</dt>
           <dd>{s.merchants.join(", ")}</dd>
         </div>
         <div className="term">
-          <dt>Categories</dt>
-          <dd>{s.categories.join(", ")}</dd>
+          <dt>How long</dt>
+          <dd>{relativeWindow(s.not_before, s.expires_at)}</dd>
         </div>
-        {s.step_up_over_paise !== null && (
-          <>
+      </dl>
+
+      <details className="terms-more">
+        <summary>Every term the gate enforces</summary>
+        <dl className="terms">
+          <div className="term">
+            <dt>Per order</dt>
+            <dd>{rupees(s.max_per_txn_paise, { compact: true })}</dd>
+          </div>
+          <div className="term">
+            <dt>Orders permitted</dt>
+            <dd>{s.max_txns}</dd>
+          </div>
+          <div className="term">
+            <dt>Categories</dt>
+            <dd>{s.categories.join(", ")}</dd>
+          </div>
+          {s.step_up_over_paise !== null && (
             <div className="term">
-              <dt>Co-signature over</dt>
+              <dt>Second signature over</dt>
               <dd>{rupees(s.step_up_over_paise, { compact: true })}</dd>
             </div>
-            <div className="term">
-              <dt>Signed by</dt>
-              <dd className="mono" style={{ fontSize: 12 }}>
-                {signature?.key_id ?? "unsigned"}
-              </dd>
-            </div>
-          </>
-        )}
-      </dl>
+          )}
+          <div className="term">
+            <dt>Signed by</dt>
+            <dd className="mono" style={{ fontSize: 12 }}>
+              {signature?.key_id ?? "not yet signed"}
+            </dd>
+          </div>
+        </dl>
+      </details>
 
       {pending.narrowed_by_envelope && (
         <p className="certificate-note">
