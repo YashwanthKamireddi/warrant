@@ -34,13 +34,25 @@ with sync_playwright() as pw:
 
     print("the landing page")
     page.goto(BASE, wait_until="networkidle")
-    page.wait_for_selector(".hero h1", timeout=10_000)
+    page.wait_for_selector(".lp-open h1", timeout=10_000)
     page.wait_for_timeout(400)
     shot(page, "00-landing")
-    for required in (".proof-cols", ".where-flow", ".who-grid", ".numbers-grid"):
+    for required in (".lp-open", ".lp-gap", ".lp-evidence", ".lp-chain", ".lp-specs", ".lp-end"):
         if page.locator(required).count() == 0:
             errors.append(f"landing page is missing {required}")
-    page.get_by_role("button", name="Open the workspace").first.click()
+    # Reveal-on-scroll must never be the reason a reader cannot read something.
+    # If the observer fails to fire, the page is blank and the build should say so.
+    page.locator(".lp-end").scroll_into_view_if_needed()
+    page.wait_for_timeout(900)
+    unread = page.evaluate(
+        "() => [...document.querySelectorAll('.lp-open [data-reveal], .lp-end [data-reveal]')]"
+        "  .filter(e => getComputedStyle(e).opacity === '0').length"
+    )
+    if unread:
+        errors.append(f"{unread} landing elements never revealed")
+    page.evaluate("window.scrollTo(0, 0)")
+    page.wait_for_timeout(400)
+    page.get_by_role("button", name="See it work").first.click()
     page.wait_for_selector(".shell", timeout=10_000)
 
     print(f"opening {BASE}")

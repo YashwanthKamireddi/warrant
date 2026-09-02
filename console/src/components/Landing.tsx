@@ -1,218 +1,238 @@
+import { useEffect, useRef } from "react";
 import { ShieldMark } from "./icons";
 
-/** What a judge sees before the workspace.
+/** The landing page.
  *
- * The research pattern for infrastructure products is "proof before promises":
- * one sentence, then a visual that proves the thing exists, then how it fits.
- * So this is not a marketing page — the hero is the counterfactual, because the
- * fastest way to explain a control plane is to show what happens without one.
+ * Built the way a product page is built rather than the way a README is: one
+ * idea per viewport, type large enough that the sentence is the design, and
+ * nothing in a box. Boxes are for things that need separating from their
+ * neighbours; when a screen holds one idea, there is nothing to separate.
  *
- * It also has a job the workspace cannot do: telling someone this is a service
- * other software calls, not an app people open. Without that, a viewer lands on
- * a storefront and reasonably wonders why they are shopping.
+ * Every number below is measured, not asserted. `make docs-check` fails the
+ * build if any of them drifts from what bench/RESULTS.json actually recorded,
+ * which is the only reason a landing page is allowed to quote numbers at all.
  */
+
+/** Reveal on scroll, once, and not at all for anyone who asked for less motion. */
+function useReveal() {
+  const root = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const host = root.current;
+    if (!host) return;
+
+    const targets = host.querySelectorAll<HTMLElement>("[data-reveal]");
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (still) {
+      targets.forEach((el) => el.setAttribute("data-shown", "true"));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          (entry.target as HTMLElement).setAttribute("data-shown", "true");
+          observer.unobserve(entry.target);
+        }
+      },
+      { rootMargin: "0px 0px -12% 0px", threshold: 0.12 },
+    );
+    targets.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
+  return root;
+}
+
 export function Landing({ onEnter }: { onEnter: () => void }) {
+  const root = useReveal();
+
   return (
-    <div className="landing">
-      <header className="landing-bar">
+    <div className="lp" ref={root}>
+      <header className="lp-bar">
         <span className="brand">
           <span className="brand-mark">
             <ShieldMark />
           </span>
           <span className="brand-words">
             <b>Warrant</b>
-            <span>No agent spends without one</span>
           </span>
         </span>
         <span className="grow" />
-        <a
-          className="btn btn-ghost btn-sm"
-          href="https://github.com/YashwanthKamireddi/warrant"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Source ↗
+        <a className="lp-link" href="https://github.com/YashwanthKamireddi/warrant">
+          Source
         </a>
-        <button className="btn btn-primary btn-sm" onClick={onEnter}>
-          Open the workspace
+        <button className="lp-cta" onClick={onEnter}>
+          See it work
         </button>
       </header>
 
-      <section className="hero">
-        <span className="hero-eyebrow">Razorpay AI Buildathon · Track 01</span>
-        <h1>
-          An AI agent is spending your money.
+      {/* ------------------------------------------------------------ act one */}
+      <section className="lp-act lp-open">
+        <h1 data-reveal>
+          No agent spends
           <br />
-          <span className="quiet">Warrant makes sure it only spends it on what you agreed to.</span>
+          without one.
         </h1>
-        <p className="hero-lead">
-          Since February 2026, Razorpay and NPCI have run agentic UPI payments in
-          production with Zomato, Swiggy and Zepto. <b>UPI Reserve Pay</b> lets you block
-          funds once with your PIN — and the agent then debits against that block
-          repeatedly, <b>without asking again</b>.
+        <p className="lp-sub" data-reveal>
+          An authorization layer for agent-initiated payments. A person says what they
+          want once. Everything the agent spends after that is checked against it — before
+          the money moves, and provable long after.
         </p>
-
-        <div className="hero-holes">
-          <div className="hole">
-            <span className="hole-n">1</span>
-            <p>
-              <b>Nothing checks what it buys against what you asked for.</b> You said
-              “chai and samosas, under ₹1,000”. The block is authorised. What stops a
-              ₹499 charge for something nobody asked for?
-            </p>
-          </div>
-          <div className="hole">
-            <span className="hole-n">2</span>
-            <p>
-              <b>When you dispute it, the merchant has no evidence.</b> No device
-              fingerprint, no session, no click. Chargeback codes have no category for
-              “correctly authorised agent, wrong outcome”. The merchant eats it.
-            </p>
-          </div>
+        <div className="lp-actions" data-reveal>
+          <button className="lp-cta lp-cta-lg" onClick={onEnter}>
+            See it work
+          </button>
+          <code className="lp-install">pip install warrant</code>
         </div>
       </section>
 
-      <section className="proof">
-        <h2>The same basket, in two worlds</h2>
-        <div className="proof-cols">
-          <div className="proof-col bad">
-            <span className="proof-label">Without Warrant</span>
-            <p className="proof-head">Payment captured</p>
-            <p className="proof-amount num">−₹199.00</p>
-            <ul>
-              <li className="no">✕ device fingerprint</li>
-              <li className="no">✕ browsing session</li>
-              <li className="no">✕ customer click</li>
-              <li className="no">✕ signed permission</li>
-            </ul>
-            <p className="proof-verdict">The merchant absorbs the chargeback.</p>
-          </div>
-          <div className="proof-col good">
-            <span className="proof-label">With Warrant</span>
-            <p className="proof-head">Blocked before settlement</p>
-            <p className="proof-amount num">₹0.00</p>
-            <ul>
-              <li className="yes">✓ signed permission</li>
-              <li className="yes">✓ checked basket</li>
-              <li className="yes">✓ verifiable by the bank</li>
-            </ul>
-            <p className="proof-verdict">The money never moved.</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="where">
-        <h2>Where it sits</h2>
-        <p className="where-lead">
-          Warrant is not an app people open. It is one API call a merchant’s backend
-          makes <b>before</b> it calls Razorpay. If Warrant says no, the payment never
-          exists.
+      {/* ------------------------------------------------------------ act two */}
+      <section className="lp-act lp-gap">
+        <p className="lp-kicker" data-reveal>
+          The gap
         </p>
-        <pre className="where-flow">{`  Priya, in the Zomato app
-        │  "order chai and samosas for my team, under ₹1,000"
-        ▼
-  Zomato's AI agent  ──── picks a basket
-        │
-        ▼
-  Zomato's backend  ──── POST /authorize  { permission, basket }
-        │                        │
-        │                        ▼
-        │                   ███ WARRANT ███   allow · block · escalate
-        │                        │
-        │◄───────────────────────┘
-        │
-        ├── blocked?  no payment is ever created
-        │
-        └── allowed?  Zomato calls Razorpay as normal
-                              │
-                              ▼
-                        Razorpay → NPCI → Priya's bank`}</pre>
-      </section>
-
-      <section className="who">
-        <h2>Who sees what</h2>
-        <div className="who-grid">
-          <div className="who-card">
-            <span className="role-glyph customer" aria-hidden>
-              P
-            </span>
-            <h3>The customer</h3>
-            <p>
-              <b>One approval screen.</b> “Allow up to ₹1,000 at Zomato for food, for 2
-              hours.” Once, at the start. Never again during the session.
-            </p>
-          </div>
-          <div className="who-card">
-            <span className="role-glyph agent" aria-hidden>
-              AI
-            </span>
-            <h3>The agent</h3>
-            <p>
-              <b>Nothing. It is an API.</b> The agent never sees a screen and is never
-              told the limits — it only learns why a basket was refused.
-            </p>
-          </div>
-          <div className="who-card">
-            <span className="role-glyph merchant" aria-hidden>
-              RT
-            </span>
-            <h3>The merchant’s risk team</h3>
-            <p>
-              <b>The console.</b> What was blocked and why, the tamper-evident ledger,
-              and the evidence pack for a dispute.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="numbers">
-        <h2>Measured, and honest about where it fails</h2>
-        <div className="numbers-grid">
-          <div className="number">
-            <span className="n num">81.8%</span>
-            <span className="k">violations stopped</span>
-          </div>
-          <div className="number">
-            <span className="n num">₹27,280</span>
-            <span className="k">leaked, of ₹281,635 at risk</span>
-          </div>
-          <div className="number">
-            <span className="n num">&lt;300µs</span>
-            <span className="k">p50 decision</span>
-          </div>
-          <div className="number">
-            <span className="n num">224</span>
-            <span className="k">tests, 9 gates</span>
-          </div>
-        </div>
-        <p className="numbers-note">
-          Two categories score near zero and are printed in the same table as the wins —
-          baskets inside every signed bound that are still not what was asked for. No
-          arithmetic catches those. A benchmark you designed to pass isn’t a benchmark.
+        <h2 data-reveal>
+          A mandate enforces the amount.
+          <br />
+          <em>Nothing enforces what it is spent on.</em>
+        </h2>
+        <p className="lp-body" data-reveal>
+          When someone authorises an agent to spend up to a limit, the bank enforces that
+          limit and nothing else. It never sees a basket — only a debit. A ceiling is
+          equally happy to buy the thing that was asked for and the thing that was not,
+          and no fraud signal fires, because nothing here is fraud. The card is real, the
+          device is real, the customer is real. It simply is not what they asked for.
         </p>
       </section>
 
-      <section className="enter">
-        <h2>Watch it work</h2>
-        <p>
-          A real model reads the instruction, picks a basket and says why. Warrant checks
-          it before any payment exists. If it’s refused, the agent is told the reason —
-          never the limits — and tries again.
+      {/* ---------------------------------------------------------- act three */}
+      <section className="lp-act lp-evidence">
+        <p className="lp-kicker" data-reveal>
+          Measured over 540 labelled cases
         </p>
-        <button className="btn btn-primary" onClick={onEnter}>
-          Open the workspace
-        </button>
+        <div className="lp-scores">
+          <div className="lp-score" data-reveal>
+            <span className="lp-score-label">An amount ceiling, alone</span>
+            <span className="lp-score-n bad">422</span>
+            <span className="lp-score-of">of 540 got through</span>
+            <span className="lp-score-money">₹1,55,923 spent outside what was agreed</span>
+          </div>
+          <div className="lp-score" data-reveal>
+            <span className="lp-score-label">With Warrant in front</span>
+            <span className="lp-score-n good">90</span>
+            <span className="lp-score-of">of 540 got through</span>
+            <span className="lp-score-money">₹27,280, and not one wrongful refusal</span>
+          </div>
+        </div>
+        <p className="lp-note" data-reveal>
+          Warrant does not catch everything, and the benchmark prints its own misses
+          rather than hiding them. What it never does is stop a purchase the person
+          actually authorised: <b>zero false stops</b>, across every category.
+        </p>
       </section>
 
-      <footer className="landing-foot">
-        <span>Warrant · No agent spends without one</span>
-        <a
-          href="https://github.com/YashwanthKamireddi/warrant"
-          target="_blank"
-          rel="noreferrer"
-        >
-          github.com/YashwanthKamireddi/warrant
-        </a>
+      {/* ----------------------------------------------------------- act four */}
+      <section className="lp-act lp-chain">
+        <p className="lp-kicker" data-reveal>
+          How
+        </p>
+        <h2 data-reveal>Three documents, each one binding the next.</h2>
+        <ol className="lp-links">
+          <li data-reveal>
+            <span className="lp-link-n">01</span>
+            <h3>The permission</h3>
+            <p>
+              What the person said, and the limits derived from it — amount, merchant,
+              category, count, window. Signed by their own device key. Nothing else in the
+              system can widen it.
+            </p>
+          </li>
+          <li data-reveal>
+            <span className="lp-link-n">02</span>
+            <h3>The basket</h3>
+            <p>
+              What the agent actually proposes to buy, checked line by line against the
+              permission it names. Signed only once it passes, and bound to that exact
+              permission by content address.
+            </p>
+          </li>
+          <li data-reveal>
+            <span className="lp-link-n">03</span>
+            <h3>The payment</h3>
+            <p>
+              The rail's own reference for the money that moved, bound to the basket that
+              justified it. A payment with no basket behind it is a payment nobody
+              authorised, and it is visible as one.
+            </p>
+          </li>
+        </ol>
+        <p className="lp-note" data-reveal>
+          Every decision — including every refusal — is appended to a hash-chained ledger.
+          Editing any earlier entry breaks every entry after it, which the console will let
+          you try.
+        </p>
+      </section>
+
+      {/* ----------------------------------------------------------- act five */}
+      <section className="lp-act lp-specs">
+        <p className="lp-kicker" data-reveal>
+          The parts that matter
+        </p>
+        <dl className="lp-spec-grid">
+          <div data-reveal>
+            <dt>No model decides</dt>
+            <dd>
+              The gate is a pure function of the signed documents and the state. A language
+              model can propose and can advise, and cannot change a verdict. Prompt
+              injection in a product name is inert by construction, not by filtering.
+            </dd>
+          </div>
+          <div data-reveal>
+            <dt>Refusals are records</dt>
+            <dd>
+              A blocked purchase is written to the ledger with its reasons, the same as an
+              allowed one. A control plane that only logs its successes cannot be audited.
+            </dd>
+          </div>
+          <div data-reveal>
+            <dt>Your merchants, not ours</dt>
+            <dd>
+              The acquirer's book of underwritten merchants and their ISO 18245 codes is a
+              file you supply. A merchant does not write its own category, so it cannot
+              relabel its way into a mandate it was not underwritten for.
+            </dd>
+          </div>
+          <div data-reveal>
+            <dt>Checked before, provable after</dt>
+            <dd>
+              The decision happens before settlement, and the evidence pack that comes out
+              the other side is what a merchant files when a customer disputes the charge.
+              Exportable as AP2 / W3C Verifiable Credentials.
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      {/* ------------------------------------------------------------ act six */}
+      <section className="lp-act lp-end">
+        <h2 data-reveal>See it refuse something.</h2>
+        <p className="lp-sub" data-reveal>
+          Four screens. A signed permission, a live agent that gets refused and adapts, the
+          money it would have cost, and the record afterwards.
+        </p>
+        <div className="lp-actions" data-reveal>
+          <button className="lp-cta lp-cta-lg" onClick={onEnter}>
+            Open the workspace
+          </button>
+        </div>
+      </section>
+
+      <footer className="lp-foot">
+        <span>Warrant · an authorization layer for agent-initiated payments</span>
+        <span className="grow" />
+        <a href="https://github.com/YashwanthKamireddi/warrant">github.com/YashwanthKamireddi/warrant</a>
       </footer>
     </div>
   );

@@ -2235,338 +2235,308 @@ a {
 }
 
 /* ==========================================================================
-   Landing
+   Landing — a product page, not a README
    --------------------------------------------------------------------------
-   Proof before promises. The hero is the counterfactual rather than a
-   value proposition, because the fastest way to explain a control plane is to
-   show what happens without one.
-
-   Same tokens as the workspace throughout. A landing page that looks like
-   different software than the product it introduces reads as a template.
+   One idea per viewport, type large enough that the sentence is the design,
+   and nothing in a box. Boxes separate a thing from its neighbours; a screen
+   holding one idea has no neighbours to separate it from.
    ========================================================================== */
 
-.landing {
-  height: 100%;
-  overflow-y: auto;
-  background: var(--ground);
+.lp {
+  min-height: 100%;
+  background: var(--surface);
+  color: var(--ink);
+  overflow-x: hidden;
 }
 
-.landing-bar {
+/* ------------------------------------------------------------------- chrome */
+
+.lp-bar {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 20;
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  padding: 0 var(--s-6);
-  height: var(--appbar);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter: blur(10px);
+  height: 58px;
+  padding: 0 clamp(18px, 5vw, 56px);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
   border-bottom: 1px solid var(--line);
 }
 
-.landing section {
-  max-width: 1060px;
+.lp-link {
+  color: var(--ink-3);
+  font-size: 13px;
+  text-decoration: none;
+}
+.lp-link:hover { color: var(--ink); }
+
+.lp-cta {
+  padding: 8px 17px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--brand);
+  color: var(--on-brand);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+.lp-cta:hover { background: var(--brand-hover); }
+.lp-cta:active { transform: scale(0.98); }
+
+.lp-cta-lg {
+  padding: 15px 34px;
+  font-size: 16px;
+}
+
+/* -------------------------------------------------------------------- acts */
+
+.lp-act {
+  max-width: 1080px;
   margin: 0 auto;
-  padding: var(--s-8) var(--s-6);
-  border-bottom: 1px solid var(--line);
-}
-.landing section:last-of-type {
-  border-bottom: none;
+  padding: clamp(96px, 17vh, 190px) clamp(22px, 6vw, 56px);
 }
 
-.landing h2 {
-  font: 600 26px/1.25 var(--font);
-  letter-spacing: -0.024em;
-  color: var(--ink);
-  margin-bottom: var(--s-5);
-}
-.landing h3 {
-  font: var(--t-title);
-  color: var(--ink);
-}
-
-/* -- hero ------------------------------------------------------------------ */
-
-.hero {
-  padding-top: var(--s-8);
-}
-.hero-eyebrow {
-  display: inline-block;
-  font: var(--t-micro);
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  color: var(--ink-4);
-  margin-bottom: var(--s-4);
-}
-.hero h1 {
-  font: 700 clamp(34px, 4.4vw, 52px) / 1.12 var(--font);
-  letter-spacing: -0.035em;
-  color: var(--ink);
-  max-width: 20ch;
+/* The one thing on the screen. Nothing else gets to be this size. */
+.lp-open h1 {
+  margin: 0;
+  font-size: clamp(46px, 8.6vw, 116px);
+  line-height: 0.98;
+  letter-spacing: -0.043em;
+  font-weight: 700;
   text-wrap: balance;
 }
-.hero h1 .quiet {
-  color: var(--ink-3);
-  font-weight: 600;
-}
-.hero-lead {
-  margin-top: var(--s-5);
-  font: 400 17px/1.6 var(--font);
-  color: var(--ink-2);
-  max-width: 68ch;
-}
-.hero-lead b {
-  font-weight: 600;
-  color: var(--ink);
-}
 
-.hero-holes {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--s-4);
-  margin-top: var(--s-6);
-}
-.hole {
-  display: grid;
-  grid-template-columns: 26px 1fr;
-  gap: var(--s-3);
-  padding: var(--s-4);
-  border: 1px solid var(--stop-line);
-  background: var(--stop-bg);
-  border-radius: var(--r-md);
-}
-.hole-n {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--stop);
-  color: var(--surface);
-  display: grid;
-  place-items: center;
-  font: 700 11px/1 var(--font);
-}
-.hole p {
-  font: var(--t-body);
+.lp-sub {
+  max-width: 30em;
+  margin: clamp(22px, 3vw, 34px) 0 0;
+  font-size: clamp(17px, 1.85vw, 22px);
+  line-height: 1.52;
   color: var(--ink-2);
 }
-.hole b {
-  color: var(--stop);
-  font-weight: 600;
-}
 
-/* -- proof ----------------------------------------------------------------- */
-
-.proof-cols {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--s-4);
-}
-.proof-col {
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  background: var(--surface);
-  box-shadow: var(--sh-sm);
-  padding: var(--s-5);
+.lp-actions {
   display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-  position: relative;
-  overflow: hidden;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+  margin-top: clamp(30px, 4vw, 46px);
 }
-.proof-col::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
+
+.lp-install {
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--sunken);
+  font-family: var(--mono);
+  font-size: 13.5px;
+  color: var(--ink-2);
 }
-.proof-col.bad::before {
-  background: var(--stop);
-}
-.proof-col.good::before {
-  background: var(--ok);
-}
-.proof-label {
-  font: var(--t-micro);
-  letter-spacing: 0.11em;
+
+.lp-kicker {
+  margin: 0 0 clamp(16px, 2vw, 24px);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--ink-4);
+  color: var(--ink-3);
 }
-.proof-head {
-  font: 600 17px/1.3 var(--font);
-  color: var(--ink);
+
+.lp-act h2 {
+  margin: 0;
+  font-size: clamp(30px, 4.6vw, 62px);
+  line-height: 1.08;
+  letter-spacing: -0.033em;
+  font-weight: 650;
+  text-wrap: balance;
 }
-.proof-amount {
-  font: 700 40px/1.05 var(--font);
-  letter-spacing: -0.035em;
+.lp-act h2 em {
+  font-style: normal;
+  color: var(--brand);
 }
-.proof-col.bad .proof-amount {
-  color: var(--stop);
+
+.lp-body {
+  max-width: 34em;
+  margin: clamp(24px, 3vw, 36px) 0 0;
+  font-size: clamp(16px, 1.55vw, 19px);
+  line-height: 1.62;
+  color: var(--ink-2);
 }
-.proof-col.good .proof-amount {
-  color: var(--ok);
+
+.lp-note {
+  max-width: 40em;
+  margin: clamp(34px, 4vw, 52px) 0 0;
+  font-size: 15px;
+  line-height: 1.62;
+  color: var(--ink-3);
 }
-.proof-col ul {
-  list-style: none;
-  margin: var(--s-2) 0 0;
-  padding: 0;
+.lp-note b { color: var(--ink); }
+
+/* ---------------------------------------------------------------- evidence */
+
+.lp-scores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: clamp(34px, 5vw, 72px);
+  margin-top: clamp(20px, 3vw, 30px);
+}
+
+.lp-score {
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
-.proof-col li {
-  font: var(--t-body);
-}
-.proof-col li.no {
-  color: var(--ink-4);
-  text-decoration: line-through;
-  text-decoration-color: var(--stop-line);
-}
-.proof-col li.yes {
-  color: var(--ink-2);
-}
-.proof-verdict {
-  margin-top: var(--s-3);
-  padding-top: var(--s-3);
-  border-top: 1px solid var(--line);
-  font: var(--t-body-strong);
-}
-.proof-col.bad .proof-verdict {
-  color: var(--stop);
-}
-.proof-col.good .proof-verdict {
-  color: var(--ok);
-}
 
-/* -- where ----------------------------------------------------------------- */
-
-.where-lead {
-  font: var(--t-body);
-  color: var(--ink-2);
-  max-width: 70ch;
-  margin-bottom: var(--s-4);
-}
-.where-lead b {
-  color: var(--ink);
+.lp-score-label {
+  font-size: 14px;
   font-weight: 600;
+  color: var(--ink-2);
 }
-.where-flow {
+
+/* The number is the argument. It gets the room an argument needs. */
+.lp-score-n {
+  font-size: clamp(72px, 13vw, 168px);
+  line-height: 0.92;
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.lp-score-n.bad { color: var(--stop); }
+.lp-score-n.good { color: var(--ok); }
+
+.lp-score-of {
+  font-size: clamp(16px, 1.7vw, 20px);
+  color: var(--ink-2);
+}
+
+.lp-score-money {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------------------------------- chain */
+
+.lp-links {
+  list-style: none;
+  margin: clamp(40px, 5vw, 64px) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: clamp(30px, 4vw, 54px);
+}
+.lp-links li {
+  padding-top: 22px;
+  border-top: 1px solid var(--line-strong);
+}
+.lp-link-n {
+  display: block;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
+  color: var(--ink-4);
+}
+.lp-links h3 {
+  margin: 12px 0 10px;
+  font-size: clamp(19px, 2vw, 24px);
+  letter-spacing: -0.018em;
+  font-weight: 620;
+}
+.lp-links p {
+  margin: 0;
+  font-size: 15px;
   line-height: 1.6;
   color: var(--ink-2);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  padding: var(--s-5);
-  overflow-x: auto;
-  box-shadow: var(--sh-xs);
 }
 
-/* -- who ------------------------------------------------------------------- */
+/* ------------------------------------------------------------------- specs */
 
-.who-grid {
+.lp-spec-grid {
+  margin: clamp(30px, 4vw, 48px) 0 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--s-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: clamp(30px, 4vw, 54px);
 }
-.who-card {
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--surface);
-  box-shadow: var(--sh-xs);
-  padding: var(--s-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
+.lp-spec-grid > div {
+  padding-top: 20px;
+  border-top: 1px solid var(--line-strong);
 }
-.who-card .role-glyph {
-  width: 30px;
-  height: 30px;
-  font-size: 11px;
+.lp-spec-grid dt {
+  font-size: clamp(17px, 1.8vw, 21px);
+  font-weight: 620;
+  letter-spacing: -0.016em;
 }
-.who-card p {
-  font: var(--t-body);
-  color: var(--ink-3);
-}
-.who-card b {
+.lp-spec-grid dd {
+  margin: 10px 0 0;
+  font-size: 15px;
+  line-height: 1.6;
   color: var(--ink-2);
-  font-weight: 600;
 }
 
-/* -- numbers --------------------------------------------------------------- */
+/* --------------------------------------------------------------------- end */
 
-.numbers-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1px;
-  background: var(--line);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  overflow: hidden;
-}
-.number {
-  background: var(--surface);
-  padding: var(--s-5);
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.number .n {
-  font: 700 30px/1.1 var(--font);
-  letter-spacing: -0.03em;
-  color: var(--ink);
-}
-.number .k {
-  font: var(--t-small);
-  color: var(--ink-4);
-}
-.numbers-note {
-  margin-top: var(--s-4);
-  font: var(--t-body);
-  color: var(--ink-3);
-  max-width: 74ch;
-}
-
-/* -- enter ----------------------------------------------------------------- */
-
-.enter {
+.lp-end {
   text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--s-3);
+  padding-bottom: clamp(110px, 19vh, 210px);
 }
-.enter p {
-  font: var(--t-body);
-  color: var(--ink-3);
-  max-width: 62ch;
+.lp-end .lp-sub {
+  margin-left: auto;
+  margin-right: auto;
 }
-.enter .btn {
-  margin-top: var(--s-2);
-  padding: 12px 22px;
-  font-size: 14.5px;
+.lp-end .lp-actions {
+  justify-content: center;
 }
 
-.landing-foot {
-  max-width: 1060px;
-  margin: 0 auto;
-  padding: var(--s-5) var(--s-6) var(--s-8);
+.lp-foot {
   display: flex;
-  justify-content: space-between;
-  gap: var(--s-4);
-  font: var(--t-small);
-  color: var(--ink-4);
   flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 26px clamp(22px, 6vw, 56px);
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.lp-foot a {
+  color: var(--ink-3);
+  text-decoration: none;
+}
+.lp-foot a:hover { color: var(--ink); }
+
+/* ------------------------------------------------------------------ reveal */
+
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.62s cubic-bezier(0.22, 0.68, 0.28, 1),
+              transform 0.62s cubic-bezier(0.22, 0.68, 0.28, 1);
+}
+[data-reveal][data-shown] {
+  opacity: 1;
+  transform: none;
 }
 
-@media (max-width: 860px) {
-  .hero-holes,
-  .proof-cols {
-    grid-template-columns: 1fr;
+/* Siblings arrive a beat apart, so a grid reads left to right rather than
+   flashing in as one block. */
+.lp-scores [data-reveal]:nth-child(2),
+.lp-links [data-reveal]:nth-child(2),
+.lp-spec-grid [data-reveal]:nth-child(2) { transition-delay: 0.09s; }
+.lp-links [data-reveal]:nth-child(3),
+.lp-spec-grid [data-reveal]:nth-child(3) { transition-delay: 0.18s; }
+.lp-spec-grid [data-reveal]:nth-child(4) { transition-delay: 0.27s; }
+
+/* Motion is decoration. Anyone who has asked for less of it gets the page
+   fully painted and completely still. */
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
+  .lp-cta { transition: none; }
 }
-
 
 /* ==========================================================================
    Walkthrough — one act per screen
