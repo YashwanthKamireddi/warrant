@@ -56,6 +56,20 @@ export function LedgerView({
 
   return (
     <>
+      {/* An intact chain used to say nothing at all, which left the tamper
+          button with no "before" to destroy. The property is the point: it has
+          to be visible while it still holds. */}
+      {chain && !chain.break && (
+        <div className="notice ok">
+          <Badge kind="pass" />
+          <span>
+            <b>Chain intact.</b> {entries.length}{" "}
+            {entries.length === 1 ? "entry" : "entries"}, each one committing to the
+            hash before it. Head <Hash value={chain.head} chars={14} />.
+          </span>
+        </div>
+      )}
+
       {chain?.break && (
         <div className="notice stop">
           <Badge kind="fail" />

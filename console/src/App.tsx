@@ -36,6 +36,16 @@ export function App() {
     () => window.location.hash === "#workspace",
   );
 
+  /** The hash was read once, at mount, so the browser's back button did
+   *  nothing: leaving the workspace changed the URL and left the workspace on
+   *  screen. Following the hash both ways makes back and forward work, and
+   *  makes /#workspace a link somebody can actually send. */
+  useEffect(() => {
+    const follow = () => setEntered(window.location.hash === "#workspace");
+    window.addEventListener("hashchange", follow);
+    return () => window.removeEventListener("hashchange", follow);
+  }, []);
+
   const [meta, setMeta] = useState<Meta | null>(null);
   const [utterance, setUtterance] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -311,7 +321,7 @@ export function App() {
     <div className="shell">
       {/* ---------------------------------------------------------- app bar */}
       <header className="appbar">
-        <div className="brand">
+        <a className="brand" href="#" aria-label="Back to the overview">
           <span className="brand-mark">
             <ShieldMark />
           </span>
@@ -319,7 +329,7 @@ export function App() {
             <b>Warrant</b>
             <span>No agent spends without one</span>
           </span>
-        </div>
+        </a>
         <span className="grow" />
         {scope?.revoked && (
           <span className="pill stop">
@@ -542,13 +552,15 @@ export function App() {
           </span>
         )}
         <span className="grow" />
-        <button
-          className="btn btn-primary"
-          onClick={() => seedBasket(step + 1)}
-          disabled={step === 4}
-        >
-          Next — {STEPS[Math.min(step, 3)]!.label}
-        </button>
+        {step === 4 ? (
+          <a className="btn btn-primary" href="#">
+            Back to the overview
+          </a>
+        ) : (
+          <button className="btn btn-primary" onClick={() => seedBasket(step + 1)}>
+            Next — {STEPS[step]!.label}
+          </button>
+        )}
       </footer>
     </div>
   );

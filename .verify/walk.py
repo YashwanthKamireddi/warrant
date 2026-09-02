@@ -114,10 +114,18 @@ with sync_playwright() as pw:
     if len(signers) < 2:
         errors.append("AP2 export does not show the subject and authorizer as different signers")
 
+    # The tamper button destroys a property, so the property has to be visible
+    # before it is destroyed. An intact chain that says nothing leaves the
+    # demonstration with no "before".
+    if page.locator(".notice.ok").count() == 0:
+        errors.append("the ledger does not say the chain is intact before tampering")
+
     print("tampering with the ledger")
     page.get_by_role("button", name="Try to rewrite the ledger").click()
     page.wait_for_selector(".notice.stop, .ledger-row.orphaned", timeout=10_000)
     page.wait_for_timeout(500)
+    if page.locator(".notice.ok").count() != 0:
+        errors.append("the chain still claims to be intact after being tampered with")
     shot(page, "07-tampered")
 
     browser.close()

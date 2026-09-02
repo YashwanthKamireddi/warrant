@@ -2773,3 +2773,21 @@ a {
   font-variant-numeric: tabular-nums;
   opacity: 0.86;
 }
+
+/* The brand doubles as the way back to the overview, so it has to look like
+   something you can click without becoming a button. */
+a.brand {
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--r-sm);
+}
+a.brand:hover .brand-words b { color: var(--brand); }
+a.brand:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+
+/* The walkthrough's last control is a link, because it leaves rather than
+   advances. It still has to sit on the same baseline as the buttons beside it. */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
