@@ -2326,14 +2326,19 @@ a {
   margin-top: clamp(30px, 4vw, 46px);
 }
 
+/* A git URL is long. It gets a rounded rectangle rather than a pill so it can
+   wrap on a phone, and it is allowed to wrap rather than pushing the page. */
 .lp-install {
+  max-width: 100%;
   padding: 12px 18px;
   border: 1px solid var(--line);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-md);
   background: var(--sunken);
   font-family: var(--mono);
-  font-size: 13.5px;
+  font-size: clamp(11px, 1.1vw, 13px);
+  line-height: 1.5;
   color: var(--ink-2);
+  overflow-wrap: anywhere;
 }
 
 .lp-kicker {

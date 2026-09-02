@@ -84,7 +84,9 @@ export function Landing({ onEnter }: { onEnter: () => void }) {
           <button className="lp-cta lp-cta-lg" onClick={onEnter}>
             See it work
           </button>
-          <code className="lp-install">pip install warrant</code>
+          <code className="lp-install">
+            pip install git+https://github.com/YashwanthKamireddi/warrant
+          </code>
         </div>
       </section>
 

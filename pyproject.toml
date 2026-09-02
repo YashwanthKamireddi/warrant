@@ -1,5 +1,5 @@
 [project]
-name = "warrant"
+name = "warrant-pay"
 version = "0.1.0"
 description = "Authorization layer for agent-initiated payments. No agent spends without a warrant."
 requires-python = ">=3.12"
