@@ -78,6 +78,9 @@ trusting the merchant**.
 | **Merchant** | item catalog | Declare item categories | Declare a category outside its acquirer-assigned MCC |
 | **Model** | nothing | Propose a scope; flag divergence | Grant authority. Overturn a block. Widen the envelope. |
 | **Rail** | the funds block | Enforce the blocked amount | Enforce category or merchant scope — which is why this layer exists |
+| **Acquirer** | the merchant registry | Assign a merchant its MCC | — (it is a file the deployer supplies; a merchant never writes its own line) |
+| **API caller** | a bearer token | Mint, check, spend and revoke permissions | Reach any endpoint without one — `warrant_router` refuses to be constructed unauthenticated |
+| **Log reader** | stderr | See verdicts, digests, rules, timings | See a basket, a product name or an utterance — none reach a log line |
 
 **The precise claim.** Only the person's key can *widen* what may be spent, so the
 authoriser cannot produce a chain that verifies as in-scope for a purchase nobody
@@ -205,6 +208,84 @@ could be presented repeatedly, placing an order each time. **Found by running
 against Razorpay test mode; the simulator settles synchronously and hid it for
 days.** See [INCIDENTS.md](INCIDENTS.md) §7.
 
+### The merchants and the products are configuration, not source
+
+Five merchants were compiled in, four of them Indian food delivery. Adopting
+this meant forking it, and the gate's most interesting rule — check declared
+categories against what an acquirer actually underwrote — was unreachable for
+anyone whose merchants were not `zomato`.
+
+Both load from TOML. `WARRANT_MERCHANTS` and `WARRANT_CATALOG`, or objects
+passed to `evaluate()` and `Warrant()` directly. The second keeps the gate a
+pure function of its arguments, which was always its stated property and was
+quietly untrue while it read a module global.
+
+A path that was *asked for* and does not exist raises. Only the absence of any
+configuration falls back to the bundled records — a typo must not hand you a
+registry full of merchants you have never heard of.
+
+### The convenience layer adds no policy
+
+`Warrant.check()` and `Warrant.spend()` call the same `gate.evaluate()`
+everything else calls. A facade that could change a verdict would be a second
+place for authorization logic to live, which is how two places drift apart.
+
+It did drift once, in the direction that matters: `check()` honoured the
+registry it was handed and `spend()` read the process-wide one, so a preview
+could say *allow* where the spend said *block*. A preview that runs different
+code is a preview of nothing. The registry belongs to the `Authorizer` — one per
+merchant deployment — and both paths read it.
+
+### Retries are idempotent in two layers, and one of them is only a cache
+
+The same basket sent three times charged three times. Every call minted a fresh
+cart nonce, so a retry built a *different* cart, which the gate has no reason to
+refuse. The engine's replay guard was never reached.
+
+`spend()` takes an `idempotency_key`; the service reads `Idempotency-Key`. A
+repeat returns the first decision without touching the rail — returning a
+refusal instead would be safe and useless, because a caller told "blocked:
+replay" reasonably concludes the payment failed and tries again. And the cart
+nonce is *derived* from the key, so when the bounded cache evicts an entry the
+gate's own `replay.cart_nonce` check refuses the repeat. The cache is the
+convenience; the nonce is the safety net.
+
+The slot is single-flight. Checking the cache and filling it were two critical
+sections, so eight simultaneous retries all missed, all authorized, and seven
+came back refused — the money right and the answer wrong.
+
+### Authentication is required to construct, not to remember
+
+`warrant_router` raises unless it is given authentication. A service that mints
+spending permissions must not become usable-because-reachable when somebody
+forgets an argument, so running open is possible and has to be typed:
+`auth=NO_AUTH`.
+
+Health and readiness are never guarded. An orchestrator holds no credential, and
+a probe that returns 401 reports the process as dead.
+
+### Logs carry digests, never contents
+
+The ledger is the record of what was decided. Logs are for whoever is on call,
+and they are read by tools, tailed into aggregators, and increasingly fed to
+language models.
+
+Half the catalogue here carries an instruction inside a *product name*, and a
+refused basket is exactly the one somebody investigates. Writing that name into
+a log line puts an injected instruction in front of every tool that reads logs —
+a longer and far less guarded path than the one the gate defends. So a decision
+is logged by digest, verdict and failed rules. The names are in the ledger,
+where nothing reads them by accident. Neither is the person's utterance, which
+is theirs.
+
+### The console is a demonstration and the service is the product
+
+`warrant serve` has a button that tampers with its own ledger. That belongs in a
+demonstration and must not be one flag away from something in front of money, so
+`warrant api` is a different command serving a different app — `service.py`, not
+`api.py`. The console's endpoints for replaying scripted baskets and breaking
+its own chain do not exist there.
+
 ### Fail closed, with nothing to fail
 
 Warrant refuses rather than waves through — safe only because the binding path has
@@ -241,15 +322,27 @@ engine/warrant/
   gate.py        the only layer that can block; pure, replayable
   derive.py      utterance → scope, clamped by a hard envelope
   divergence.py  the advisory judge
+  agent.py       a real model shopping; never told the limits
   llm.py         live → transcript → fallback, always labelled
+  providers.py   Anthropic and Groq; model overrides scoped per provider
   authorize.py   orchestration; write-ahead ordering
   chain.py       append-only hash chain; refusals are entries
   evidence.py    the chain as a Razorpay dispute submission
   interop.py     the chain in AP2 vocabulary, W3C-VC shaped
-  rails/         Razorpay test mode; deterministic simulator
-  api.py         HTTP surface; a view onto the engine, never a second one
+  rails/         Razorpay test mode; a real UPI mandate; deterministic simulator
+  merchants_shopify.py  a real store's catalogue and real orders
+  demo.py        the five-basket scenario, pinned identical everywhere
+  cli.py         warrant demo / serve / api / verify / trace
+  client.py      the front door: permit / check / spend. Adds no policy
+  service.py     the router a company mounts. Auth required to construct
+  observability.py  structured logs; digests in, contents never
+  catalog.py     the products, loaded from the deployer's TOML
+  py.typed       PEP 561; without it every annotation here is invisible
+  api.py         the console's HTTP surface; a view onto the engine, never a second one
 ```
 
 `bench/` is the labelled corpus and harness. `console/` is a view onto the engine —
 every verdict it renders came from `gate.evaluate()`. `.verify/` holds the gates:
-secrets, tokens, contrast, overlap, layout, browser.
+secrets, tokens, contrast, overlap, layout, browser, and `docs-examples`, which
+executes every code block in the documentation because prose is not otherwise
+checked by anything.

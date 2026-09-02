@@ -472,6 +472,7 @@ check that it fails.**
 engine/warrant/
   client.py      The front door. Warrant.permit / check / spend.
   service.py     The router a company mounts. Auth required to construct.
+  cli.py         warrant demo / serve / api / verify / trace.
   canon.py       RFC 8785 subset. Rejects floats — money is integer paise.
   crypto.py      Ed25519 over canonical bytes. Seeded keys for reproducibility.
   models.py      Intent → Cart → Receipt, bound by content address.
@@ -480,10 +481,17 @@ engine/warrant/
   gate.py        The only layer that can block. Pure, replayable, no model.
   derive.py      Utterance → scope, clamped by a hard envelope.
   divergence.py  The advisory judge. Can escalate; cannot authorise.
+  agent.py       A real model shopping. It is never told the limits.
+  llm.py         Live → transcript → fallback, always labelled with which.
+  providers.py   Anthropic and Groq, with per-provider model overrides.
   authorize.py   Orchestration. Write-ahead ordering, serialised per mandate.
   chain.py       Append-only hash chain. Refusals are entries, not silences.
   evidence.py    The chain as a Razorpay dispute submission.
   interop.py     The chain in AP2 vocabulary, W3C-VC shaped.
+  observability.py  Structured logs. Digests in; basket contents never.
+  merchants_shopify.py  A real store's catalogue and real orders.
+  demo.py        The five-basket scenario, pinned so it is identical everywhere.
+  api.py         The console's HTTP surface. A view onto the engine.
   py.typed       PEP 561. Without it every annotation here is invisible.
   rails/         Razorpay test mode, a real UPI mandate, and a simulator.
 bench/           The labelled corpus, the four policies, the harness.

@@ -164,6 +164,30 @@ if "p50 under 300µs" not in readme:
 else:
     print("  ok   latency stated as a bound")
 
+# -- module listings --------------------------------------------------------- #
+#
+# README.md and ARCHITECTURE.md both draw the package as a tree, by hand. A
+# module added without touching them is invisible to a reader following either
+# one, which is how ARCHITECTURE.md ended up describing half the system.
+
+ENGINE = ROOT / "engine" / "warrant"
+ARCHITECTURE = (ROOT / "ARCHITECTURE.md").read_text()
+
+shipped = {
+    path.name
+    for path in ENGINE.glob("*.py")
+    if not path.name.startswith("_")
+}
+for doc_name, text in (("README.md", readme), ("ARCHITECTURE.md", ARCHITECTURE)):
+    missing = sorted(name for name in shipped if name not in text)
+    if missing:
+        failures.append(
+            f"{doc_name} does not mention {', '.join(missing)}"
+        )
+        print(f"  FAIL modules listed in {doc_name:<18} missing {', '.join(missing)}")
+    else:
+        print(f"  ok   modules listed in {doc_name:<18} all {len(shipped)}")
+
 print()
 if failures:
     print(f"{len(failures)} documentation drift(s):")
