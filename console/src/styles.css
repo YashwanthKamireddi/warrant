@@ -1986,3 +1986,91 @@ a {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   Role bands
+   --------------------------------------------------------------------------
+   The console asks one person to play three: the customer who grants
+   permission, the agent that spends it, and the risk team that reads the
+   aftermath. Without saying so, the storefront reads as a checkout and the
+   ledger reads as somebody else's problem.
+
+   These bands are the fix. Deliberately quiet -- a hairline, a glyph and a
+   label -- because they are orientation, not decoration. Colour still belongs
+   to verdicts alone.
+   ========================================================================== */
+
+.role {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px var(--s-5);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+}
+.role:first-child {
+  border-top: none;
+}
+
+.role-glyph {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: none;
+  font: 700 10px/1 var(--font);
+  letter-spacing: 0.02em;
+  color: var(--surface);
+  background: var(--ink-3);
+}
+.role-glyph.customer {
+  background: var(--brand);
+}
+.role-glyph.agent {
+  background: var(--seal);
+}
+.role-glyph.merchant {
+  background: var(--ink-2);
+}
+
+.role-name {
+  font: var(--t-micro);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.role-name b {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.role-hint {
+  font: var(--t-small);
+  color: var(--ink-4);
+  margin-left: auto;
+  text-align: right;
+}
+
+/* The agent's panel is where a viewer is invited to misbehave, so it says so. */
+.agent-brief {
+  font: var(--t-small);
+  line-height: 1.5;
+  color: var(--ink-3);
+  padding: 0 0 var(--s-1);
+}
+.agent-brief b {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.main-role {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px var(--s-6);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}

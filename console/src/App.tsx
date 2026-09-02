@@ -10,7 +10,7 @@ import { LedgerView } from "./components/LedgerView";
 import { StandardsView } from "./components/StandardsView";
 import { Storefront } from "./components/Storefront";
 import { Basket, Rows, ShieldMark } from "./components/icons";
-import { Badge, Empty, Gauge, Hash } from "./components/primitives";
+import { Badge, Empty, Gauge, Hash, Role } from "./components/primitives";
 import type {
   ChainStatus,
   Comparison,
@@ -347,10 +347,15 @@ export function App() {
       <div className="workspace">
         <aside className="rail">
           <div className="rail-scroll">
+            <Role
+              as="customer"
+              name="Priya"
+              hint={approved ? "her key has signed" : "granting permission"}
+            />
             <section className="step">
               <div className="step-head">
                 <span className={`step-index${approved ? " done" : ""}`}>1</span>
-                <span className="step-title">The person says something</span>
+                <span className="step-title">Say what you want</span>
               </div>
               {approved ? (
                 <p className="said">{utterance}</p>
@@ -402,7 +407,7 @@ export function App() {
                 <div className="step-head">
                   <span className={`step-index${approved ? " done" : ""}`}>2</span>
                   <span className="step-title">
-                    {approved ? "The permission they signed" : "Approve to sign"}
+                    {approved ? "The permission you signed" : "Approve it before signing"}
                   </span>
                 </div>
                 <Certificate
@@ -438,7 +443,7 @@ export function App() {
                 <section className="step upcoming">
                   <div className="step-head">
                     <span className="step-index">3</span>
-                    <span className="step-title">The agent builds a basket</span>
+                    <span className="step-title">Her agent builds a basket</span>
                   </div>
                   <p className="step-hint">
                     Every basket is checked against that permission before any money moves.
@@ -459,9 +464,18 @@ export function App() {
 
           {approved && meta && (
             <section className="rail-basket step">
+              <Role
+                as="agent"
+                name="Priya's agent"
+                hint="spending her permission"
+              />
+              <p className="agent-brief">
+                <b>Try to get away with something.</b> Everything below is at the right
+                merchant — but only some of it is what she asked for.
+              </p>
               <div className="step-head">
                 <span className="step-index done">3</span>
-                <span className="step-title">The agent builds a basket</span>
+                <span className="step-title">Build a basket</span>
                 <span className="grow" />
                 <select
                   className="select"
@@ -539,6 +553,18 @@ export function App() {
         </aside>
 
         <main className="main">
+          <div className="main-role">
+            <span className="role-glyph merchant" aria-hidden>
+              RT
+            </span>
+            <span className="role-name">
+              You are <b>the merchant's risk team</b>
+            </span>
+            <span className="role-hint">
+              what the gate decided, and what you could show a bank
+            </span>
+          </div>
+
           <nav className="tabs" role="tablist">
             {TABS.map(({ key, label }) => {
               const count =

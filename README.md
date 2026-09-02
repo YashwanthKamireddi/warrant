@@ -310,7 +310,7 @@ Runs in order, and fails on the first problem:
 | `typecheck` | the console compiles under `strict` |
 | `docs-check` | every number in this README matches what the code measures |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
-| `audit-contrast` | all 33 rendered pairs meet WCAG AA, computed from the tokens |
+| `audit-contrast` | all 37 rendered pairs meet WCAG AA, computed from the tokens |
 | `audit-overlap` | nothing spills outside its box or paints over a sibling, across 6 states |
 | `browser` | the frame holds at 5 viewports; the real flow runs with no console errors, and the console's verdicts match what `warrant demo` prints |
 

@@ -106,3 +106,34 @@ export function Empty({
     </div>
   );
 }
+
+
+/** Who the viewer is at this point in the flow.
+ *
+ * The console asks one person to be three: the customer who grants permission,
+ * the agent that spends it, and the risk team that reads the aftermath. Saying
+ * so is the difference between a storefront that looks like a checkout and one
+ * that reads as "you are the agent now, try something".
+ */
+export function Role({
+  as,
+  name,
+  hint,
+}: {
+  as: "customer" | "agent" | "merchant";
+  name: string;
+  hint?: string;
+}) {
+  const initial = { customer: "P", agent: "AI", merchant: "RT" }[as];
+  return (
+    <div className="role">
+      <span className={`role-glyph ${as}`} aria-hidden>
+        {initial}
+      </span>
+      <span className="role-name">
+        You are <b>{name}</b>
+      </span>
+      {hint && <span className="role-hint">{hint}</span>}
+    </div>
+  );
+}
