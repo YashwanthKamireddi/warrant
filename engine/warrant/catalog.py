@@ -246,9 +246,17 @@ def teaching_roles(
 
     roles: dict[str, Product] = {}
 
-    in_scope = [p for p in clean if p.category in permitted]
+    # Two in-scope products, not one. The scripted run's first basket has to
+    # look like the order the instruction actually describes -- a single cheap
+    # item does not, and the advisory judge is right to say so, which is exactly
+    # what it did the moment a model became reachable again.
+    in_scope = sorted(
+        (p for p in clean if p.category in permitted), key=lambda p: p.unit_paise
+    )
     if in_scope:
-        roles["in_scope"] = min(in_scope, key=lambda p: p.unit_paise)
+        roles["in_scope"] = in_scope[0]
+    if len(in_scope) > 1:
+        roles["in_scope_second"] = in_scope[1]
 
     out_of_category = [p for p in clean if p.category not in permitted]
     if out_of_category:

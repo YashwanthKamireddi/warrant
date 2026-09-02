@@ -349,7 +349,7 @@ def meta() -> dict[str, Any]:
         "capability_note": capability.note,
         "rails": _available_rails(),
         "catalog": list(CATALOG),
-        "default_utterance": UTTERANCE,
+        "default_utterance": console_utterance(),
         "scripted_steps": _scripted_steps(),
     }
 
@@ -419,6 +419,60 @@ def _retarget(pending: PendingIntent) -> PendingIntent:
     })
 
 
+def console_utterance() -> str:
+    """The instruction, naming the products the scripted basket actually buys.
+
+    It was fixed text about chai and samosas while the basket was built from
+    whatever the catalogue happened to stock. The advisory judge compares the
+    two and escalated the first step for exactly that reason, which was correct
+    of it. Deriving one from the other keeps them honest for any catalogue.
+    """
+    scope = console_scope()
+    roles = teaching_roles(
+        active_catalog(),
+        merchant=scope.merchants[0],
+        permitted=frozenset(scope.categories),
+        step_up_paise=scope.step_up_over_paise,
+    )
+    first = roles.get("in_scope")
+    if first is None:
+        return UTTERANCE
+    second = roles.get("in_scope_second")
+    what = first.name if second is None else f"{first.name} and {second.name}"
+    rupees = scope.max_total_paise // 100
+    return f"order {what.lower()} for my team from {scope.merchants[0]}, keep it under {rupees}"
+
+
+def _in_scope_basket(roles: dict[str, Any], scope: Scope) -> list[dict[str, Any]]:
+    """A basket that looks like the order the instruction describes.
+
+    Two products rather than one, in quantities that read as an order for a
+    group and land comfortably under the co-signature threshold. A single cheap
+    item satisfies every arithmetic bound and still does not match a sentence
+    asking for two things for a team -- and the advisory judge says so, which is
+    correct of it and made the first scripted step escalate the moment a model
+    was reachable.
+    """
+    first = roles["in_scope"]
+    second = roles.get("in_scope_second")
+    ceiling = scope.step_up_over_paise or scope.max_per_txn_paise
+    target = int(ceiling * 0.9)
+
+    if second is None:
+        qty = max(1, min(6, target // first.unit_paise))
+        return [{"sku": first.sku, "qty": qty}]
+
+    # Most of the budget on the cheaper line, the rest on the second, so the
+    # basket reads as "a lot of the cheap thing and a few of the other".
+    first_qty = max(1, min(6, int(target * 0.65) // first.unit_paise))
+    spent = first_qty * first.unit_paise
+    second_qty = max(1, min(4, (target - spent) // second.unit_paise))
+    return [
+        {"sku": first.sku, "qty": first_qty},
+        {"sku": second.sku, "qty": second_qty},
+    ]
+
+
 def _scripted_steps() -> list[dict[str, Any]]:
     """The five-basket run, built from whatever catalogue is loaded.
 
@@ -443,6 +497,7 @@ def _scripted_steps() -> list[dict[str, Any]]:
 
     steps: list[dict[str, Any]] = []
     legit = roles.get("in_scope")
+    legit_lines = _in_scope_basket(roles, scope)
 
     if legit:
         steps.append({
@@ -450,7 +505,7 @@ def _scripted_steps() -> list[dict[str, Any]]:
             "expect": "allow",
             "teaches": "Every bound the subject signed is satisfied, so the debit proceeds.",
             "merchant": merchant,
-            "lines": basket(legit.sku),
+            "lines": legit_lines,
             "replay_of": None,
         })
     if legit and (drift := roles.get("wrong_category")):
@@ -463,7 +518,10 @@ def _scripted_steps() -> list[dict[str, Any]]:
                 "subject authorized."
             ),
             "merchant": merchant,
-            "lines": basket(legit.sku, drift.sku),
+            "lines": [
+                {"sku": legit.sku, "qty": 1},
+                {"sku": drift.sku, "qty": 1},
+            ],
             "replay_of": None,
         })
     if injected := roles.get("injection"):
@@ -488,7 +546,7 @@ def _scripted_steps() -> list[dict[str, Any]]:
                 "refused."
             ),
             "merchant": merchant,
-            "lines": basket(legit.sku),
+            "lines": legit_lines,
             "replay_of": 1,
         })
     if over := roles.get("over_threshold"):

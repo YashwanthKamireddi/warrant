@@ -179,7 +179,7 @@ export function App() {
   /** Runs the scripted baskets one at a time and keeps whatever succeeded. A
    *  single failing step used to discard the whole run, hiding the failure
    *  behind an empty screen instead of showing it. */
-  const runScripted = () =>
+  const runScripted = (stay = false) =>
     run(async () => {
       if (!sessionId || !meta) return;
       const failures: string[] = [];
@@ -200,7 +200,7 @@ export function App() {
         }
       }
       setChain(await api.chain(sessionId));
-      setStep(3);
+      if (!stay) setStep(3);
       void refreshEvidence(sessionId);
       if (failures.length > 0) throw new Error(failures.join(" · "));
     });
@@ -508,7 +508,7 @@ export function App() {
                   Attach the second signature this amount requires
                 </label>
               )}
-              <button className="btn" onClick={runScripted} disabled={busy || !approved}>
+              <button className="btn" onClick={() => runScripted()} disabled={busy || !approved}>
                 Run five scripted baskets
               </button>
             </div>
@@ -527,6 +527,22 @@ export function App() {
             <h1 className="act-head">
               Every decision, in order, and provable after the fact.
             </h1>
+            {ledger.length < 3 && (
+              <div className="act-do">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => runScripted(true)}
+                  disabled={busy || !approved}
+                >
+                  {busy ? "Deciding…" : "Put five baskets through the gate"}
+                </button>
+                <span className="act-note">
+                  Nothing has been decided yet, so there is nothing to prove. This
+                  runs the five that teach each verdict and writes every one of
+                  them — including the refusals — into the record below.
+                </span>
+              </div>
+            )}
             <LedgerView entries={ledger} chain={chain} />
             <div className="act-do">
               <button className="btn" onClick={tamper} disabled={busy || !sessionId}>
