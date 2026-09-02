@@ -21,8 +21,18 @@ def enter(page: Page, base: str) -> None:
 
     The console derives and signs on arrival, so there is nothing to click:
     waiting for the certificate is waiting for the bootstrap to finish.
+
+    Checks first that something on this port is actually the console. A stray
+    process on the verify port -- `warrant api` is an easy one to leave running
+    -- otherwise turns into a thirty second wait for a selector that was never
+    going to appear, and a failure that reads like a console bug.
     """
     page.goto(f"{base}/#workspace", wait_until="networkidle")
+    if page.locator(".shell, .lp").count() == 0:
+        raise AssertionError(
+            f"{base} is serving something, but it is not the console. "
+            "Another process is probably holding this port."
+        )
     page.wait_for_selector(".certificate", timeout=30000)
     page.wait_for_selector(".seal:not(.unsigned)", timeout=30000)
 
