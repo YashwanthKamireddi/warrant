@@ -346,15 +346,28 @@ def warrant_router(
         response_model=DecisionResponse,
         dependencies=guard,
     )
-    def spend(permission_id: str, body: BasketRequest) -> DecisionResponse:
+    def spend(
+        permission_id: str, body: BasketRequest, request: Request
+    ) -> DecisionResponse:
         """Decide, and place the debit if it clears.
 
         A refusal is a 403 carrying the same body a 200 would: an agent that has
         to parse a status code to find out why it was refused will guess, and an
         agent guessing at authorization is the problem.
+
+        Send an ``Idempotency-Key`` header on anything that can be retried. A
+        repeat with the same key returns the first decision and does not touch
+        the rail again. Without one, two identical requests are two purchases,
+        which is right for someone buying the same thing twice and wrong for an
+        agent retrying after a timeout.
         """
         permission = store.get(permission_id)
-        decision = warrant.spend(permission, body.merchant, _as_items(body.items))
+        decision = warrant.spend(
+            permission,
+            body.merchant,
+            _as_items(body.items),
+            idempotency_key=request.headers.get("idempotency-key"),
+        )
         payload = _as_response(decision)
         if decision.allowed:
             return payload

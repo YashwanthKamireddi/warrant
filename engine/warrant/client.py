@@ -48,11 +48,14 @@ live, which is how the two drift apart.
 
 from __future__ import annotations
 
+import hashlib
 import secrets
 import time
+from collections import OrderedDict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from .authorize import AuthorizationOutcome, Authorizer, PendingIntent
@@ -111,6 +114,21 @@ def scope_as_proposal(scope: Scope, utterance: str) -> ScopeProposal:
         plain_english=_describe(scope),
         source="pinned",
     )
+
+
+def _nonce(permission: Permission, idempotency_key: str | None) -> str:
+    """The cart's replay guard.
+
+    Random when nobody supplied a key, because two identical baskets really are
+    two purchases. Derived from the key when one was supplied, so a retry builds
+    the *same* cart and the gate's own replay.cart_nonce check refuses it even if
+    the response cache has been evicted. Scoped to the permission so one caller's
+    key cannot collide with another's.
+    """
+    if idempotency_key is None:
+        return secrets.token_hex(16)
+    material = f"{permission.intent.digest}\x00{idempotency_key}".encode()
+    return hashlib.sha256(material).hexdigest()[:32]
 
 
 def _coerce(item: ItemLike) -> LineItem:
@@ -192,6 +210,12 @@ class WarrantDecision:
         return self.allowed
 
 
+#: How many (permission, idempotency key) results a process remembers. A retry
+#: arrives seconds after the original, so this only has to outlive a network
+#: hiccup, not a day.
+IDEMPOTENCY_CACHE = 2048
+
+
 class Warrant:
     """An authorization layer you can put in front of an agent's spending.
 
@@ -231,6 +255,8 @@ class Warrant:
             else load_registry(merchants)
         )
         self.ledger = ledger if isinstance(ledger, Ledger) else Ledger(ledger)
+        self._seen: OrderedDict[tuple[str, str], WarrantDecision] = OrderedDict()
+        self._seen_lock = Lock()
         self._authorizer = Authorizer(
             authorizer_key=key or SigningKey.generate(),
             ledger=self.ledger,
@@ -346,20 +372,45 @@ class Warrant:
         merchant: str,
         items: Iterable[ItemLike],
         *,
+        idempotency_key: str | None = None,
         now: int | None = None,
     ) -> WarrantDecision:
         """Check the basket and, if it clears, place the debit on the rail.
 
         The refusal is recorded whether or not it clears. A control plane that
         only writes down its successes cannot be audited.
+
+        **Pass an ``idempotency_key`` for anything that can be retried.** Without
+        one, every call mints a fresh cart nonce, so the same basket sent twice
+        is two purchases -- which is correct for someone buying the same sandwich
+        twice and catastrophic for an agent retrying after a timeout. With one,
+        a repeat returns the first decision without touching the rail again, and
+        the cart nonce is derived from the key so the engine's own replay guard
+        catches anything that gets past this cache.
         """
-        cart = self._cart(permission, merchant, items, now)
+        if idempotency_key is not None:
+            slot = (permission.intent.digest, idempotency_key)
+            with self._seen_lock:
+                cached = self._seen.get(slot)
+                if cached is not None:
+                    self._seen.move_to_end(slot)
+                    return cached
+
+        cart = self._cart(permission, merchant, items, now, idempotency_key)
         outcome = self._authorizer.authorize(
             permission.intent, cart,
             subject_key=permission.signer.public,
             now=now or int(time.time()),
         )
-        return WarrantDecision(decision=outcome.decision, cart=cart, outcome=outcome)
+        decision = WarrantDecision(decision=outcome.decision, cart=cart, outcome=outcome)
+
+        if idempotency_key is not None:
+            with self._seen_lock:
+                self._seen[slot] = decision
+                self._seen.move_to_end(slot)
+                while len(self._seen) > IDEMPOTENCY_CACHE:
+                    self._seen.popitem(last=False)
+        return decision
 
     # --------------------------------------------------------------- evidence
 
@@ -396,6 +447,7 @@ class Warrant:
         merchant: str,
         items: Iterable[ItemLike],
         now: int | None,
+        idempotency_key: str | None = None,
     ) -> CartMandate:
         lines = tuple(_coerce(i) for i in items)
         if not lines:
@@ -405,5 +457,5 @@ class Warrant:
             merchant=merchant,
             items=lines,
             now=now or int(time.time()),
-            nonce=secrets.token_hex(16),
+            nonce=_nonce(permission, idempotency_key),
         )

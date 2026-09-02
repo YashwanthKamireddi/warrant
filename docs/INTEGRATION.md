@@ -122,6 +122,44 @@ warrant.close()
 written. Use it to show someone what would happen. Use `spend()` to make it
 happen.
 
+### Retries
+
+**Pass an `idempotency_key` to anything that can be retried.**
+
+```python
+import time
+
+from warrant import Warrant
+from warrant.models import Scope
+
+now = int(time.time())
+warrant = Warrant(merchants="warrant.example.toml")
+permission = warrant.permit("lunch", scope=Scope(
+    merchants=("acme-grocers",), categories=("food_beverage",),
+    max_total_paise=100_000, max_per_txn_paise=50_000, max_txns=3,
+    not_before=now, expires_at=now + 7200,
+))
+basket = [{"sku": "sandwich", "category": "food_beverage", "qty": 1, "unit_paise": 24_000}]
+
+first = warrant.spend(permission, "acme-grocers", basket, idempotency_key="order-4417")
+retry = warrant.spend(permission, "acme-grocers", basket, idempotency_key="order-4417")
+
+# One charge, one cart, whatever the network did in between.
+assert first.cart.id == retry.cart.id
+assert retry.allowed
+
+warrant.close()
+```
+
+Without a key, two identical requests are two purchases — which is right for
+someone buying the same sandwich twice and wrong for an agent retrying after a
+timeout. With one, the repeat returns the first decision and never reaches the
+rail. The cart nonce is derived from the key as well, so the gate's own replay
+check catches anything the response cache has evicted.
+
+Over HTTP, send the standard `Idempotency-Key` header on
+`POST /warrant/permissions/{id}/spend`.
+
 ### Verdicts
 
 | | |
