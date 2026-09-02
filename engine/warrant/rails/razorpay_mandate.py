@@ -57,11 +57,23 @@ MAX_MANDATE_PAISE: Paise = 100_000_00
 # mandate alone.
 FREQUENCY = "as_presented"
 
+# Which rail the mandate is registered on. UPI Autopay is the one that matches
+# Reserve Pay, but it has to be enabled on the Razorpay account: registration
+# succeeds regardless, and then the checkout simply does not offer UPI, which is
+# a confusing way to find out. `card` needs no activation and is the same
+# mechanism -- a token minted once, debited afterwards with nobody asked
+# anything -- so it is what the live walk falls back to.
+METHODS = ("upi", "card", "emandate")
+DEFAULT_METHOD = os.environ.get("WARRANT_MANDATE_METHOD", "card")
+
 
 class MandateHandle(BaseModel):
     """What a registration produced. The URL is the part a human has to visit."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
+
+    method: str
+    """upi, card or emandate -- whichever rail the mandate was registered on."""
 
     invoice_id: str
     customer_id: str
@@ -147,6 +159,7 @@ class RazorpayMandate:
         name: str = "Warrant demo customer",
         email: str = "demo@example.com",
         contact: str = "9123456780",
+        method: str | None = None,
     ) -> MandateHandle:
         """Create a real mandate whose ceiling is the one the person approved.
 
@@ -157,6 +170,9 @@ class RazorpayMandate:
         """
         if ceiling_paise <= 0:
             raise ValueError("a mandate ceiling must be positive")
+        method = method or DEFAULT_METHOD
+        if method not in METHODS:
+            raise ValueError(f"mandate method must be one of {METHODS}, got {method!r}")
         if ceiling_paise > MAX_MANDATE_PAISE:
             raise ValueError(
                 f"UPI Autopay caps a mandate at {MAX_MANDATE_PAISE // 100:,} rupees; "
@@ -176,7 +192,7 @@ class RazorpayMandate:
                 "currency": "INR",
                 "description": description,
                 "subscription_registration": {
-                    "method": "upi",
+                    "method": method,
                     "max_amount": ceiling_paise,
                     "expire_at": 4102444800,
                     "frequency": FREQUENCY,
@@ -184,6 +200,7 @@ class RazorpayMandate:
             }
         )
         self._handle = MandateHandle(
+            method=method,
             invoice_id=invoice["id"],
             customer_id=customer["id"],
             order_id=invoice.get("order_id"),

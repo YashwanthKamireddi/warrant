@@ -110,10 +110,25 @@ def test_registers_with_the_ceiling_the_person_approved():
 
     registration = client.call("invoice.create")["subscription_registration"]
     assert registration["max_amount"] == 100_000
-    assert registration["method"] == "upi"
     assert registration["frequency"] == "as_presented"
     assert handle.short_url.startswith("https://")
     assert handle.ceiling_paise == 100_000
+
+
+def test_registers_on_whichever_rail_is_asked_for():
+    """UPI Autopay needs account activation; card does not. Same mechanism."""
+    for method in ("upi", "card", "emandate"):
+        client = FakeClient()
+        RazorpayMandate(client=client).register(
+            ceiling_paise=100_000, description="x", method=method
+        )
+        assert client.call("invoice.create")["subscription_registration"]["method"] == method
+
+
+def test_refuses_a_mandate_method_razorpay_does_not_have():
+    mandate = RazorpayMandate(client=FakeClient())
+    with pytest.raises(ValueError, match="method must be one of"):
+        mandate.register(ceiling_paise=100_000, description="x", method="cheque")
 
 
 def test_refuses_a_ceiling_above_what_upi_autopay_allows():

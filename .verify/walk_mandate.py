@@ -97,7 +97,7 @@ def main() -> int:
         ceiling_paise=scope.max_total_paise,
         description=f"Authorise up to Rs {CEILING // 100:,} for 2 hours",
     )
-    print(f"\n2. real UPI mandate   {handle.invoice_id}")
+    print(f"\n2. real {handle.method} mandate   {handle.invoice_id}")
     print(f"   max_amount Rs {handle.ceiling_paise // 100:,}, frequency as_presented")
     print(f"   authorise it here: {handle.short_url}")
 

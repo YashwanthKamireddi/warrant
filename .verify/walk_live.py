@@ -128,8 +128,12 @@ def main() -> int:
         ceiling_paise=CEILING,
         description=f"Authorise up to Rs {CEILING // 100:,} for 2 hours",
     )
-    print(f"   real UPI Autopay mandate {handle.invoice_id}, max_amount "
+    print(f"   real {handle.method} mandate {handle.invoice_id}, max_amount "
           f"Rs {handle.ceiling_paise // 100:,}, frequency as_presented")
+    if handle.method != "upi":
+        print("   (UPI Autopay is not enabled on this account, so this registers on "
+              f"{handle.method}. Same mechanism: one authorisation, then debits with")
+        print("   nobody asked anything. Set WARRANT_MANDATE_METHOD=upi once enabled.)")
     print(f"\n   \033[1mAUTHORISE IT HERE:\033[0m {handle.short_url}")
     print(f"   waiting up to {args.wait}s…")
 
