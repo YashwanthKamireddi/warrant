@@ -256,6 +256,7 @@ class Warrant:
         )
         self.ledger = ledger if isinstance(ledger, Ledger) else Ledger(ledger)
         self._seen: OrderedDict[tuple[str, str], WarrantDecision] = OrderedDict()
+        self._seen_locks: OrderedDict[tuple[str, str], Lock] = OrderedDict()
         self._seen_lock = Lock()
         self._authorizer = Authorizer(
             authorizer_key=key or SigningKey.generate(),
@@ -388,29 +389,57 @@ class Warrant:
         the cart nonce is derived from the key so the engine's own replay guard
         catches anything that gets past this cache.
         """
-        if idempotency_key is not None:
-            slot = (permission.intent.digest, idempotency_key)
+        if idempotency_key is None:
+            return self._spend_once(permission, merchant, items, now, None)
+
+        # Single-flight. Checking the cache and filling it were two separate
+        # critical sections, so eight retries arriving together all missed, all
+        # authorized, and seven came back "blocked: replay" -- the money was
+        # right and the answer was wrong, which is the failure this key exists
+        # to prevent. Same-key callers now queue; different keys never contend.
+        slot = (permission.intent.digest, idempotency_key)
+        with self._seen_lock:
+            cached = self._seen.get(slot)
+            if cached is not None:
+                self._seen.move_to_end(slot)
+                return cached
+            gate = self._seen_locks.setdefault(slot, Lock())
+            self._seen_locks.move_to_end(slot)
+
+        with gate:
             with self._seen_lock:
                 cached = self._seen.get(slot)
                 if cached is not None:
                     self._seen.move_to_end(slot)
                     return cached
 
+            decision = self._spend_once(
+                permission, merchant, items, now, idempotency_key
+            )
+
+            with self._seen_lock:
+                self._seen[slot] = decision
+                self._seen.move_to_end(slot)
+                while len(self._seen) > IDEMPOTENCY_CACHE:
+                    evicted, _ = self._seen.popitem(last=False)
+                    self._seen_locks.pop(evicted, None)
+            return decision
+
+    def _spend_once(
+        self,
+        permission: Permission,
+        merchant: str,
+        items: Iterable[ItemLike],
+        now: int | None,
+        idempotency_key: str | None,
+    ) -> WarrantDecision:
         cart = self._cart(permission, merchant, items, now, idempotency_key)
         outcome = self._authorizer.authorize(
             permission.intent, cart,
             subject_key=permission.signer.public,
             now=now or int(time.time()),
         )
-        decision = WarrantDecision(decision=outcome.decision, cart=cart, outcome=outcome)
-
-        if idempotency_key is not None:
-            with self._seen_lock:
-                self._seen[slot] = decision
-                self._seen.move_to_end(slot)
-                while len(self._seen) > IDEMPOTENCY_CACHE:
-                    self._seen.popitem(last=False)
-        return decision
+        return WarrantDecision(decision=outcome.decision, cart=cart, outcome=outcome)
 
     # --------------------------------------------------------------- evidence
 

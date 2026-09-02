@@ -160,3 +160,92 @@ def test_the_idempotency_key_header_is_honoured():
         assert first.status_code == 200
         assert again.status_code == 200
         assert first.json()["cart_id"] == again.json()["cart_id"]
+
+
+# ------------------------------------------------------------- concurrency
+
+
+def test_simultaneous_retries_all_get_the_same_answer(warrant):
+    """Eight retries arriving together must not produce seven refusals.
+
+    Checking the cache and filling it were two critical sections, so every
+    concurrent caller missed, every one authorized, and the nonce guard refused
+    all but the first. The money was right and the answer was wrong -- and a
+    caller told "blocked: replay" reasonably concludes the payment failed.
+    """
+    import threading
+
+    permission = warrant.permit("lunch", scope=scope(max_total_paise=1_000_000, max_txns=50))
+    results: list = []
+    start = threading.Barrier(8)
+
+    def attempt() -> None:
+        start.wait()
+        results.append(
+            warrant.spend(permission, "acme", [SANDWICH], idempotency_key="racing")
+        )
+
+    threads = [threading.Thread(target=attempt) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert all(r.verdict is Verdict.ALLOW for r in results)
+    assert len({r.cart.id for r in results}) == 1
+    assert spent(warrant, permission) == 24_000
+
+
+def test_concurrent_purchases_cannot_overspend_the_ceiling(warrant):
+    """Different keys are different purchases and must still respect the budget.
+
+    The ceiling check and the spend it authorises have to be atomic with respect
+    to each other, or twelve callers each see a budget nobody has claimed yet.
+    """
+    import threading
+
+    # Room for exactly four.
+    permission = warrant.permit(
+        "lunch", scope=scope(max_total_paise=96_000, max_per_txn_paise=24_000, max_txns=20)
+    )
+    results: list = []
+    start = threading.Barrier(12)
+
+    def attempt(n: int) -> None:
+        start.wait()
+        results.append(
+            warrant.spend(permission, "acme", [SANDWICH], idempotency_key=f"k{n}")
+        )
+
+    threads = [threading.Thread(target=attempt, args=(n,)) for n in range(12)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    allowed = [r for r in results if r.verdict is Verdict.ALLOW]
+    assert len(allowed) == 4
+    assert spent(warrant, permission) == 96_000
+
+
+def test_different_keys_do_not_serialise_behind_each_other(warrant):
+    """Single-flight is per key. Two unrelated purchases must not queue."""
+    permission = warrant.permit("lunch", scope=scope(max_txns=20, max_total_paise=1_000_000))
+
+    warrant.spend(permission, "acme", [SANDWICH], idempotency_key="a")
+    warrant.spend(permission, "acme", [SANDWICH], idempotency_key="b")
+
+    assert len(warrant._seen_locks) == 2
+    assert spent(warrant, permission) == 48_000
+
+
+def test_the_lock_registry_is_evicted_alongside_the_cache(warrant, monkeypatch):
+    """A lock per idempotency key, kept forever, is a slower memory leak."""
+    monkeypatch.setattr("warrant.client.IDEMPOTENCY_CACHE", 3)
+    permission = warrant.permit("lunch", scope=scope(max_txns=50, max_total_paise=10_000_000))
+
+    for n in range(8):
+        warrant.spend(permission, "acme", [SANDWICH], idempotency_key=f"key-{n}")
+
+    assert len(warrant._seen) <= 3
+    assert len(warrant._seen_locks) <= 3
