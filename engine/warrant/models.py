@@ -250,7 +250,10 @@ class CartMandate(_Doc):
 class RailRef(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    kind: Literal["razorpay", "simulated"]
+    # "razorpay" places an Order and a Payment Link a human completes.
+    # "razorpay_mandate" debits a UPI Autopay mandate with nobody asked
+    # anything, which is the case the gate exists for.
+    kind: Literal["razorpay", "razorpay_mandate", "simulated"]
     order_id: str | None = None
     payment_id: str | None = None
     status: str | None = None

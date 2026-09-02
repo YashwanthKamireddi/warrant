@@ -89,6 +89,12 @@ audit-contrast: ## fail on any rendered pair below WCAG AA
 audit-overlap: build ## fail if anything spills its box or paints over a sibling
 	@$(MAKE) --no-print-directory _with-server SCRIPT=.verify/audit_overlap.py
 
+mandate: ## register a real UPI Autopay mandate and drive a debit through the gate (needs keys)
+	uv run python .verify/walk_mandate.py
+
+mandate-check: ## the offline half of the mandate walk: registration and refusal only
+	uv run python .verify/walk_mandate.py --skip-auth
+
 browser-razorpay: build ## drive the console against real Razorpay test mode (needs keys)
 	@$(MAKE) --no-print-directory _with-server SCRIPT=.verify/walk_razorpay.py
 
