@@ -12,6 +12,7 @@ a demo that needs no migrations is a demo a reviewer can actually run.
 
 from __future__ import annotations
 
+import copy
 import secrets
 import threading
 import time
@@ -30,9 +31,18 @@ from .chain import EventKind, Ledger
 from .crypto import SigningKey
 from .demo import STEPS, UTTERANCE, build_scenario
 from .evidence import assemble_evidence
+from .gate import evaluate
 from .interop import to_ap2_chain
 from .llm import describe_capability
-from .models import CartMandate, DebitReceipt, IntentMandate, LineItem, RailBinding
+from .models import (
+    CartMandate,
+    CheckStatus,
+    DebitReceipt,
+    IntentMandate,
+    LineItem,
+    RailBinding,
+    Verdict,
+)
 from .rails.razorpay_rail import RazorpayNotConfigured, RazorpayRail
 from .rails.simulated import SimulatedRail
 
@@ -500,6 +510,112 @@ def submit_cart(session_id: str, body: CartRequest) -> dict[str, Any]:
         "outcome": payload,
         "scope": _scope_json(session.intent, session),
         "ledger_added": _ledger_json(session, since=before),
+    }
+
+
+class CompareRequest(BaseModel):
+    merchant: str = "zomato"
+    lines: list[CartLine] = Field(min_length=1, max_length=20)
+
+
+@app.post("/api/sessions/{session_id}/compare")
+def compare(session_id: str, body: CompareRequest) -> dict[str, Any]:
+    """The same basket, with and without a gate.
+
+    A rule name is not a stake. `scope.category -> BLOCK` is correct and
+    verifiable and says nothing about what it was worth. This runs one basket
+    through both worlds and answers in money: what settles when nothing checks,
+    what evidence exists afterwards, and what happens instead.
+
+    Nothing here is illustrative -- the "with" column is a real evaluation by the
+    same gate the rest of the system uses, on the real mandate in this session.
+    """
+    session = _session(session_id)
+    if session.intent is None:
+        raise HTTPException(status_code=409, detail="intent has not been approved yet")
+
+    items: list[LineItem] = []
+    for line in body.lines:
+        try:
+            product = by_sku(line.sku)
+        except KeyError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        items.append(
+            LineItem(
+                sku=product.sku,
+                name=product.name,
+                category=product.category,
+                qty=line.qty,
+                unit_paise=product.unit_paise,
+            )
+        )
+
+    cart = CartMandate(
+        intent_digest=session.intent.digest,
+        merchant=body.merchant,
+        line_items=tuple(items),
+        total_paise=sum(i.line_paise for i in items),
+        issued_at=session.clock,
+        nonce=f"{session_id}-compare-{secrets.token_hex(4)}",
+    )
+
+    # Evaluated against a copy of the live state, so previewing never consumes
+    # budget, a nonce, or an attempt from the real mandate.
+    state = copy.deepcopy(session.authorizer.state_for(session.intent))
+    decision = evaluate(
+        session.intent,
+        cart,
+        state,
+        now=session.clock,
+        subject_key=session.subject_key.public,
+    )
+
+    failures = [c for c in decision.checks if c.status is CheckStatus.FAIL]
+    warnings = [c for c in decision.checks if c.status is CheckStatus.WARN]
+
+    return {
+        "cart": {
+            "merchant": cart.merchant,
+            "total_paise": cart.total_paise,
+            "line_items": [
+                {"name": i.name, "qty": i.qty, "category": i.category, "line_paise": i.line_paise}
+                for i in cart.line_items
+            ],
+        },
+        "without": {
+            # No gate is not a policy; it is what happens when nobody wrote one.
+            "outcome": "settled",
+            "amount_paise": cart.total_paise,
+            "evidence": [
+                {"item": "device fingerprint", "present": False},
+                {"item": "browsing session", "present": False},
+                {"item": "customer click", "present": False},
+                {"item": "signed permission", "present": False},
+            ],
+            "on_dispute": "The merchant has nothing to submit and absorbs the chargeback.",
+        },
+        "with": {
+            "outcome": str(decision.verdict),
+            "amount_paise": 0 if decision.verdict is Verdict.BLOCK else cart.total_paise,
+            "failed_rules": [
+                {"rule": c.rule, "detail": c.detail, "observed": c.observed, "limit": c.limit}
+                for c in failures
+            ],
+            "warned_rules": [{"rule": c.rule, "detail": c.detail} for c in warnings],
+            "checks_run": len(decision.checks),
+            "model_used": decision.model_used,
+            "evidence": [
+                {"item": "signed permission", "present": True},
+                {"item": "checked basket", "present": True},
+                {"item": "bound receipt", "present": decision.verdict is Verdict.ALLOW},
+            ],
+            "on_dispute": (
+                "The money never moved."
+                if decision.verdict is Verdict.BLOCK
+                else "The merchant submits the signed chain, verifiable against the "
+                "cardholder's own public key."
+            ),
+        },
     }
 
 

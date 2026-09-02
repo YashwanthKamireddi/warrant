@@ -1753,3 +1753,236 @@ a {
   color: var(--ink-3);
   max-width: 78ch;
 }
+
+/* ==========================================================================
+   Counterfactual — the same basket in two worlds
+   --------------------------------------------------------------------------
+   The one screen that answers "so what". Everything else in this console shows
+   a mechanism; this shows a stake. It is deliberately the least decorated thing
+   here — two columns, one number each, and the evidence list that is the whole
+   argument.
+   ========================================================================== */
+
+.cf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  max-width: 980px;
+}
+
+.cf-basket {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+  flex-wrap: wrap;
+}
+.cf-basket-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+}
+.cf-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font: var(--t-small);
+  color: var(--ink-3);
+}
+.cf-item b {
+  font: var(--t-body-strong);
+  color: var(--ink);
+}
+.cf-item em {
+  font-style: normal;
+  color: var(--ink-4);
+}
+.cf-basket-total {
+  font: 700 18px/1 var(--font);
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+.cf-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-4);
+}
+
+.cf-col {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+  padding: var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  position: relative;
+  overflow: hidden;
+}
+.cf-col::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+}
+.cf-without::before {
+  background: var(--stop);
+}
+.cf-with.stopped::before {
+  background: var(--ok);
+}
+.cf-with.allowed::before {
+  background: var(--brand);
+}
+
+.cf-col h3 {
+  font: var(--t-micro);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+.cf-col h4 {
+  font: var(--t-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  margin-top: var(--s-3);
+}
+
+.cf-headline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 600 17px/1.3 var(--font);
+  color: var(--ink);
+  letter-spacing: -0.015em;
+}
+.cf-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--surface);
+  flex: none;
+}
+.cf-mark.bad {
+  background: var(--stop);
+}
+.cf-mark.good {
+  background: var(--ok);
+}
+.cf-mark.ok {
+  background: var(--brand);
+}
+
+.cf-amount {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  color: var(--ink);
+}
+.cf-amount.bad {
+  color: var(--stop);
+}
+.cf-amount.good {
+  color: var(--ok);
+}
+
+.cf-sub {
+  font: var(--t-small);
+  color: var(--ink-3);
+}
+
+.cf-rules {
+  list-style: none;
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.cf-rules li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--ok-bg);
+  border: 1px solid var(--ok-line);
+  border-radius: var(--r-sm);
+}
+.cf-rules code {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ok);
+  font-weight: 500;
+}
+.cf-rules span {
+  font: var(--t-small);
+  color: var(--ink-2);
+}
+
+.cf-evidence {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.cf-evidence li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font: var(--t-body);
+}
+.cf-evidence li span {
+  width: 15px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 12px;
+}
+.cf-evidence li.no {
+  color: var(--ink-4);
+  text-decoration: line-through;
+  text-decoration-color: var(--stop-line);
+}
+.cf-evidence li.no span {
+  color: var(--stop);
+}
+.cf-evidence li.yes {
+  color: var(--ink-2);
+}
+.cf-evidence li.yes span {
+  color: var(--ok);
+}
+
+.cf-verdict {
+  margin-top: var(--s-3);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--line);
+  font: var(--t-body-strong);
+  color: var(--ink-2);
+}
+.cf-verdict.bad {
+  color: var(--stop);
+}
+.cf-verdict.good {
+  color: var(--ok);
+}
+
+@media (max-width: 1100px) {
+  .cf-columns {
+    grid-template-columns: 1fr;
+  }
+}

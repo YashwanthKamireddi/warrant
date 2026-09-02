@@ -56,6 +56,8 @@ PAIRS: tuple[tuple[str, str, float, str], ...] = (
     ("--ink-4", "--sunken", 3.0, "disabled control labels"),
     ("--brand", "--brand-soft", 4.5, "selected rail option"),
     ("--ink-2", "--ok-bg", 4.5, "placed-on-rail explanation"),
+    ("--stop", "--surface", 4.5, "counterfactual loss figure"),
+    ("--ok", "--ok-bg", 4.5, "counterfactual rule chips"),
     ("--line-strong", "--surface", 1.3, "control borders (non-text)"),
 )
 

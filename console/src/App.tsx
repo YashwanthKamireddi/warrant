@@ -5,6 +5,7 @@ import { Certificate } from "./components/Certificate";
 import { ChainDiagram } from "./components/ChainDiagram";
 import { DecisionCard } from "./components/DecisionCard";
 import { EvidenceView } from "./components/EvidenceView";
+import { Counterfactual } from "./components/Counterfactual";
 import { LedgerView } from "./components/LedgerView";
 import { StandardsView } from "./components/StandardsView";
 import { Storefront } from "./components/Storefront";
@@ -12,6 +13,7 @@ import { Basket, Rows, ShieldMark } from "./components/icons";
 import { Badge, Empty, Gauge, Hash } from "./components/primitives";
 import type {
   ChainStatus,
+  Comparison,
   EvidencePack,
   LedgerEntry,
   Meta,
@@ -21,9 +23,19 @@ import type {
   Signature,
 } from "./types";
 
-type Tab = "decisions" | "ledger" | "evidence" | "standards";
+type Tab = "stakes" | "decisions" | "ledger" | "evidence" | "standards";
+
+/** Every path an interpretation can take gets a label. A missing case rendered
+ *  an empty chip, which is worse than a wrong one -- it looks like a bug. */
+const SOURCE_LABEL: Record<string, string> = {
+  pinned: "Scope pinned",
+  live: "Interpreted live",
+  transcript: "Interpretation replayed",
+  fallback: "No model · deterministic",
+};
 
 const TABS: { key: Tab; label: string }[] = [
+  { key: "stakes", label: "What it prevents" },
   { key: "decisions", label: "Decisions" },
   { key: "ledger", label: "Ledger" },
   { key: "evidence", label: "Dispute evidence" },
@@ -46,6 +58,7 @@ export function App() {
   const [rail, setRail] = useState<"simulated" | "razorpay">("simulated");
   const [cosign, setCosign] = useState(false);
   const [tab, setTab] = useState<Tab>("decisions");
+  const [comparison, setComparison] = useState<Comparison | null>(null);
   const [evidence, setEvidence] = useState<EvidencePack | null>(null);
   const [evidenceError, setEvidenceError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +138,24 @@ export function App() {
       return sum + (product ? product.unit_paise * line.qty : 0);
     }, 0);
   }, [lines, meta]);
+
+  /** Preview both outcomes for whatever is in the basket. Side-effect free --
+   *  the engine evaluates against a copy of the state, so previewing never
+   *  consumes budget, a nonce or an attempt. */
+  useEffect(() => {
+    if (!sessionId || signature === null || lines.length === 0) {
+      setComparison(null);
+      return;
+    }
+    let cancelled = false;
+    api
+      .compare(sessionId, merchant, lines)
+      .then((c) => !cancelled && setComparison(c))
+      .catch(() => !cancelled && setComparison(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, signature, merchant, lines]);
 
   const authorize = () =>
     run(async () => {
@@ -260,16 +291,14 @@ export function App() {
             being present is not the same as a live call succeeding. */}
         {meta && (
           <span
-            className={`pill ${pending ? (pending.source === "live" ? "ok" : "hold") : ""}`}
+            className={`pill ${
+              pending ? (pending.source === "live" ? "ok" : "hold") : ""
+            }`}
             title={meta.capability_note}
           >
             <span className="dot" />
             {pending
-              ? {
-                  live: "Interpreted live",
-                  transcript: "Interpretation replayed",
-                  fallback: "No model · deterministic",
-                }[pending.source]
+              ? SOURCE_LABEL[pending.source] ?? pending.source
               : meta.capability.credentials_configured
                 ? "Credentials available"
                 : "No credentials"}
@@ -535,6 +564,17 @@ export function App() {
 
           <div className="pane" role="tabpanel">
             <div className="pane-inner">
+              {tab === "stakes" && (
+                <Counterfactual
+                  comparison={comparison}
+                  empty={
+                    approved
+                      ? "Pick anything from the storefront and this shows what happens in both worlds — with a gate and without one. Try the Power Bank."
+                      : "Approve a permission first, then add something to the basket."
+                  }
+                />
+              )}
+
               {tab === "decisions" &&
                 (outcomes.length === 0 ? (
                   /* Before anything has run, the pane earns its space by

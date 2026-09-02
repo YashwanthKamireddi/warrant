@@ -90,7 +90,7 @@ export interface Scope {
 export interface PendingIntent {
   approval_prompt: string;
   ambiguities: string[];
-  source: "live" | "transcript" | "fallback";
+  source: "pinned" | "live" | "transcript" | "fallback";
   narrowed_by_envelope: boolean;
   proposed_max_total_paise: number;
   scope: Omit<
@@ -181,4 +181,34 @@ export interface EvidencePack {
   signatures_verified: boolean;
   chain_intact: boolean;
   verification_note: string;
+}
+
+
+export interface EvidenceItem {
+  item: string;
+  present: boolean;
+}
+
+export interface Comparison {
+  cart: {
+    merchant: string;
+    total_paise: number;
+    line_items: { name: string; qty: number; category: string; line_paise: number }[];
+  };
+  without: {
+    outcome: string;
+    amount_paise: number;
+    evidence: EvidenceItem[];
+    on_dispute: string;
+  };
+  with: {
+    outcome: Verdict;
+    amount_paise: number;
+    failed_rules: { rule: string; detail: string; observed: unknown; limit: unknown }[];
+    warned_rules: { rule: string; detail: string }[];
+    checks_run: number;
+    model_used: boolean;
+    evidence: EvidenceItem[];
+    on_dispute: string;
+  };
 }

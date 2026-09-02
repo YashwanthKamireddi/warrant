@@ -3,12 +3,16 @@ import type { PendingIntent, Scope, Signature } from "../types";
 import { Seal } from "./primitives";
 
 const PROVENANCE: Record<PendingIntent["source"], string> = {
+  pinned:
+    "Scope pinned, so this run is identical on every machine. Start a session with " +
+    "derive to interpret the sentence live instead.",
   live: "Interpreted by a live model call.",
   transcript: "Replayed from the bundled transcript. No live call was made.",
   fallback: "No model was reachable, so the scope narrowed to the deterministic minimum.",
 };
 
 const PROVENANCE_LABEL: Record<PendingIntent["source"], string> = {
+  pinned: "Scope pinned",
   live: "Interpreted live",
   transcript: "Interpretation replayed",
   fallback: "No model",

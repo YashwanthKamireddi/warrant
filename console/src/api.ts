@@ -1,5 +1,6 @@
 import type {
   ChainStatus,
+  Comparison,
   EvidencePack,
   IntentEnvelope,
   LedgerEntry,
@@ -73,6 +74,12 @@ export const api = {
         body: JSON.stringify({ merchant, lines, cosign, replay_of: replayOf }),
       },
     ),
+
+  compare: (sessionId: string, merchant: string, lines: { sku: string; qty: number }[]) =>
+    request<Comparison>(`/sessions/${sessionId}/compare`, {
+      method: "POST",
+      body: JSON.stringify({ merchant, lines }),
+    }),
 
   settle: (sessionId: string) =>
     request<{ settled: Outcome[]; scope: Scope; ledger_added: LedgerEntry[] }>(

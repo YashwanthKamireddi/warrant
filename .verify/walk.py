@@ -60,6 +60,15 @@ with sync_playwright() as pw:
     if verdicts != expected:
         errors.append(f"verdicts {verdicts} != {expected} printed by `warrant demo`")
 
+    print("opening what it prevents")
+    page.get_by_role("tab", name="What it prevents").click()
+    page.get_by_role("button", name="Add one Fast Power Bank 10000mAh").click()
+    page.wait_for_selector(".cf-columns", timeout=15_000)
+    page.wait_for_timeout(700)
+    shot(page, "09-counterfactual")
+    if page.locator(".cf-amount.bad").count() == 0:
+        errors.append("counterfactual did not render the loss figure")
+
     print("opening the ledger")
     page.get_by_role("tab", name="Ledger").click()
     page.wait_for_selector(".ledger-row", timeout=10_000)
