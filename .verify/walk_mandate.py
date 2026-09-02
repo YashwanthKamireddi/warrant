@@ -29,7 +29,13 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "engine"))
 from warrant.catalog import line_item  # noqa: E402
 from warrant.crypto import SigningKey  # noqa: E402
 from warrant.gate import MandateState, evaluate  # noqa: E402
-from warrant.models import CartMandate, IntentMandate, LineItem, Scope  # noqa: E402
+from warrant.models import (  # noqa: E402
+    CartMandate,
+    IntentMandate,
+    LineItem,
+    Scope,
+    Verdict,
+)
 from warrant.rails.razorpay_mandate import (  # noqa: E402
     MandateNotAuthorised,
     RazorpayMandate,
@@ -137,7 +143,7 @@ def main() -> int:
     print("   from here the agent can debit with nobody asked anything.")
 
     # ------------------------------------------------------------- the gate
-    state = MandateState()
+    state = MandateState(intent_digest=intent.digest)
     baskets = [
         ("in scope", sku("chai-6"), True),
         ("out of scope", sku("powerbank"), False),
@@ -155,17 +161,17 @@ def main() -> int:
             intent=intent, cart=cart, state=state, now=int(time.time()),
             subject_key=subject.public,
         )
-        allowed = decision.outcome == "allow"
+        allowed = decision.verdict is Verdict.ALLOW
         under_ceiling = cart.total_paise <= handle.ceiling_paise
         print(f"\n4. {label}: {item.name} Rs {item.line_paise // 100}")
         print(f"   under the mandate ceiling: {under_ceiling}  ->  the bank would pay it")
-        print(f"   gate: {decision.outcome.upper()}")
+        print(f"   gate: {decision.verdict.value.upper()}")
         if allowed != should_allow:
-            failures.append(f"{label} basket returned {decision.outcome}")
+            failures.append(f"{label} basket returned {decision.verdict.value}")
             continue
 
         if not allowed:
-            reasons = [c.rule for c in decision.checks if not c.passed]
+            reasons = [c.rule for c in decision.failures]
             print(f"   refused by {', '.join(reasons)} — no debit is attempted at all")
             continue
 

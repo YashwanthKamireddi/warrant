@@ -89,6 +89,9 @@ audit-contrast: ## fail on any rendered pair below WCAG AA
 audit-overlap: build ## fail if anything spills its box or paints over a sibling
 	@$(MAKE) --no-print-directory _with-server SCRIPT=.verify/audit_overlap.py
 
+live: ## the whole chain live: real catalog -> gate -> real mandate debit -> real order
+	uv run python .verify/walk_live.py
+
 mandate: ## register a real UPI Autopay mandate and drive a debit through the gate (needs keys)
 	uv run python .verify/walk_mandate.py
 

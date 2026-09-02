@@ -65,6 +65,13 @@ _RECORDS: tuple[MerchantRecord, ...] = (
         "General merchandise",
         frozenset({"electronics", "apparel", "groceries", "other"}),
     ),
+    # A live Shopify store, underwritten as an eating place. This is the record
+    # a real acquirer would hold, and it is what makes the store's own product
+    # types checkable: the store may list an "Electronics" product, and its MCC
+    # says it was not underwritten to sell one under a food mandate.
+    MerchantRecord(
+        "shopify", "5812", "Eating places and restaurants", frozenset({"food_beverage"})
+    ),
 )
 
 REGISTRY: dict[str, MerchantRecord] = {r.merchant: r for r in _RECORDS}
