@@ -199,6 +199,108 @@ agreed was fine. A simulator agrees with whatever assumption you built into it.
 
 ---
 
+## 8. The convenience layer double-charged on every retry
+
+**What happened.** I added a small facade over the engine so adopting this did not
+require choosing a signing key and inventing a nonce. Then I asked what a payments
+API has to survive, and sent the same basket three times:
+
+```
+attempt 1: allow  settled=True  cart=cm_b11e020b…
+attempt 2: allow  settled=True  cart=cm_b0472749…
+attempt 3: allow  settled=True  cart=cm_7a08c415…
+total spent: 72000 paise
+```
+
+Rs 720 for one lunch.
+
+**Why.** The engine has a replay guard and it was never reached. Every call minted
+a fresh cart nonce, so a retry built a *different* cart, which the gate has no
+reason to refuse. The engine had been correct the whole time; the convenience
+layer handed it a new nonce every call. An agent retrying a timed-out request is
+not an edge case, it is the normal case.
+
+**How I got out.** Two layers, because one of them is only a cache.
+
+- A repeat with the same `idempotency_key` returns the first decision without
+  touching the rail. Returning a *refusal* would be safe and useless: a caller
+  told "blocked: replay" reasonably concludes the payment failed and tries again.
+- The cart nonce is **derived** from the key, so when the bounded cache evicts an
+  entry the gate's own `replay.cart_nonce` check refuses the repeat. A test clears
+  the cache and asserts the second charge still does not happen.
+
+Then eight simultaneous retries produced one allow and seven refusals — the money
+right and the answer wrong, the same failure one level up. Checking the cache and
+filling it were separate critical sections. The slot is single-flight now, and a
+test asserts different keys still never contend.
+
+**What I took from it.** The engine was never wrong. I put a friendlier surface in
+front of it and the surface reintroduced the exact class of bug the engine exists
+to prevent. Convenience layers need the same tests as the thing they wrap.
+
+---
+
+## 9. I shipped a payment authorization service with no authentication
+
+**What happened.** I built the mountable service — permissions, checks, spends,
+revocations — and went looking for something else to improve. On a whim I grepped
+it for `Depends`, `auth`, `token`. Nothing. Every endpoint was open. Anyone who
+could reach the port could mint a spending permission and spend it.
+
+**Why.** I had been building the thing that decides whether money may move and had
+never once asked who was allowed to ask it. Every test I wrote called the handlers
+as a trusted caller, so every test passed.
+
+**How I got out.** `warrant_router` now *raises* unless it is given
+authentication. Not a warning, not default-open with a note in the docs —
+construction fails. A service that mints spending permissions must not become
+usable-because-reachable when somebody forgets an argument, so running open is
+possible and has to be typed: `auth=NO_AUTH`.
+
+Bearer tokens compare with `compare_digest` against every configured key rather
+than returning on the first match, so a rejection takes the same time whichever
+key it was measured against. Health and readiness stay unguarded, because an
+orchestrator holds no credential and a probe that returns 401 reports the process
+as dead.
+
+**What I took from it.** The gap was not hard to fix and was invisible from
+inside: my tests modelled a world with no attacker in it.
+
+---
+
+## 10. My own credential guard let a real API key into a commit
+
+**What happened.** A Groq key arrived in chat. I wrote it to `.env`, confirmed
+`.env` was gitignored and untracked, and then — because a guard that has never
+been seen to fire is not a guard — deliberately appended the key to `README.md`
+and tried to commit it.
+
+It committed. Exit 0. `git log -S` found the key sitting in local history.
+
+**Why.** The global pre-commit hook has a pattern per vendor and had no pattern
+for Groq's `gsk_` prefix. Worse, its generic `API_KEY=` rule required the value to
+be **quoted** — so a bare `KEY=value`, the exact shape of every line in a `.env`
+file and the way a key is most often pasted, matched nothing at all.
+
+**How I got out.** Reset the commit — `origin` had never been ahead of it, so the
+key never left the machine — then added the missing patterns, made the generic
+rule work without quotes, and re-ran the same three probes:
+
+```
+GROQ_API_KEY           blocked
+SHOPIFY_TOKEN          blocked
+DB_PASSWORD            blocked
+```
+
+**What I took from it.** I had trusted that guard for days across every repository
+on this machine. It took ninety seconds to test and it was wrong. The lesson is
+not "add Groq to the list" — it is that a detector nobody has watched fail is a
+belief, not a control. Every gate in this project has since been proven by
+breaking what it watches: the overlap detector, the docs-links audit, the
+screenshot staleness check.
+
+---
+
 ## Still open
 
 Honesty requires listing what has not been fixed.

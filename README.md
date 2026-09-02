@@ -24,6 +24,26 @@ checked *before* settlement, provable *after* dispute.
 
 ---
 
+---
+
+## Track 01 · the bar, line by line
+
+> *Every money action explainable, bounded and gated. Show the audit trail and
+> one failure handled gracefully.*
+
+| The bar | Where it is |
+| :--- | :--- |
+| **Explainable** | Every verdict names the rule that produced it and the observed-versus-limit numbers behind it — `merchant.mcc_scope`, `scope.category`, `replay.cart_nonce`. Nothing says "declined". |
+| **Bounded** | A hard `Envelope` no derived scope may exceed, and inside it a scope the person signed with their own device key. The narrower of the two always wins. |
+| **Gated** | `gate.evaluate()` is the only thing that can block, and it is a pure function of the signed documents and the state. [No model can change a verdict](#where-the-model-runs--and-where-it-deliberately-doesnt). |
+| **Audit trail** | A hash-chained ledger where **refusals are entries, not silences**. Edit any entry and every entry after it orphans — the console has a button that lets you try. |
+| **One failure handled gracefully** | The agent proposes ₹960, Warrant escalates, the agent is told *only the reason* and comes back with ₹480 to stay under the co-signature threshold. Live, in about four seconds. Ten more are written up in **[INCIDENTS.md](INCIDENTS.md)**. |
+
+*"...or that makes a merchant transactable by an AI buyer end to end"* — that is
+this project. An AI buyer arrives with a signed permission, the merchant checks
+the basket against it before taking money, and both sides keep a record that
+survives a dispute.
+
 ## The problem
 
 Since **February 2026**, Razorpay and NPCI have run agentic UPI payments in
