@@ -21,6 +21,13 @@ Be precise about what that closes and what it does not:
             relabelling its catalog, because its MCC says what it is and it did
             not write that.
 
+  configurable  The registry below is a *default*, not the product. Nobody
+            adopting this runs an Indian food-delivery marketplace by
+            coincidence, so the records load from a TOML file -- point
+            WARRANT_MERCHANTS at your own, or hand a MerchantRegistry to
+            evaluate() directly. The bundled records exist so the thing runs
+            out of the box, not because they are the ones that matter.
+
   still open  A merchant *inside* the category mislabelling within its own
             catalog. Zomato is MCC 5812; a power bank listed there as
             ``food_beverage`` still passes this check. Catching that needs the
@@ -31,9 +38,22 @@ Be precise about what that closes and what it does not:
 
 from __future__ import annotations
 
+import os
+import tomllib
+from pathlib import Path
 from typing import NamedTuple
 
-__all__ = ["MerchantRecord", "REGISTRY", "assigned_categories", "is_registered"]
+__all__ = [
+    "MerchantRecord",
+    "MerchantRegistry",
+    "REGISTRY",
+    "active_registry",
+    "assigned_categories",
+    "bundled_registry",
+    "is_registered",
+    "load_registry",
+    "use_registry",
+]
 
 
 class MerchantRecord(NamedTuple):
@@ -45,8 +65,100 @@ class MerchantRecord(NamedTuple):
     categories: frozenset[str]
 
 
+class MerchantRegistry:
+    """An acquirer's book of who it underwrote, and for what.
+
+    Immutable once built. Swapping the registry is how an adopter configures
+    this for their own merchants; mutating a shared one at runtime is how two
+    requests end up disagreeing about what a merchant is allowed to sell.
+    """
+
+    __slots__ = ("_records",)
+
+    def __init__(self, records: tuple[MerchantRecord, ...] = ()) -> None:
+        seen: dict[str, MerchantRecord] = {}
+        for record in records:
+            if record.merchant in seen:
+                raise ValueError(f"merchant {record.merchant!r} is registered twice")
+            if not record.mcc.isdigit() or len(record.mcc) != 4:
+                raise ValueError(
+                    f"{record.merchant!r} has MCC {record.mcc!r}; ISO 18245 codes are "
+                    "four digits"
+                )
+            seen[record.merchant] = record
+        self._records = seen
+
+    # ------------------------------------------------------------- accessors
+
+    def get(self, merchant: str) -> MerchantRecord | None:
+        return self._records.get(merchant)
+
+    def __contains__(self, merchant: object) -> bool:
+        return merchant in self._records
+
+    def __len__(self) -> int:
+        return len(self._records)
+
+    def __iter__(self):
+        return iter(self._records.values())
+
+    def assigned_categories(self, merchant: str) -> frozenset[str]:
+        """Categories the acquirer's MCC permits. Empty for an unknown merchant.
+
+        Empty means *nothing is permitted*, not *anything is permitted*. An
+        unregistered merchant fails closed, which is the only safe direction:
+        the alternative lets anyone who is not in the book sell anything.
+        """
+        record = self._records.get(merchant)
+        return record.categories if record else frozenset()
+
+    def with_merchant(self, record: MerchantRecord) -> MerchantRegistry:
+        """A new registry with one more merchant in it."""
+        return MerchantRegistry((*self._records.values(), record))
+
+    # ------------------------------------------------------------ construction
+
+    @classmethod
+    def from_mapping(cls, data: dict) -> MerchantRegistry:
+        """Build from parsed TOML or JSON.
+
+        Expects a ``merchant`` array of tables::
+
+            [[merchant]]
+            id = "acme-grocers"
+            mcc = "5411"
+            description = "Grocery stores and supermarkets"
+            categories = ["grocery", "food_beverage"]
+        """
+        entries = data.get("merchant") or data.get("merchants") or []
+        records = []
+        for i, entry in enumerate(entries):
+            missing = {"id", "mcc", "categories"} - entry.keys()
+            if missing:
+                raise ValueError(
+                    f"merchant #{i + 1} is missing {', '.join(sorted(missing))}"
+                )
+            records.append(
+                MerchantRecord(
+                    merchant=str(entry["id"]),
+                    mcc=str(entry["mcc"]),
+                    description=str(entry.get("description", "")),
+                    categories=frozenset(entry["categories"]),
+                )
+            )
+        return cls(tuple(records))
+
+    @classmethod
+    def from_file(cls, path: str | Path) -> MerchantRegistry:
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"no merchant registry at {path}")
+        return cls.from_mapping(tomllib.loads(path.read_text(encoding="utf-8")))
+
+
 # ISO 18245 merchant category codes, the same vocabulary an acquirer assigns.
-_RECORDS: tuple[MerchantRecord, ...] = (
+# These are a starting point for the demo and the benchmark, not the product.
+_BUNDLED: tuple[MerchantRecord, ...] = (
     MerchantRecord(
         "zomato", "5812", "Eating places and restaurants", frozenset({"food_beverage"})
     ),
@@ -74,18 +186,49 @@ _RECORDS: tuple[MerchantRecord, ...] = (
     ),
 )
 
-REGISTRY: dict[str, MerchantRecord] = {r.merchant: r for r in _RECORDS}
+
+def bundled_registry() -> MerchantRegistry:
+    return MerchantRegistry(_BUNDLED)
+
+
+def load_registry(path: str | Path | None = None) -> MerchantRegistry:
+    """Load a registry from a file, from WARRANT_MERCHANTS, or fall back.
+
+    A path that was asked for and does not exist raises. Only the *absence* of
+    any configuration falls back to the bundled records -- a typo in a path
+    should not silently hand you a registry full of Indian food delivery.
+    """
+    path = path or os.environ.get("WARRANT_MERCHANTS")
+    if not path:
+        return bundled_registry()
+    return MerchantRegistry.from_file(path)
+
+
+_active: MerchantRegistry = load_registry()
+
+
+def active_registry() -> MerchantRegistry:
+    """The registry the gate consults when it is not handed one."""
+    return _active
+
+
+def use_registry(registry: MerchantRegistry) -> MerchantRegistry:
+    """Install a registry process-wide. Returns the one it replaced."""
+    global _active
+    previous, _active = _active, registry
+    return previous
+
+
+# Kept because the demo, the benchmark and the console all read it directly, and
+# because "the merchants this build knows about" is a genuinely useful thing to
+# be able to print.
+REGISTRY: dict[str, MerchantRecord] = {r.merchant: r for r in _BUNDLED}
 
 
 def is_registered(merchant: str) -> bool:
-    return merchant in REGISTRY
+    return merchant in _active
 
 
 def assigned_categories(merchant: str) -> frozenset[str]:
-    """Categories the acquirer's MCC permits. Empty for an unregistered merchant.
-
-    Empty means *nothing is permitted*, not *anything is permitted*. An
-    unregistered merchant fails closed.
-    """
-    record = REGISTRY.get(merchant)
-    return record.categories if record else frozenset()
+    """Categories the acquirer's MCC permits, per the active registry."""
+    return _active.assigned_categories(merchant)

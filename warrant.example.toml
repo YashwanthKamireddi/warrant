@@ -1,0 +1,52 @@
+# The acquirer's book: who you underwrote, and for what.
+#
+# Point WARRANT_MERCHANTS at a copy of this file, or hand a MerchantRegistry to
+# evaluate() directly. Without either, Warrant falls back to a handful of
+# bundled records that exist so the demo runs -- they are not the product, and
+# nobody adopting this runs an Indian food-delivery marketplace by coincidence.
+#
+# The point of this file is that a merchant does not write its own line in it.
+# An acquirer assigns a merchant category code at onboarding, the same way card
+# networks have done for decades, and the gate checks a merchant's *declared*
+# item categories against what its acquirer *assigned* it. A merchant that tags
+# a power bank as food walks straight through a food-only mandate unless
+# something outside the merchant says what the merchant is.
+#
+#   id           your identifier for the merchant; whatever the cart carries
+#   mcc          ISO 18245 code, four digits. Refused if it is not.
+#   description  human-readable, printed in refusals and evidence packs
+#   categories   what this code permits. A merchant that is not in this file
+#                permits nothing -- unregistered fails closed, never open.
+
+[[merchant]]
+id = "acme-grocers"
+mcc = "5411"
+description = "Grocery stores and supermarkets"
+categories = ["grocery", "food_beverage"]
+
+[[merchant]]
+id = "northwind-electronics"
+mcc = "5732"
+description = "Electronics stores"
+categories = ["electronics"]
+
+[[merchant]]
+id = "contoso-pharmacy"
+mcc = "5912"
+description = "Drug stores and pharmacies"
+categories = ["pharmacy", "personal_care"]
+
+[[merchant]]
+id = "fabrikam-travel"
+mcc = "4722"
+description = "Travel agencies and tour operators"
+categories = ["travel"]
+
+# A marketplace underwritten broadly. Note that a wide MCC buys a merchant very
+# little here: the mandate's own categories still have to permit the item, and
+# the narrower of the two always wins.
+[[merchant]]
+id = "globex-marketplace"
+mcc = "5399"
+description = "General merchandise"
+categories = ["electronics", "apparel", "grocery", "other"]

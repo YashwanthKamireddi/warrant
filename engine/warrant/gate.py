@@ -22,7 +22,7 @@ import re
 from dataclasses import dataclass, field
 
 from .crypto import VerifyKey
-from .merchants import REGISTRY, assigned_categories
+from .merchants import MerchantRegistry, active_registry
 from .models import (
     CartMandate,
     Check,
@@ -134,8 +134,17 @@ def evaluate(
     *,
     now: int,
     subject_key: VerifyKey,
+    registry: MerchantRegistry | None = None,
 ) -> Decision:
-    """Evaluate one cart against one intent. Deterministic, total, side-effect free."""
+    """Evaluate one cart against one intent. Deterministic, total, side-effect free.
+
+    ``registry`` is the acquirer's book of underwritten merchants. Passing it
+    explicitly keeps this a pure function of its arguments; omitting it reads
+    the process-wide one, which is what a service configured once at startup
+    wants. Nobody adopting this runs the bundled merchants, so both doors are
+    open.
+    """
+    registry = registry if registry is not None else active_registry()
     checks: list[Check] = []
     scope = intent.scope
 
@@ -207,8 +216,8 @@ def evaluate(
     # The merchant declares its own item categories, so before trusting them at
     # all, check them against what the merchant's acquirer assigned it. A merchant
     # does not write its own MCC.
-    record = REGISTRY.get(cart.merchant)
-    permitted_by_mcc = assigned_categories(cart.merchant)
+    record = registry.get(cart.merchant)
+    permitted_by_mcc = registry.assigned_categories(cart.merchant)
     unbacked = sorted(c for c in cart.categories if c not in permitted_by_mcc)
     checks.append(
         _check(
