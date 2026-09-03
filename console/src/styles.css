@@ -86,6 +86,15 @@
   --font: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
+  /* Sizes, for rules that want a size and not a whole font shorthand. Six
+     steps; anything between two of them was drift, not a decision. */
+  --size-nano: 10.5px;
+  --size-micro: 11.5px;
+  --size-small: 12.5px;
+  --size-body: 13.5px;
+  --size-title: 15px;
+  --size-lead: 16.5px;
+
   --t-display: 600 20px/1.25 var(--font);
   --t-title: 600 15px/1.4 var(--font);
   --t-body: 400 13.5px/1.55 var(--font);
@@ -253,7 +262,7 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px 4px 8px;
+  padding: var(--s-1) 10px var(--s-1) var(--s-2);
   border-radius: var(--r-pill);
   border: 1px solid var(--line);
   background: var(--surface-2);
@@ -382,7 +391,7 @@ a {
   width: 100%;
   min-height: 74px;
   resize: vertical;
-  padding: 10px 12px;
+  padding: 10px var(--s-3);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-md);
   background: var(--surface);
@@ -534,7 +543,7 @@ a {
   display: grid;
   place-items: center;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--size-nano);
   font-weight: 600;
   letter-spacing: 0.03em;
   position: relative;
@@ -661,7 +670,7 @@ a {
   display: grid;
   place-items: center;
   color: var(--ink-3);
-  font-size: 14px;
+  font-size: var(--size-body);
   line-height: 1;
 }
 .stepper button:hover:not(:disabled) {
@@ -772,7 +781,7 @@ a {
 
 .chev {
   color: var(--ink-4);
-  font-size: 9px;
+  font-size: var(--size-nano);
   flex: none;
   transition: transform 0.16s ease;
 }
@@ -783,7 +792,7 @@ a {
 .verdict {
   font: 700 10.5px/1 var(--font);
   letter-spacing: 0.05em;
-  padding: 5px 8px;
+  padding: 5px var(--s-2);
   border-radius: var(--r-xs);
   border: 1px solid transparent;
   flex: none;
@@ -826,7 +835,7 @@ a {
   color: var(--ink-4);
 }
 .decision-meta .mono {
-  font-size: 10.5px;
+  font-size: var(--size-nano);
 }
 
 .decision-amount {
@@ -903,7 +912,7 @@ a {
   grid-template-columns: 18px 176px 1fr auto;
   gap: var(--s-3);
   align-items: baseline;
-  padding: 8px var(--s-5);
+  padding: var(--s-2) var(--s-5);
   border-bottom: 1px solid var(--line);
   font: var(--t-small);
 }
@@ -912,7 +921,7 @@ a {
 }
 .check .rule {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: var(--size-micro);
   color: var(--ink-3);
 }
 .check.fail .rule {
@@ -935,7 +944,7 @@ a {
   gap: 6px;
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  font-size: 11px;
+  font-size: var(--size-micro);
   color: var(--ink-4);
   white-space: nowrap;
 }
@@ -962,7 +971,7 @@ a {
   color: var(--ok);
 }
 .settled .mono {
-  font-size: 11.5px;
+  font-size: var(--size-micro);
 }
 
 .teaches {
@@ -1021,13 +1030,13 @@ a {
 .ledger-seq {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  font-size: 11.5px;
+  font-size: var(--size-micro);
   color: var(--ink-4);
   text-align: right;
 }
 .ledger-kind {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: var(--size-micro);
   color: var(--ink-2);
 }
 .ledger-row.refusal .ledger-kind {
@@ -1044,7 +1053,7 @@ a {
 .ledger-hash {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  font-size: 11px;
+  font-size: var(--size-micro);
   color: var(--ink-4);
   text-align: right;
 }
@@ -1097,7 +1106,7 @@ a {
 }
 .evidence-intro .mono {
   color: var(--ink-2);
-  font-size: 12px;
+  font-size: var(--size-small);
 }
 
 .doc {
@@ -1118,7 +1127,7 @@ a {
 }
 .doc-head h4 {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--size-small);
   font-weight: 600;
   color: var(--ink-2);
 }
@@ -1130,7 +1139,7 @@ a {
   margin: 0;
   padding: var(--s-4);
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: var(--size-micro);
   line-height: 1.65;
   white-space: pre-wrap;
   word-break: break-word;
@@ -1189,7 +1198,7 @@ a {
   background: currentColor;
 }
 .statusbar .mono {
-  font-size: 10.5px;
+  font-size: var(--size-nano);
 }
 
 /* ==========================================================================
@@ -1280,7 +1289,7 @@ a {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding-top: 4px;
+  padding-top: var(--s-1);
 }
 .link-node {
   width: 11px;
@@ -1320,7 +1329,7 @@ a {
 }
 .link-title code {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--size-small);
   font-weight: 600;
   color: var(--ink);
 }
@@ -1336,7 +1345,7 @@ a {
 .link-says {
   font: var(--t-body);
   color: var(--ink-2);
-  padding: 8px 12px;
+  padding: var(--s-2) var(--s-3);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
@@ -1442,7 +1451,7 @@ a {
 }
 .cred-kind {
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: var(--size-small);
   font-weight: 600;
   color: var(--ink);
 }
@@ -1451,7 +1460,7 @@ a {
   color: var(--ink-3);
 }
 .cred-proof {
-  font-size: 11px;
+  font-size: var(--size-micro);
   color: var(--ink-4);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1598,7 +1607,7 @@ a {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 12px;
+  font-size: var(--size-small);
   font-weight: 700;
   color: var(--surface);
   flex: none;
@@ -1644,14 +1653,14 @@ a {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 8px 10px;
+  padding: var(--s-2) 10px;
   background: var(--ok-bg);
   border: 1px solid var(--ok-line);
   border-radius: var(--r-sm);
 }
 .cf-rules code {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: var(--size-micro);
   color: var(--ok);
   font-weight: 500;
 }
@@ -1678,7 +1687,7 @@ a {
   width: 15px;
   text-align: center;
   font-weight: 700;
-  font-size: 12px;
+  font-size: var(--size-small);
 }
 .cf-evidence li.no {
   color: var(--ink-4);
@@ -1873,20 +1882,20 @@ a {
 .run-who {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   font: var(--t-body-strong);
   color: var(--ink);
 }
 .run-who em {
   font-style: normal;
   font-weight: 400;
-  font-size: 11.5px;
+  font-size: var(--size-micro);
   color: var(--ink-4);
 }
 .run-who .role-glyph {
   width: 20px;
   height: 20px;
-  font-size: 9px;
+  font-size: var(--size-nano);
 }
 
 .run-said {
@@ -1904,7 +1913,7 @@ a {
 .run-pick {
   font: var(--t-small);
   color: var(--ink-2);
-  padding: 4px 9px;
+  padding: var(--s-1) 9px;
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   background: var(--surface-2);
@@ -1926,7 +1935,7 @@ a {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--s-1);
 }
 .run-reasons li {
   font: var(--t-body);
@@ -1979,19 +1988,19 @@ a {
 
 .lp-link {
   color: var(--ink-3);
-  font-size: 13px;
+  font-size: var(--size-small);
   text-decoration: none;
 }
 .lp-link:hover { color: var(--ink); }
 
 .lp-cta {
-  padding: 8px 17px;
+  padding: var(--s-2) 17px;
   border: 0;
   border-radius: var(--r-pill);
   background: var(--brand);
   color: var(--on-brand);
   font: inherit;
-  font-size: 13.5px;
+  font-size: var(--size-body);
   font-weight: 600;
   cursor: pointer;
   transition: background 0.16s ease, transform 0.16s ease;
@@ -2001,7 +2010,7 @@ a {
 
 .lp-cta-lg {
   padding: 15px 34px;
-  font-size: 16px;
+  font-size: var(--size-title);
 }
 
 /* -------------------------------------------------------------------- acts */
@@ -2042,7 +2051,7 @@ a {
    wrap on a phone, and it is allowed to wrap rather than pushing the page. */
 .lp-install {
   max-width: 100%;
-  padding: 12px 18px;
+  padding: var(--s-3) 18px;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   background: var(--sunken);
@@ -2054,8 +2063,8 @@ a {
 }
 
 .lp-kicker {
-  margin: 0 0 clamp(16px, 2vw, 24px);
-  font-size: 12.5px;
+  margin: 0 0 clamp(var(--s-4), 2vw, var(--s-6));
+  font-size: var(--size-small);
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -2077,7 +2086,7 @@ a {
 
 .lp-body {
   max-width: 34em;
-  margin: clamp(24px, 3vw, 36px) 0 0;
+  margin: clamp(var(--s-6), 3vw, 36px) 0 0;
   font-size: clamp(16px, 1.55vw, 19px);
   line-height: 1.62;
   color: var(--ink-2);
@@ -2086,7 +2095,7 @@ a {
 .lp-note {
   max-width: 40em;
   margin: clamp(34px, 4vw, 52px) 0 0;
-  font-size: 15px;
+  font-size: var(--size-title);
   line-height: 1.62;
   color: var(--ink-3);
 }
@@ -2098,7 +2107,7 @@ a {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: clamp(34px, 5vw, 72px);
-  margin-top: clamp(20px, 3vw, 30px);
+  margin-top: clamp(var(--s-5), 3vw, 30px);
 }
 
 .lp-score {
@@ -2108,7 +2117,7 @@ a {
 }
 
 .lp-score-label {
-  font-size: 14px;
+  font-size: var(--size-body);
   font-weight: 600;
   color: var(--ink-2);
 }
@@ -2131,7 +2140,7 @@ a {
 
 .lp-score-money {
   margin-top: 6px;
-  font-size: 14px;
+  font-size: var(--size-body);
   color: var(--ink-3);
 }
 
@@ -2152,18 +2161,18 @@ a {
 .lp-link-n {
   display: block;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--size-small);
   color: var(--ink-4);
 }
 .lp-links h3 {
-  margin: 12px 0 10px;
+  margin: var(--s-3) 0 10px;
   font-size: clamp(19px, 2vw, 24px);
   letter-spacing: -0.018em;
   font-weight: 620;
 }
 .lp-links p {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--size-title);
   line-height: 1.6;
   color: var(--ink-2);
 }
@@ -2177,7 +2186,7 @@ a {
   gap: clamp(30px, 4vw, 54px);
 }
 .lp-spec-grid > div {
-  padding-top: 20px;
+  padding-top: var(--s-5);
   border-top: 1px solid var(--line-strong);
 }
 .lp-spec-grid dt {
@@ -2187,7 +2196,7 @@ a {
 }
 .lp-spec-grid dd {
   margin: 10px 0 0;
-  font-size: 15px;
+  font-size: var(--size-title);
   line-height: 1.6;
   color: var(--ink-2);
 }
@@ -2209,11 +2218,11 @@ a {
 .lp-foot {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--s-3);
   align-items: center;
   padding: 26px clamp(22px, 6vw, 56px);
   border-top: 1px solid var(--line);
-  font-size: 13px;
+  font-size: var(--size-small);
   color: var(--ink-3);
 }
 .lp-foot a {
@@ -2267,7 +2276,7 @@ a {
 .steps {
   display: flex;
   gap: 2px;
-  padding: 0 clamp(16px, 4vw, 40px);
+  padding: 0 clamp(var(--s-4), 4vw, 40px);
   border-bottom: 1px solid var(--line);
   background: var(--surface);
   overflow-x: auto;
@@ -2279,13 +2288,13 @@ a {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 14px 18px 12px;
+  padding: 14px 18px var(--s-3);
   border: 0;
   border-bottom: 2px solid transparent;
   background: none;
   color: var(--ink-3);
   font: inherit;
-  font-size: 13.5px;
+  font-size: var(--size-body);
   white-space: nowrap;
   cursor: pointer;
   transition: color 0.14s ease, border-color 0.14s ease;
@@ -2304,7 +2313,7 @@ a {
   height: 21px;
   border: 1px solid var(--line-strong);
   border-radius: 50%;
-  font-size: 11.5px;
+  font-size: var(--size-micro);
   font-variant-numeric: tabular-nums;
 }
 .stepbtn.on .stepbtn-n {
@@ -2323,7 +2332,7 @@ a {
 .stage {
   min-height: 0;
   overflow-y: auto;
-  padding: clamp(28px, 5vw, 52px) clamp(16px, 4vw, 40px) 40px;
+  padding: clamp(28px, 5vw, 52px) clamp(var(--s-4), 4vw, 40px) 40px;
 }
 
 .act {
@@ -2337,7 +2346,7 @@ a {
 .stage-who {
   max-width: 760px;
   margin: 0 auto 14px;
-  font-size: 12px;
+  font-size: var(--size-small);
   letter-spacing: 0.04em;
   color: var(--ink-3);
 }
@@ -2370,7 +2379,7 @@ a {
   border-left: 3px solid var(--brand);
   background: var(--brand-soft);
   border-radius: 0 10px 10px 0;
-  font-size: 16.5px;
+  font-size: var(--size-lead);
   line-height: 1.5;
   color: var(--ink);
 }
@@ -2378,14 +2387,14 @@ a {
 .decisions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--s-3);
 }
 
 .cosign {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: var(--s-2);
+  font-size: var(--size-small);
   color: var(--ink-3);
 }
 
@@ -2396,7 +2405,7 @@ a {
   border: 1px solid var(--stop-line);
   border-radius: 9px;
   background: var(--stop-bg);
-  font-size: 13px;
+  font-size: var(--size-small);
   color: var(--stop);
 }
 
@@ -2405,12 +2414,12 @@ a {
 .tryown,
 .more {
   border-top: 1px solid var(--line);
-  padding-top: 16px;
+  padding-top: var(--s-4);
 }
 .tryown > summary,
 .more > summary {
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--size-small);
   color: var(--ink-3);
   list-style: none;
 }
@@ -2434,7 +2443,7 @@ a {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 12px clamp(16px, 4vw, 40px);
+  padding: var(--s-3) clamp(var(--s-4), 4vw, 40px);
   border-top: 1px solid var(--line);
   background: var(--surface);
 }
@@ -2448,7 +2457,7 @@ a {
 
 @media (max-width: 720px) {
   .budget { display: none; }
-  .stepbtn { padding: 13px 12px; }
+  .stepbtn { padding: 13px var(--s-3); }
 
   /* Four bare numbers tell a reader nothing about where they are or what is
      next. Hiding every label saved room and cost all of the meaning, so the
@@ -2457,13 +2466,13 @@ a {
     display: none;
   }
   .stepbtn.on {
-    padding-right: 16px;
+    padding-right: var(--s-4);
   }
 }
 
 .terms-more > summary {
   cursor: pointer;
-  font-size: 12.5px;
+  font-size: var(--size-small);
   color: var(--ink-3);
   list-style: none;
   padding: 11px var(--s-5);
@@ -2482,13 +2491,13 @@ a {
   height: 26px;
   padding: 0 11px;
   border-radius: 999px;
-  font-size: 10.5px;
+  font-size: var(--size-nano);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .btn-amount {
-  margin-left: 8px;
+  margin-left: var(--s-2);
   padding-left: 9px;
   border-left: 1px solid var(--on-brand);
   font-variant-numeric: tabular-nums;
@@ -2517,7 +2526,7 @@ a.btn {
    must not compete. */
 .act-note {
   max-width: 42ch;
-  font-size: 13px;
+  font-size: var(--size-small);
   line-height: 1.5;
   color: var(--ink-3);
 }
@@ -2577,12 +2586,12 @@ a.btn {
 
 .product-body {
   flex: 1;
-  padding: 11px 12px 8px;
+  padding: 11px var(--s-3) var(--s-2);
   min-width: 0;
 }
 .product-body h4 {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--size-small);
   font-weight: 600;
   line-height: 1.35;
   color: var(--ink);
@@ -2609,7 +2618,7 @@ a.btn {
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   background: var(--sunken);
-  font-size: 10.5px;
+  font-size: var(--size-nano);
   letter-spacing: 0.02em;
   color: var(--ink-3);
   white-space: nowrap;
@@ -2637,11 +2646,11 @@ a.btn {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 8px 12px 11px;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3) 11px;
 }
 .product-price {
-  font-size: 13.5px;
+  font-size: var(--size-body);
   font-weight: 600;
   color: var(--ink);
 }
@@ -2661,10 +2670,10 @@ a.btn {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: var(--s-3);
+  padding-top: var(--s-3);
   border-top: 1px solid var(--line);
-  font-size: 12.5px;
+  font-size: var(--size-small);
   color: var(--ink-3);
 }
 .real-rail a.btn { text-decoration: none; }
