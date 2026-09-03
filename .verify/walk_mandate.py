@@ -19,12 +19,13 @@ what CI does; the debit steps are then reported as skipped rather than passed.
 from __future__ import annotations
 
 import argparse
-import os
 import pathlib
 import sys
 import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "engine"))
+
+import drive  # noqa: E402
 
 from warrant.catalog import line_item  # noqa: E402
 from warrant.crypto import SigningKey  # noqa: E402
@@ -45,14 +46,6 @@ CEILING = 100_000  # Rs 1,000, the ceiling the sentence asked for
 failures: list[str] = []
 
 
-def load_env() -> None:
-    env = pathlib.Path(__file__).resolve().parents[1] / ".env"
-    if not env.exists():
-        return
-    for line in env.read_text().splitlines():
-        if "=" in line and not line.strip().startswith("#"):
-            k, v = line.split("=", 1)
-            os.environ.setdefault(k.strip(), v.strip())
 
 
 def sku(name: str) -> LineItem:
@@ -65,7 +58,7 @@ def main() -> int:
     ap.add_argument("--wait", type=int, default=180)
     args = ap.parse_args()
 
-    load_env()
+    drive.load_env()
     now = int(time.time())
 
     # ---------------------------------------------------------- the promise

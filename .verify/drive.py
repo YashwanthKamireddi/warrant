@@ -6,6 +6,9 @@ which is how the SKU drift got in. The path lives here now: change the console,
 change this file, and every gate follows.
 """
 
+import os
+import pathlib
+
 from playwright.sync_api import Page
 
 STEPS = {
@@ -66,3 +69,19 @@ def scripted_baskets(page: Page, expected: int = 5) -> None:
         f"document.querySelectorAll('.decision').length === {expected}",
         timeout=30000,
     )
+
+
+def load_env(root: pathlib.Path | None = None) -> None:
+    """Read .env the way the package does, for scripts that run before it.
+
+    Both live walks carried their own copy of this. Two copies of the same
+    eight lines is two places for one of them to stop matching the other.
+    Real environment variables win, as they do everywhere else here.
+    """
+    env = (root or pathlib.Path(__file__).resolve().parents[1]) / ".env"
+    if not env.is_file():
+        return
+    for line in env.read_text().splitlines():
+        if "=" in line and not line.strip().startswith("#"):
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip())
