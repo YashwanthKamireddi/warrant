@@ -290,7 +290,36 @@ export function App() {
       setChain(await api.chain(sessionId));
     });
 
+  /** Throw this session away and sign a fresh permission.
+   *
+   *  Revoking a mandate and breaking the chain are both meant to be pressed --
+   *  they are two of the four things this act offers. Both are also permanent,
+   *  and until now there was no way back from either: every basket afterwards
+   *  was refused, correctly, for ever, and the console never said why or
+   *  offered a way out. A demonstration you can brick and not un-brick is a
+   *  demonstration people press once. */
+  const restart = () =>
+    run(async () => {
+      setSessionId(null);
+      setPending(null);
+      setSignature(null);
+      setScope(null);
+      setOutcomes([]);
+      setLedger([]);
+      setChain(null);
+      setAttempts([]);
+      setAgentStarted(false);
+      setQuantities({});
+      setRealOrders({});
+      setEvidence(null);
+      setEvidenceError(null);
+      setStep(1);
+    });
+
   const approved = signature !== null;
+  const revoked = scope?.revoked === true;
+  const chainBroken = chain?.break != null;
+  const settledSomething = ledger.some((e) => e.kind === "debit_settled");
   const needsCosign =
     scope?.step_up_over_paise != null && basketTotal > scope.step_up_over_paise;
 
@@ -442,6 +471,22 @@ export function App() {
       {error && (
         <div className="stage-error" role="alert">
           {error}
+        </div>
+      )}
+
+      {(revoked || chainBroken) && (
+        <div className="spent-banner" role="status">
+          <span>
+            {revoked && chainBroken
+              ? "This permission is revoked and this ledger is broken."
+              : revoked
+                ? "This permission is revoked, so every basket from here is refused."
+                : "This ledger is broken, so every entry after the edit is orphaned."}{" "}
+            Both are permanent, which is the point of them.
+          </span>
+          <button className="btn btn-sm" onClick={restart} disabled={busy}>
+            {busy ? "Starting…" : "Start again with a fresh permission"}
+          </button>
         </div>
       )}
 
@@ -620,7 +665,15 @@ export function App() {
                 you a button whose only possible answer is "nothing has settled
                 yet" -- which is true, and is not a thing to make somebody click
                 to find out. */}
-            {razorpayReady && ledger.some((e) => e.kind === "debit_settled") && (
+            {razorpayReady && !settledSomething && (
+              <p className="act-note">
+                Nothing has settled yet, so there is no debit to put on Razorpay.
+                Let the agent buy something the permission covers, or run the five
+                baskets above.
+              </p>
+            )}
+
+            {razorpayReady && settledSomething && (
               <div className="act-do">
                 {latestRealOrder ? (
                   <span className="real-rail placed">

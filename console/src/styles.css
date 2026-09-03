@@ -2677,3 +2677,19 @@ a.btn {
   color: var(--ink-3);
 }
 .real-rail a.btn { text-decoration: none; }
+
+/* Says the session is spent, and offers the way out. Sits under the stepper so
+   it is visible from whichever act the reader is on: revoking and tampering are
+   properties of the session, not of the screen that triggered them. */
+.spent-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  padding: 11px clamp(var(--s-4), 4vw, 40px);
+  border-bottom: 1px solid var(--hold-line);
+  background: var(--hold-bg);
+  font-size: var(--size-small);
+  color: var(--hold);
+}
