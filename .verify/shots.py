@@ -86,9 +86,12 @@ with sync_playwright() as pw:
     page.wait_for_timeout(400)
     shoot(page, "02-decisions", ".decisions")
 
+    # No click: the act seeds itself with whatever this merchant sells that the
+    # permission does not cover. Naming a product here was a promise about
+    # somebody else's inventory, and it broke the moment the catalogue became
+    # a real storefront's.
     drive.step(page, "prevents")
-    page.get_by_role("button", name="Add one Fast Power Bank 10000mAh").click()
-    page.wait_for_selector(".cf-columns", timeout=15_000)
+    page.wait_for_selector(".cf-columns", timeout=20_000)
     page.wait_for_timeout(700)
     shoot(page, "07-razorpay", ".cf")
 

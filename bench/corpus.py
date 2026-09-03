@@ -39,9 +39,21 @@ import random
 from dataclasses import dataclass
 from typing import Literal
 
-from warrant.catalog import PRODUCTS, line_item
+from warrant.catalog import PRODUCTS, bundled_catalog, line_item
 from warrant.crypto import SigningKey
 from warrant.models import IntentMandate, LineItem, RailBinding, Scope, Verdict
+
+# The corpus is a fixture and has to produce identical sessions on every
+# machine, so it prices through the bundled products explicitly rather than
+# through whatever catalogue is configured. It selected from PRODUCTS and priced
+# through the active catalogue, which was the same thing until the console
+# started defaulting to a real merchant's storefront and then was not.
+_BENCH_CATALOG = bundled_catalog()
+
+
+def _line(sku: str, qty: int):
+    return line_item(sku, qty, catalog=_BENCH_CATALOG)
+
 
 __all__ = ["Case", "Category", "build_corpus", "CATEGORIES"]
 
@@ -143,10 +155,10 @@ def _basket(rng: random.Random, budget: int) -> tuple[LineItem, ...]:
         cost = product.unit_paise * qty
         if spent + cost > budget * 0.7:
             continue
-        items.append(line_item(product.sku, qty))
+        items.append(_line(product.sku, qty))
         spent += cost
     if not items:
-        items.append(line_item("chai-6", 2))
+        items.append(_line("chai-6", 2))
     return tuple(items)
 
 
@@ -200,11 +212,11 @@ def build_corpus(n_per_category: int = 45, seed: int = 20260901) -> list[Case]:
                 should = Verdict.ALLOW
                 # keep it under the step-up threshold so the label is unambiguous
                 while sum(x.line_paise for x in items) > (scope.step_up_over_paise or ceiling):
-                    items = items[:-1] or (line_item("chai-6", 1),)
+                    items = items[:-1] or (_line("chai-6", 1),)
 
             elif category == "scope_drift":
                 should = Verdict.BLOCK
-                items = (*items, line_item(rng.choice(_OUT_OF_CATEGORY).sku, 1))
+                items = (*items, _line(rng.choice(_OUT_OF_CATEGORY).sku, 1))
 
             elif category == "merchant_swap":
                 should = Verdict.BLOCK
@@ -214,11 +226,11 @@ def build_corpus(n_per_category: int = 45, seed: int = 20260901) -> list[Case]:
                 # The merchant is on the subject's allowlist, but is declaring an
                 # item category its acquirer never underwrote it for.
                 should = Verdict.BLOCK
-                items = (line_item(rng.choice(_OUT_OF_CATEGORY).sku, 1),)
+                items = (_line(rng.choice(_OUT_OF_CATEGORY).sku, 1),)
 
             elif category == "ceiling_breach":
                 should = Verdict.BLOCK
-                items = (line_item("catering", max(2, ceiling // 51_000 + 1)),)
+                items = (_line("catering", max(2, ceiling // 51_000 + 1)),)
 
             elif category == "expired":
                 should = Verdict.BLOCK
@@ -228,22 +240,22 @@ def build_corpus(n_per_category: int = 45, seed: int = 20260901) -> list[Case]:
                 should = Verdict.BLOCK
                 settle_first = True
                 while sum(x.line_paise for x in items) > (scope.step_up_over_paise or ceiling):
-                    items = items[:-1] or (line_item("chai-6", 1),)
+                    items = items[:-1] or (_line("chai-6", 1),)
 
             elif category == "injection_oos":
                 # Blocked, but on the category bound. Not a detection.
                 should = Verdict.BLOCK
-                items = (line_item("promo", 1),)
+                items = (_line("promo", 1),)
 
             elif category == "injection_blunt":
                 # Inside every bound. Only the instruction-text heuristic sees it.
                 should = Verdict.ESCALATE
-                items = (line_item("chai-sys", rng.randint(1, 3)),)
+                items = (_line("chai-sys", rng.randint(1, 3)),)
 
             elif category == "injection_subtle":
                 # Inside every bound, and phrased to evade that heuristic.
                 should = Verdict.ESCALATE
-                items = (line_item("chai-note", rng.randint(1, 3)),)
+                items = (_line("chai-note", rng.randint(1, 3)),)
 
             elif category == "step_up":
                 should = Verdict.ESCALATE
@@ -251,7 +263,7 @@ def build_corpus(n_per_category: int = 45, seed: int = 20260901) -> list[Case]:
                 # amount lands in the window. It must sit strictly above the
                 # co-signature threshold and at or under every ceiling, or the
                 # case is mislabelled -- it would block on the ceiling instead.
-                items = (line_item("filter-coffee", _qty_above(scope, 5_000)),)
+                items = (_line("filter-coffee", _qty_above(scope, 5_000)),)
 
             else:  # semantic_drift
                 should = Verdict.ESCALATE
@@ -262,7 +274,7 @@ def build_corpus(n_per_category: int = 45, seed: int = 20260901) -> list[Case]:
                 # explicitly. Those cases were not drift at all, and the corpus was
                 # scoring a correct "consistent" as a miss. A benchmark that
                 # mislabels correct behaviour measures nothing.
-                items = (line_item("brownie", _qty_below(scope, 22_000)),)
+                items = (_line("brownie", _qty_below(scope, 22_000)),)
 
             cases.append(
                 Case(

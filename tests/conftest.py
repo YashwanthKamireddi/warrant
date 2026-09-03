@@ -94,6 +94,27 @@ def make_cart(intent: IntentMandate):
 
 
 @pytest.fixture(autouse=True)
+def _bundled_catalog_by_default(request):
+    """Tests read the bundled products, never the live storefront snapshot.
+
+    The console now defaults to a real merchant's catalogue, which is the point
+    of it -- and a test suite whose fixtures depend on somebody else's live
+    prices is a suite that fails when they run a sale. Tests that are *about*
+    configuration opt out with @pytest.mark.catalog.
+    """
+    from warrant.catalog import bundled_catalog, use_catalog
+
+    if request.node.get_closest_marker("catalog"):
+        yield
+        return
+    previous = use_catalog(bundled_catalog())
+    try:
+        yield
+    finally:
+        use_catalog(previous)
+
+
+@pytest.fixture(autouse=True)
 def _no_network_by_default(monkeypatch, request):
     """Tests never call a real provider.
 

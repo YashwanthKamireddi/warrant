@@ -52,6 +52,10 @@ class Product(NamedTuple):
     unit_paise: int
     merchant: str
     note: str
+    #: The merchant's own photograph of the thing. Optional, because a catalogue
+    #: written by hand has none -- and a storefront's does, which is most of the
+    #: difference between a shop and a list of strings.
+    image: str = ""
 
 
 PRODUCTS: tuple[Product, ...] = (
@@ -197,6 +201,7 @@ class Catalog:
                     unit_paise=int(entry["unit_paise"]),
                     merchant=str(entry["merchant"]),
                     note=str(entry.get("note", "")),
+                    image=str(entry.get("image", "")),
                 )
             )
         return cls(tuple(products))
@@ -303,16 +308,27 @@ def bundled_catalog() -> Catalog:
 
 
 def load_catalog(path: str | Path | None = None) -> Catalog:
-    """Load from a file, from WARRANT_CATALOG, or fall back to the bundled one.
+    """Load from a file, from WARRANT_CATALOG, from a real storefront, or bundled.
 
     A path that was asked for and does not exist raises. Only the absence of any
-    configuration falls back, for the same reason the merchant registry does: a
-    typo must not hand you somebody else's products.
+    configuration falls through, for the same reason the merchant registry does:
+    a typo must not hand you somebody else's products.
+
+    With nothing configured this reads the committed snapshot of a real
+    merchant's storefront -- their titles, their SKUs, their prices. The bundled
+    tuple is the last resort and the deliberate choice of the scripted demo and
+    the benchmark, which have to produce identical output on every machine.
     """
     path = path or os.environ.get("WARRANT_CATALOG")
-    if not path:
+    if path:
+        return Catalog.from_file(path)
+
+    try:
+        from .storefront import load_snapshot
+
+        return load_snapshot(os.environ.get("WARRANT_STOREFRONT", "sleepyowl"))
+    except Exception:  # noqa: BLE001 - a missing snapshot is not a reason to fail
         return bundled_catalog()
-    return Catalog.from_file(path)
 
 
 _active: Catalog = load_catalog()

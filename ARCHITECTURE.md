@@ -337,6 +337,7 @@ engine/warrant/
   service.py     the router a company mounts. Auth required to construct
   observability.py  structured logs; digests in, contents never
   catalog.py     the products, loaded from the deployer's TOML
+  storefront.py  a real merchant's catalogue, snapshotted from their storefront
   py.typed       PEP 561; without it every annotation here is invisible
   api.py         the console's HTTP surface; a view onto the engine, never a second one
 ```

@@ -136,6 +136,7 @@ export interface Product {
   sku: string;
   name: string;
   category: string;
+  image?: string;
   unit_paise: number;
   merchant: string;
   note: string;

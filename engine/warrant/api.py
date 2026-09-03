@@ -71,7 +71,16 @@ app.add_middleware(
 # Read from the active catalog rather than the bundled tuple, so a console
 # started with WARRANT_CATALOG set shows that merchant's products. The bundled
 # ones are a demonstration; they are not what an adopter is supposed to sell.
-CATALOG: tuple[dict[str, Any], ...] = tuple(p._asdict() for p in active_catalog())
+def catalog_json() -> list[dict[str, Any]]:
+    """The active catalogue, read when it is asked for.
+
+    This was a module-level constant computed at import, which meant swapping the
+    catalogue left the API still serving the one that happened to be loaded when
+    Python first read this file -- a frozen copy quietly disagreeing with the
+    thing it was a copy of, which is the drift every gate in this repository
+    exists to stop.
+    """
+    return [p._asdict() for p in active_catalog()]
 
 
 def _available_rails() -> list[dict[str, Any]]:
@@ -348,7 +357,7 @@ def meta() -> dict[str, Any]:
         "capability": capability.model_dump(mode="json"),
         "capability_note": capability.note,
         "rails": _available_rails(),
-        "catalog": list(CATALOG),
+        "catalog": catalog_json(),
         "default_utterance": console_utterance(),
         "scripted_steps": _scripted_steps(),
     }
@@ -434,13 +443,19 @@ def console_utterance() -> str:
         permitted=frozenset(scope.categories),
         step_up_paise=scope.step_up_over_paise,
     )
-    first = roles.get("in_scope")
-    if first is None:
+    if "in_scope" not in roles:
         return UTTERANCE
-    second = roles.get("in_scope_second")
-    what = first.name if second is None else f"{first.name} and {second.name}"
+
+    # Named from the basket the scripted run actually buys, not from the roles
+    # it was chosen out of. A second product that gets dropped for budget was
+    # still being named, so the instruction asked for two things and the basket
+    # bought one -- which is precisely the divergence the judge escalates on.
+    catalog = active_catalog()
+    lines = _in_scope_basket(roles, scope)
+    names = [catalog.by_sku(line["sku"]).name.lower() for line in lines]
+    what = names[0] if len(names) == 1 else " and ".join((", ".join(names[:-1]), names[-1]))
     rupees = scope.max_total_paise // 100
-    return f"order {what.lower()} for my team from {scope.merchants[0]}, keep it under {rupees}"
+    return f"order {what} for my team from {scope.merchants[0]}, keep it under {rupees}"
 
 
 def _in_scope_basket(roles: dict[str, Any], scope: Scope) -> list[dict[str, Any]]:

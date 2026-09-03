@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from warrant.api import CATALOG
+from warrant.api import catalog_json
 from warrant.catalog import PRODUCTS, by_sku, line_item
 from warrant.demo import STEPS
 
@@ -22,7 +22,17 @@ def test_every_scripted_sku_exists_in_the_catalog():
 
 
 def test_the_api_serves_exactly_the_shared_catalog():
-    assert [c["sku"] for c in CATALOG] == [p.sku for p in PRODUCTS]
+    """And reads it when asked, so swapping the catalogue actually swaps it."""
+    assert [c["sku"] for c in catalog_json()] == [p.sku for p in PRODUCTS]
+
+    from warrant.catalog import Catalog, Product, use_catalog
+
+    mine = Catalog((Product("only-one", "Only One", "food_beverage", 100, "m", ""),))
+    previous = use_catalog(mine)
+    try:
+        assert [c["sku"] for c in catalog_json()] == ["only-one"]
+    finally:
+        use_catalog(previous)
 
 
 def test_scripted_items_match_catalog_prices_and_categories():

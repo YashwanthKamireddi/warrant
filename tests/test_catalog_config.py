@@ -82,9 +82,18 @@ def test_a_catalogue_that_was_asked_for_and_is_missing_raises(tmp_path):
         load_catalog(tmp_path / "nope.toml")
 
 
-def test_no_configuration_falls_back_to_the_bundled_products(monkeypatch):
+@pytest.mark.catalog
+def test_no_configuration_reads_a_real_merchants_storefront(monkeypatch):
+    """The default is a real catalogue, not one this repository typed."""
     monkeypatch.delenv("WARRANT_CATALOG", raising=False)
-    assert len(load_catalog()) == len(bundled_catalog())
+    catalog = load_catalog()
+
+    assert len(catalog) > len(bundled_catalog())
+    assert catalog.merchants() != ("zomato",)
+    # and it has the shape a demonstration needs, without anybody planting it
+    categories = {p.category for p in catalog}
+    assert "food_beverage" in categories
+    assert categories - {"food_beverage"}, "nothing is out of category"
 
 
 def test_the_environment_can_point_at_a_catalogue(tmp_path, monkeypatch):

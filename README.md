@@ -511,6 +511,7 @@ engine/warrant/
   models.py      Intent → Cart → Receipt, bound by content address.
   merchants.py   Acquirer-assigned MCC registry, loaded from your TOML.
   catalog.py     The products, loaded from your TOML.
+  storefront.py  A real merchant's live catalogue, read from their storefront.
   gate.py        The only layer that can block. Pure, replayable, no model.
   derive.py      Utterance → scope, clamped by a hard envelope.
   divergence.py  The advisory judge. Can escalate; cannot authorise.

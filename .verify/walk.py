@@ -82,7 +82,19 @@ with sync_playwright() as pw:
 
     print("opening what it prevents")
     drive.step(page, "prevents")
-    page.get_by_role("button", name="Add one Fast Power Bank 10000mAh").click()
+    # Ask the page which product is out of category rather than naming one. The
+    # catalogue is a real merchant's now, so a hard-coded product name is a
+    # promise about somebody else's inventory.
+    out_of_scope = page.evaluate(
+        "() => { const el = [...document.querySelectorAll('.product')]"
+        "  .find(e => /electronics|merchandise|equipment|apparel/i.test(e.innerText));"
+        "  return el ? el.querySelector('button[aria-label^=\"Add one\"]')"
+        "    ?.getAttribute('aria-label') : null; }"
+    )
+    if not out_of_scope:
+        errors.append("the storefront offers nothing outside the mandate's categories")
+    else:
+        page.get_by_role("button", name=out_of_scope).click()
     page.wait_for_selector(".cf-columns", timeout=15_000)
     page.wait_for_timeout(700)
     shot(page, "09-counterfactual")

@@ -46,10 +46,23 @@ def step(page: Page, name: str) -> None:
 
 
 def scripted_baskets(page: Page, expected: int = 5) -> None:
-    """Run the five-basket script and wait for every verdict to land."""
+    """Run the five reference baskets and wait for every verdict to land.
+
+    They live on the record now. They used to sit beside the live agent as a
+    second way to do the same thing, which made the fixture compete with the
+    real model for the reader's attention -- and the fixture won, because it was
+    instant.
+    """
+    step(page, "record")
+    page.get_by_role("button", name="Put five baskets through the gate").click()
+    page.wait_for_function(
+        f"document.querySelectorAll('.ledger-row').length > {expected}",
+        timeout=60000,
+    )
+    # The verdicts are rendered where the baskets are proposed; the record is
+    # where they end up. Both are true and they are different screens.
     step(page, "prevents")
-    page.get_by_role("button", name="Run five scripted baskets").click()
     page.wait_for_function(
         f"document.querySelectorAll('.decision').length === {expected}",
-        timeout=60000,
+        timeout=30000,
     )

@@ -57,7 +57,7 @@ export function App() {
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [chain, setChain] = useState<ChainStatus | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [merchant] = useState("zomato");
+
   const [rail, setRail] = useState<"simulated" | "razorpay">("simulated");
   const [cosign, setCosign] = useState(false);
   const [step, setStep] = useState(1);
@@ -69,12 +69,27 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  /** Whose shop this is. It was the literal string "zomato", so pointing the
+   *  console at a real storefront left the storefront rendering nothing at all:
+   *  every product belonged to a merchant the filter had never heard of. */
+  const merchant = useMemo(() => {
+    if (scope?.merchants?.length) return scope.merchants[0]!;
+    return meta?.catalog[0]?.merchant ?? "";
+  }, [scope, meta]);
+
+
   useEffect(() => {
     api
       .meta()
       .then((m) => {
         setMeta(m);
         setUtterance(m.default_utterance);
+        // The best rail this deployment can actually reach. Asking a visitor to
+        // choose between "simulated" and "real" put the most credible thing in
+        // the product -- a real Razorpay order id -- behind a decision most
+        // people never made.
+        const best = m.rails.find((r) => r.id === "razorpay" && r.available);
+        if (best) setRail("razorpay");
       })
       .catch((e: ApiError) => setError(e.message));
   }, []);
@@ -270,6 +285,17 @@ export function App() {
    *  is derived and signed on arrival so step 1 opens on a signed certificate
    *  and the counterfactual on step 3 has a scope to evaluate against. */
   const [booting, setBooting] = useState(false);
+
+  /** The agent shops the moment you arrive at its act. It was a button, which
+   *  made the one screen where a real model does real work look like an offer
+   *  rather than the product. */
+  const [agentStarted, setAgentStarted] = useState(false);
+  useEffect(() => {
+    if (step !== 2 || !approved || agentStarted || agentRunning || busy) return;
+    setAgentStarted(true);
+    void runAgent();
+  }, [step, approved, agentStarted, agentRunning, busy, runAgent]);
+
   useEffect(() => {
     if (!entered || !meta || sessionId || booting) return;
     setBooting(true);
@@ -291,10 +317,33 @@ export function App() {
     })();
   }, [entered, meta, sessionId, booting]);
 
+  /** The cheapest thing this merchant sells that the permission does not cover.
+   *  Asked of the catalogue rather than named: the products are a real
+   *  storefront's now, so a hard-coded sku is a promise about somebody else's
+   *  inventory -- and it was `powerbank`, which that merchant does not stock. */
+  const outOfScope = useMemo(() => {
+    if (!meta || !scope) return null;
+    const permitted = new Set(scope.categories);
+    // A product the merchant actually sells, never one of the adversarial
+    // fixtures Warrant appends. Seeding the counterfactual with our own planted
+    // item makes the strongest screen in the console look invented, which is
+    // the whole reason the catalogue is a real storefront's now.
+    return (
+      meta.catalog
+        .filter(
+          (p) =>
+            p.merchant === merchant &&
+            !permitted.has(p.category) &&
+            !p.sku.startsWith("warrant-"),
+        )
+        .sort((a, b) => a.unit_paise - b.unit_paise)[0] ?? null
+    );
+  }, [meta, scope, merchant]);
+
   const seedBasket = (n: number) => {
     setStep(n);
-    if (n === 3 && approved && Object.keys(quantities).length === 0) {
-      setQuantities({ powerbank: 1 });
+    if (n === 3 && approved && outOfScope && Object.keys(quantities).length === 0) {
+      setQuantities({ [outOfScope.sku]: 1 });
     }
   };
 
@@ -398,28 +447,6 @@ export function App() {
                 spellCheck={false}
                 aria-label="Instruction given to the agent"
               />
-              {meta && meta.rails.length > 1 && (
-                <div className="rail-choice" role="radiogroup" aria-label="Payment rail">
-                  {meta.rails.map((option) => (
-                    <button
-                      key={option.id}
-                      role="radio"
-                      aria-checked={rail === option.id}
-                      className={`rail-option${rail === option.id ? " on" : ""}`}
-                      disabled={!option.available}
-                      title={option.note}
-                      onClick={() => setRail(option.id)}
-                    >
-                      <b>{option.label}</b>
-                      <span>
-                        {option.available
-                          ? option.note
-                          : "Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to enable"}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
               <button
                 className="btn btn-primary"
                 onClick={derive}
@@ -447,7 +474,11 @@ export function App() {
                 onClick={runAgent}
                 disabled={busy || !approved || agentRunning}
               >
-                {agentRunning ? "The agent is shopping…" : "Run the agent"}
+                {agentRunning
+                  ? "The agent is shopping…"
+                  : attempts.length > 0
+                    ? "Run it again"
+                    : "Run the agent"}
               </button>
               {/* This screen promises that a model reads the instruction. Whether
                   one is actually reachable belongs next to the button that
@@ -483,6 +514,7 @@ export function App() {
                 catalog={meta.catalog}
                 quantities={quantities}
                 merchant={merchant}
+                permitted={scope?.categories}
                 onChange={(sku, qty) =>
                   setQuantities((q) => ({ ...q, [sku]: qty }))
                 }
@@ -508,9 +540,6 @@ export function App() {
                   Attach the second signature this amount requires
                 </label>
               )}
-              <button className="btn" onClick={() => runScripted()} disabled={busy || !approved}>
-                Run five scripted baskets
-              </button>
             </div>
             {outcomes.length > 0 && (
               <div className="decisions">
