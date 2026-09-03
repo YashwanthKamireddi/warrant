@@ -107,7 +107,11 @@ def build(order: list[tuple[str, float]]) -> Path:
         if not src.is_file():
             raise SystemExit(f"missing clip: {src}")
         dst = WORK / f"{name}.mp4"
-        if not dst.is_file():
+        # Re-encode when the clip is newer than its intermediate. Caching on
+        # existence alone silently shipped a stale take: the agent clip was
+        # retaken, the cached mp4 predated it by four minutes, and the film that
+        # came out contained the run this recorder had explicitly rejected.
+        if not dst.is_file() or dst.stat().st_mtime < src.stat().st_mtime:
             normalise(src, dst, target)
         normalised.append(dst)
 
