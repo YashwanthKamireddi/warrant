@@ -366,6 +366,10 @@ export function App() {
     );
   }, [meta, scope, merchant]);
 
+  /** The order placed from the record, keyed at -1 so it cannot collide with a
+   *  decision's own index. */
+  const latestRealOrder = realOrders[-1];
+
   const seedBasket = (n: number) => {
     setStep(n);
     if (n === 3 && approved && outOfScope && Object.keys(quantities).length === 0) {
@@ -608,6 +612,51 @@ export function App() {
               </div>
             )}
             <LedgerView entries={ledger} chain={chain} />
+            {/* Where somebody looking for "the payment" actually looks. The
+                action existed only on a decision card on the previous act, and
+                an allowed card is collapsed by default, so the one thing that
+                produces a real Razorpay order was behind a chevron. */}
+            {/* Only when something actually settled. Offering it otherwise gives
+                you a button whose only possible answer is "nothing has settled
+                yet" -- which is true, and is not a thing to make somebody click
+                to find out. */}
+            {razorpayReady && ledger.some((e) => e.kind === "debit_settled") && (
+              <div className="act-do">
+                {latestRealOrder ? (
+                  <span className="real-rail placed">
+                    <b>On Razorpay</b>
+                    <span className="mono">{latestRealOrder.order_id}</span>
+                    {latestRealOrder.payment_link && (
+                      <a
+                        className="btn btn-sm"
+                        href={latestRealOrder.payment_link}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open the real checkout ↗
+                      </a>
+                    )}
+                  </span>
+                ) : (
+                  <>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => placeOnRazorpay(-1)}
+                      disabled={busy}
+                    >
+                      {busy ? "Placing…" : "Place the settled debit on real Razorpay"}
+                    </button>
+                    <span className="act-note">
+                      The walkthrough settles on the simulator so this record can
+                      complete — a real payment finishes on the customer's own
+                      device. This puts the same signed cart on Razorpay and gives
+                      you the order and the checkout link it produced.
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+
             <div className="act-do">
               <button className="btn" onClick={tamper} disabled={busy || !sessionId}>
                 <Rows size={13} /> Try to rewrite the ledger
@@ -615,9 +664,11 @@ export function App() {
               <button className="btn" onClick={revoke} disabled={busy || !approved}>
                 Revoke the permission
               </button>
-              <button className="btn" onClick={settle} disabled={busy || !sessionId}>
-                Settle what the rail captured
-              </button>
+              {outcomes.some((o) => o.rail?.ok && !o.rail.settled) && (
+                <button className="btn" onClick={settle} disabled={busy}>
+                  Settle what the rail captured
+                </button>
+              )}
             </div>
             <details className="more">
               <summary>The dispute pack a merchant would file</summary>

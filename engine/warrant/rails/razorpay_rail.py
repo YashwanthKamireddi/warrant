@@ -117,6 +117,26 @@ class RazorpayRail:
             raw={"payment_link": link.get("short_url"), "payment_link_id": link.get("id")},
         )
 
+    def create_order(self, cart: CartMandate, *, idempotency_key: str) -> dict[str, Any]:
+        """Just the Order, with no Payment Link beside it.
+
+        A test account allows 30 links a day and far more orders, so when the
+        link cap is reached this is what still produces a real Razorpay object
+        somebody can look up.
+        """
+        return self._client.order.create(
+            {
+                "amount": cart.total_paise,
+                "currency": "INR",
+                "payment_capture": 1,
+                "receipt": idempotency_key[:40],
+                "notes": {
+                    "cart_digest": cart.digest,
+                    "intent_digest": cart.intent_digest,
+                },
+            }
+        )
+
     def poll(self, order_id: str, cart: CartMandate) -> RailResult:
         """Ask Razorpay whether anything has been captured against this order yet."""
         try:

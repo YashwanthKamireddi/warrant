@@ -109,6 +109,40 @@ export function DecisionCard({
         <span className="decision-amount">{rupees(outcome.cart.total_paise)}</span>
       </button>
 
+
+      {/* The walkthrough settles on the simulator so the record completes.
+          This is the same signed cart, placed on the real rail, which is
+          what produces an order id and a link somebody can actually open.
+          Nothing is re-decided: the gate allowed this basket already. */}
+      {onPlaceOnRazorpay && !realOrder && (
+        <div className="real-rail">
+          <button className="btn btn-sm" onClick={onPlaceOnRazorpay} disabled={busy}>
+            {busy ? "Placing…" : "Place this on real Razorpay"}
+          </button>
+          <span>Creates a real Order and Payment Link in test mode.</span>
+        </div>
+      )}
+
+      {realOrder && (
+        <div className="real-rail placed">
+          <span className="placed-head">
+            <Badge kind="pass" />
+            <b>On Razorpay</b>
+            <span className="mono">{realOrder.order_id}</span>
+          </span>
+          {realOrder.payment_link && (
+            <a
+              className="btn btn-sm"
+              href={realOrder.payment_link}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open the real checkout ↗
+            </a>
+          )}
+        </div>
+      )}
+
       {open && (
         <div className="decision-body">
           {outcome.reasons.length > 0 && (
@@ -161,38 +195,6 @@ export function DecisionCard({
             </div>
           )}
 
-          {/* The walkthrough settles on the simulator so the record completes.
-              This is the same signed cart, placed on the real rail, which is
-              what produces an order id and a link somebody can actually open.
-              Nothing is re-decided: the gate allowed this basket already. */}
-          {onPlaceOnRazorpay && !realOrder && (
-            <div className="real-rail">
-              <button className="btn btn-sm" onClick={onPlaceOnRazorpay} disabled={busy}>
-                {busy ? "Placing…" : "Place this on real Razorpay"}
-              </button>
-              <span>Creates a real Order and Payment Link in test mode.</span>
-            </div>
-          )}
-
-          {realOrder && (
-            <div className="real-rail placed">
-              <span className="placed-head">
-                <Badge kind="pass" />
-                <b>On Razorpay</b>
-                <span className="mono">{realOrder.order_id}</span>
-              </span>
-              {realOrder.payment_link && (
-                <a
-                  className="btn btn-sm"
-                  href={realOrder.payment_link}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open the real checkout ↗
-                </a>
-              )}
-            </div>
-          )}
 
           {outcome.rail && !outcome.rail.ok && (
             <div className="teaches" style={{ color: "var(--stop)" }}>

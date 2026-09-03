@@ -1052,10 +1052,20 @@ def place_on_razorpay(session_id: str, index: int) -> dict[str, Any]:
     authorized, at the amount it was authorized for.
     """
     session = _session(session_id)
-    try:
-        cart, _ = session.documents[index]
-    except IndexError:
-        raise HTTPException(404, detail=f"no authorized cart at {index}") from None
+
+    if index < 0:
+        # The most recent debit that actually settled. The console reaches for
+        # this from the record, where somebody looking for "the payment" looks,
+        # and it saves the browser tracking an index into a list the server owns.
+        settled = [c for c, receipt in session.documents if receipt is not None]
+        if not settled:
+            raise HTTPException(404, detail="nothing has settled yet")
+        cart = settled[-1]
+    else:
+        try:
+            cart, _ = session.documents[index]
+        except IndexError:
+            raise HTTPException(404, detail=f"no authorized cart at {index}") from None
 
     try:
         rail = RazorpayRail()
@@ -1069,15 +1079,37 @@ def place_on_razorpay(session_id: str, index: int) -> dict[str, Any]:
         ) from exc
 
     result = rail.attempt(cart, idempotency_key=cart.digest[:40])
-    if not result.ok:
-        raise HTTPException(502, detail=f"Razorpay refused it: {result.failure_summary}")
+    if result.ok:
+        return {
+            "order_id": result.ref.order_id,
+            "payment_link": result.raw.get("payment_link"),
+            "amount_paise": result.amount_paise,
+            "settled": result.settled,
+        }
 
-    return {
-        "order_id": result.ref.order_id,
-        "payment_link": result.raw.get("payment_link"),
-        "amount_paise": result.amount_paise,
-        "settled": result.settled,
-    }
+    # A test account allows 30 payment links a day and no comparable number of
+    # orders. Losing the order because the link hit a cap throws away the part
+    # that was actually real: an order id is a Razorpay object a reviewer can
+    # look up in the dashboard, link or no link.
+    if "payment_link" in (result.error_reason or ""):
+        try:
+            order = rail.create_order(cart, idempotency_key=cart.digest[:40])
+        except Exception:  # noqa: BLE001 - fall through to the honest refusal
+            pass
+        else:
+            return {
+                "order_id": order["id"],
+                "payment_link": None,
+                "amount_paise": cart.total_paise,
+                "settled": False,
+                "note": (
+                    "Razorpay's test mode allows 30 payment links a day and this "
+                    "account has used them. The order is real; the link is not "
+                    "available until the cap resets."
+                ),
+            }
+
+    raise HTTPException(502, detail=f"Razorpay refused it: {result.failure_summary}")
 
 
 @app.post("/api/sessions/{session_id}/tamper")
