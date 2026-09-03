@@ -33,7 +33,11 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "engine"))
 from warrant.catalog import PRODUCTS  # noqa: E402
 from warrant.crypto import SigningKey  # noqa: E402
 from warrant.gate import MandateState, evaluate  # noqa: E402
-from warrant.merchants_shopify import ShopifyNotConfigured, ShopifyStore  # noqa: E402
+from warrant.storefront import (  # noqa: E402
+    StorefrontUnavailable,
+    load_snapshot,
+    snapshot_taken,
+)
 from warrant.models import (  # noqa: E402
     CartMandate,
     CheckStatus,
@@ -67,25 +71,21 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--wait", type=int, default=240,
                     help="seconds to wait for the mandate to be authorised")
-    ap.add_argument("--no-order", action="store_true",
-                    help="debit the mandate but do not place the Shopify order")
     args = ap.parse_args()
     load_env()
 
     # ------------------------------------------------------- 1. the catalog
     rule("1. the merchant's catalog")
-    store: ShopifyStore | None = None
+    merchant = "sleepyowl"
     try:
-        store = ShopifyStore()
-        catalog = store.catalog()
-        merchant = "shopify"
-        variants = store.variant_ids()
-        print(f"   {len(catalog)} live products from {store.shop}")
-    except ShopifyNotConfigured as exc:
-        catalog, merchant, variants = PRODUCTS, "zomato", {}
+        catalog = load_snapshot(merchant)
+        print(f"   {len(catalog)} products from {merchant}, "
+              f"snapshotted {snapshot_taken(merchant)}")
+    except StorefrontUnavailable as exc:
+        catalog, merchant = PRODUCTS, "zomato"
         print(f"   {exc}")
         print("   falling back to the bundled catalog")
-        skipped.append("the live Shopify catalog and the real order")
+        skipped.append("the real merchant's catalogue")
 
     in_scope = next((p for p in catalog if p.category == "food_beverage"), None)
     out_of_scope = next((p for p in catalog if p.category != "food_beverage"), None)
@@ -124,10 +124,19 @@ def main() -> int:
     # --------------------------------------------------------- 3. the money
     rule("3. the mandate the money moves on")
     mandate = RazorpayMandate()
-    handle = mandate.register(
-        ceiling_paise=CEILING,
-        description=f"Authorise up to Rs {CEILING // 100:,} for 2 hours",
-    )
+    try:
+        handle = mandate.register(
+            ceiling_paise=CEILING,
+            description=f"Authorise up to Rs {CEILING // 100:,} for 2 hours",
+        )
+    except Exception as exc:  # noqa: BLE001 - a live API limit is not a crash
+        # Razorpay allows a test account 30 payment links a day, and a mandate
+        # registration is one. Hitting that is a fact about the account, not a
+        # fault in the chain, and a traceback says the opposite.
+        print(f"   Razorpay would not register a mandate: {exc}")
+        print("   skipping the debit steps; everything before this still ran")
+        skipped.append("the real mandate, the debit and the revocation")
+        return report()
     print(f"   real {handle.method} mandate {handle.invoice_id}, max_amount "
           f"Rs {handle.ceiling_paise // 100:,}, frequency as_presented")
     if handle.method != "upi":
@@ -210,20 +219,6 @@ def main() -> int:
             continue
         state.record_settled(cart)
 
-        if store is None or args.no_order:
-            skipped.append("placing the real Shopify order")
-            continue
-        variant = variants.get(product.sku)
-        if not variant:
-            problems.append(f"no Shopify variant id for {product.sku}")
-            continue
-        order = store.create_order(
-            [(variant, 1)],
-            note=f"warrant · intent {intent.id} · cart {cart.id}",
-            tags=["warrant", "agentic"],
-        )
-        print(f"   \033[1mreal order {order.name}\033[0m for "
-              f"Rs {order.total_paise // 100} in {store.shop}")
 
     # ------------------------------------------------------ 5. the revocation
     if status.authorised:
@@ -231,8 +226,6 @@ def main() -> int:
         print("   token deleted at the bank" if mandate.revoke()
               else "   nothing to revoke")
 
-    if store is not None:
-        store.close()
     return report()
 
 

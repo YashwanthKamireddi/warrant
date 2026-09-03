@@ -18,10 +18,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "engine"))
 
 from warrant.storefront import Storefront, StorefrontUnavailable, snapshot  # noqa: E402
 
-STORES = [
-    ("sleepyowl.co", "sleepyowl"),
-    ("bluetokaicoffee.com", "bluetokai"),
-]
+STORES = [("sleepyowl.co", "sleepyowl")]
 
 failures = 0
 for domain, merchant in STORES:

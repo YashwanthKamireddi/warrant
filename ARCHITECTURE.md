@@ -330,7 +330,6 @@ engine/warrant/
   evidence.py    the chain as a Razorpay dispute submission
   interop.py     the chain in AP2 vocabulary, W3C-VC shaped
   rails/         Razorpay test mode; a real UPI mandate; deterministic simulator
-  merchants_shopify.py  a real store's catalogue and real orders
   demo.py        the five-basket scenario, pinned identical everywhere
   cli.py         warrant demo / serve / api / verify / trace
   client.py      the front door: permit / check / spend. Adds no policy

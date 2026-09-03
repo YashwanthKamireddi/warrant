@@ -241,22 +241,6 @@ a {
   letter-spacing: 0.005em;
 }
 
-.appbar-divider {
-  width: 1px;
-  height: 26px;
-  background: var(--line);
-  flex: none;
-}
-
-.appbar-context {
-  font: var(--t-small);
-  color: var(--ink-3);
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  min-width: 0;
-}
-
 .grow {
   flex: 1;
 }
@@ -309,25 +293,6 @@ a {
   background: var(--stop);
 }
 
-/* ==========================================================================
-   Mandate strip — the live state of the signed permission
-   ========================================================================== */
-
-.mandatebar {
-  display: flex;
-  align-items: center;
-  gap: var(--s-6);
-  padding: var(--s-3) var(--s-5);
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-  min-height: var(--mandatebar);
-}
-
-.mandate-idle {
-  font: var(--t-small);
-  color: var(--ink-4);
-}
-
 .gauge {
   display: flex;
   flex-direction: column;
@@ -377,18 +342,6 @@ a {
   background: var(--stop);
 }
 
-.mandate-facts {
-  display: flex;
-  align-items: center;
-  gap: var(--s-5);
-  font: var(--t-small);
-  color: var(--ink-3);
-}
-.mandate-facts b {
-  color: var(--ink-2);
-  font-weight: 600;
-}
-
 /* ==========================================================================
    Rail
    ========================================================================== */
@@ -402,23 +355,6 @@ a {
   min-height: 0;
 }
 
-.rail-scroll {
-  flex: 0 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.rail-basket {
-  flex: 1 1 auto;
-  min-height: 268px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-top: 1px solid var(--line);
-  padding: var(--s-5);
-  gap: var(--s-3);
-}
-
 .step {
   padding: var(--s-5);
   display: flex;
@@ -429,32 +365,10 @@ a {
 .rail-basket.step {
   border-bottom: none;
 }
-
-.step-head {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-}
-.step-index {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font: 600 11px/1 var(--font);
-  background: var(--sunken);
-  color: var(--ink-3);
-  border: 1px solid var(--line);
-  flex: none;
-}
 .step-index.done {
   background: var(--brand);
   border-color: var(--brand);
   color: var(--on-brand);
-}
-.step-title {
-  font: var(--t-body-strong);
-  color: var(--ink);
 }
 .step-head .grow {
   flex: 1;
@@ -486,15 +400,6 @@ a {
   outline: none;
   border-color: var(--accent);
   box-shadow: var(--ring);
-}
-
-.said {
-  font: 400 14px/1.55 var(--font);
-  color: var(--ink-2);
-  padding: 10px 12px;
-  background: var(--sunken);
-  border-radius: var(--r-md);
-  border-left: 3px solid var(--line-strong);
 }
 
 .select {
@@ -578,19 +483,6 @@ a {
 .btn-ghost:hover:not(:disabled) {
   background: var(--sunken);
   color: var(--ink);
-}
-
-.btn-danger {
-  color: var(--stop);
-  border: 1px solid var(--stop-line);
-  background: var(--surface);
-}
-.btn-danger:hover:not(:disabled) {
-  background: var(--stop-bg);
-}
-
-.btn-block {
-  width: 100%;
 }
 .btn-sm {
   padding: 6px 10px;
@@ -730,20 +622,6 @@ a {
   gap: var(--s-2);
 }
 
-/* ==========================================================================
-   Storefront
-   ========================================================================== */
-
-.storefront {
-  flex: 1 1 auto;
-  min-height: 80px;
-  overflow-y: auto;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--surface);
-  box-shadow: var(--sh-xs);
-}
-
 .product {
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -761,24 +639,6 @@ a {
 }
 .product.picked {
   background: var(--accent-soft);
-}
-
-.product-id {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.product-id b {
-  font: var(--t-body-strong);
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.product-id span {
-  font: var(--t-micro);
-  color: var(--ink-4);
 }
 .product-price {
   font: var(--t-body);
@@ -823,23 +683,6 @@ a {
   padding: 5px 0;
 }
 
-.basket-total {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s-3);
-}
-.basket-total span {
-  font: var(--t-small);
-  color: var(--ink-3);
-}
-.basket-total b {
-  font: 700 19px/1.2 var(--font);
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-  letter-spacing: -0.02em;
-}
-
 .cosign {
   display: flex;
   align-items: flex-start;
@@ -855,13 +698,6 @@ a {
 .cosign input {
   accent-color: var(--seal);
   margin-top: 2px;
-}
-
-.rail-actions {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
 }
 .rail-actions .row {
   display: flex;
@@ -881,34 +717,6 @@ a {
   min-width: 0;
   overflow: hidden;
 }
-
-.tabs {
-  display: flex;
-  align-items: center;
-  gap: var(--s-1);
-  padding: 0 var(--s-6);
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-  flex: none;
-}
-.tab {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 13px 12px 12px;
-  font: var(--t-body-strong);
-  color: var(--ink-3);
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  transition: color 0.12s;
-}
-.tab:hover {
-  color: var(--ink-2);
-}
-.tab[aria-selected="true"] {
-  color: var(--brand);
-  border-bottom-color: var(--brand);
-}
 .tab .count {
   font: 600 10.5px/1 var(--font);
   font-variant-numeric: tabular-nums;
@@ -920,20 +728,6 @@ a {
 .tab[aria-selected="true"] .count {
   background: var(--brand-soft);
   color: var(--brand);
-}
-
-.pane {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--s-6);
-}
-
-.pane-inner {
-  max-width: 980px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-3);
 }
 
 /* ==========================================================================
@@ -1376,21 +1170,6 @@ a {
   font: var(--t-body);
   color: var(--ink-3);
 }
-
-/* ==========================================================================
-   Status bar
-   ========================================================================== */
-
-.statusbar {
-  display: flex;
-  align-items: center;
-  gap: var(--s-4);
-  padding: 0 var(--s-5);
-  background: var(--surface);
-  border-top: 1px solid var(--line);
-  font: var(--t-micro);
-  color: var(--ink-4);
-}
 .statusbar .state {
   display: inline-flex;
   align-items: center;
@@ -1598,44 +1377,6 @@ a {
   font: var(--t-small);
   color: var(--ink-4);
 }
-
-/* ==========================================================================
-   Rail selection and real-rail placement
-   ========================================================================== */
-
-.rail-choice {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--s-2);
-}
-
-.rail-option {
-  text-align: left;
-  padding: 10px 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-md);
-  background: var(--surface);
-  box-shadow: var(--sh-xs);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  transition:
-    border-color 0.14s,
-    background 0.14s,
-    box-shadow 0.14s;
-}
-.rail-option b {
-  font: var(--t-body-strong);
-  color: var(--ink);
-}
-.rail-option span {
-  font: var(--t-micro);
-  color: var(--ink-4);
-  line-height: 1.4;
-}
-.rail-option:hover:not(:disabled) {
-  border-color: var(--ink-4);
-}
 .rail-option.on {
   border-color: var(--brand);
   background: var(--brand-soft);
@@ -1643,13 +1384,6 @@ a {
 }
 .rail-option.on b {
   color: var(--brand);
-}
-.rail-option:disabled {
-  background: var(--sunken);
-  cursor: default;
-}
-.rail-option:disabled b {
-  color: var(--ink-4);
 }
 
 .placed {
@@ -2045,28 +1779,6 @@ a {
   color: var(--ink-4);
   margin-left: auto;
   text-align: right;
-}
-
-/* The agent's panel is where a viewer is invited to misbehave, so it says so. */
-.agent-brief {
-  font: var(--t-small);
-  line-height: 1.5;
-  color: var(--ink-3);
-  padding: 0 0 var(--s-1);
-}
-.agent-brief b {
-  color: var(--ink-2);
-  font-weight: 600;
-}
-
-.main-role {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 10px var(--s-6);
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--line);
-  flex: none;
 }
 
 /* ==========================================================================

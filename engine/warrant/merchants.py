@@ -184,7 +184,7 @@ _BUNDLED: tuple[MerchantRecord, ...] = (
     MerchantRecord(
         "shopify", "5812", "Eating places and restaurants", frozenset({"food_beverage"})
     ),
-    # Real storefronts the console reads. An acquirer underwriting a coffee D2C
+    # The real storefront the console reads. An acquirer underwriting a coffee D2C
     # brand assigns 5499 -- miscellaneous food stores -- which covers what they
     # sell to eat and drink and does not cover the mugs and tote bags in the same
     # catalogue. That is not a contrivance: it is why the mug is refused twice,
@@ -192,9 +192,6 @@ _BUNDLED: tuple[MerchantRecord, ...] = (
     # categories, and neither refusal needed anybody to plant anything.
     MerchantRecord(
         "sleepyowl", "5499", "Miscellaneous food stores", frozenset({"food_beverage"})
-    ),
-    MerchantRecord(
-        "bluetokai", "5499", "Miscellaneous food stores", frozenset({"food_beverage"})
     ),
 )
 
