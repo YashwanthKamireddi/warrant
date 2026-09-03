@@ -25,6 +25,20 @@ over it.
 | `NARRATION.md` | word-for-word, timed to the cut — source |
 | `clips/`, `work/`, `out/` | build output — gitignored |
 
+## The agent is recorded, not staged
+
+`live-03-agent` is a live model choosing from a real merchant's catalogue, and it
+does not converge every time. Some runs escalate three times without coming
+down — one of those was in the first cut of this film, the agent saying it would
+stay under the ₹500 threshold while buying ₹698, twice. Honest about the model
+and dishonest about the product, because the behaviour being demonstrated is the
+adaptation.
+
+So the recorder takes that clip up to five times and keeps the first run where
+the agent is escalated and then comes back under the threshold. Nothing is
+edited, sped up, or stitched: a take is kept whole or discarded whole, and the
+console is never told which outcome is wanted.
+
 ## Two decisions worth knowing
 
 **The console is recorded at a 1440×810 viewport upscaled to 1920×1080.** Capturing

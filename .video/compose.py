@@ -37,16 +37,21 @@ XFADE = 0.45  # seconds of crossfade between clips
 # then and the console is static, so the freeze is invisible and it beats
 # re-recording to chase a duration.
 CUT: list[tuple[str, float]] = [
+    # Five minutes exactly. The live clips are the current product: a real
+    # merchant's catalogue, a live model choosing from it, the gate, the record,
+    # and a real Razorpay order. The old cut showed a two-pane console that no
+    # longer exists and never showed the landing page or the agent at all.
     ("card-01-problem", 20.0),
     ("card-02-holes", 26.0),
-    ("live-01-firstrun", 7.0),
+    ("live-01-landing", 12.0),
     ("card-03-warrant", 30.0),
-    ("live-02-permission", 20.0),
-    ("live-03-verdicts", 28.0),
+    ("live-02-permission", 14.0),
+    ("live-03-agent", 26.0),          # the centrepiece: refused, then adapting
+    ("live-04-prevents", 16.0),
     ("card-04-boundary", 28.0),
-    ("live-04-ledger-tamper", 20.0),
-    ("live-05-evidence", 16.0),
-    ("live-06-ap2", 12.0),
+    ("live-05-record-tamper", 18.0),
+    ("live-06-evidence-ap2", 16.0),
+    ("live-07-razorpay", 12.0),
     ("card-05-results", 20.0),
     ("card-06-losses", 24.0),
     ("card-07-limits", 22.0),

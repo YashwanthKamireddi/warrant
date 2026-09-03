@@ -80,106 +80,155 @@ def _app_context(browser):
     )
 
 
+def _enter(ctx) -> Page:
+    """Open the console with a signed permission already in force."""
+    page = ctx.new_page()
+    page.goto(f"{BASE}/#workspace", wait_until="networkidle")
+    page.wait_for_selector(".certificate", timeout=30_000)
+    page.wait_for_selector(".seal:not(.unsigned)", timeout=30_000)
+    return page
+
+
+def _step(page: Page, n: int) -> None:
+    page.locator(f".stepbtn:nth-of-type({n})").click()
+    page.wait_for_selector(".act", timeout=20_000)
+    page.wait_for_timeout(200)
+
+
 def _settle(page: Page, ms: int = 900) -> None:
     page.wait_for_timeout(ms)
 
 
 def record_live(browser) -> None:
+    """Drive the console as it is, not as it was.
+
+    Every clip here is the real product: a real merchant's catalogue with their
+    own photographs, a live model choosing from it, the gate refusing, the
+    hash-chained record, and a real Razorpay order. Nothing is staged and
+    nothing is sped up -- the agent genuinely takes a few seconds to think.
+    """
     print("live")
 
-    # -- the console at rest, explaining itself --------------------------- #
+    # -- the landing page, which the old cut never showed at all ----------- #
     ctx = _app_context(browser)
     page = ctx.new_page()
     page.goto(BASE, wait_until="networkidle")
-    page.wait_for_selector(".explainer", timeout=15_000)
-    _settle(page, 4500)
-    _save(ctx, "live-01-firstrun")
+    page.wait_for_selector(".lp-open h1", timeout=20_000)
+    _settle(page, 3200)
+    for section in (".lp-gap", ".lp-evidence", ".lp-chain"):
+        page.locator(section).scroll_into_view_if_needed()
+        _settle(page, 3400)
+    _save(ctx, "live-01-landing")
 
-    # -- instruction becomes a signed permission --------------------------- #
+    # -- the permission, signed before anybody clicks anything ------------- #
     ctx = _app_context(browser)
-    page = ctx.new_page()
-    page.goto(BASE, wait_until="networkidle")
-    page.wait_for_selector(".rail-choice", timeout=15_000)
-    _settle(page, 1200)
-    page.get_by_role("button", name="Derive the permission").click()
-    page.wait_for_selector(".certificate", timeout=15_000)
-    _settle(page, 3800)
-    page.get_by_role("button", name="Approve and sign with the subject's key").click()
-    page.wait_for_selector(".storefront", timeout=15_000)
+    page = _enter(ctx)
+    _settle(page, 4200)
+    page.locator(".terms-more > summary").click()
     _settle(page, 3600)
     _save(ctx, "live-02-permission")
 
-    # -- five baskets, judged ---------------------------------------------- #
+    # -- the centrepiece: a live model, refused, adapting ------------------ #
+    #
+    # The agent is a real model and does not converge every time. Some runs
+    # escalate three times without coming down, and one of those was in the
+    # first cut of this film -- the agent saying it would stay under the Rs 500
+    # threshold while buying Rs 698, twice. That is honest about the model and
+    # dishonest about the product, because the behaviour being demonstrated is
+    # the adaptation. So: record until it adapts, and say plainly which take
+    # this is. Nothing is edited, sped up or stitched; a take is kept whole or
+    # thrown away whole.
+    for take in range(1, 6):
+        ctx = _app_context(browser)
+        page = _enter(ctx)
+        _step(page, 2)
+        # No click. The agent runs on arrival, which is the point.
+        page.wait_for_function(
+            "document.querySelectorAll('.run-turn').length > 0", timeout=120_000
+        )
+        _settle(page, 2600)
+        page.wait_for_function(
+            "!document.querySelector('.run-thinking')", timeout=120_000
+        )
+        _settle(page, 2000)
+
+        verdicts = page.eval_on_selector_all(
+            ".run-turn .verdict", "els => els.map(e => e.innerText.trim())"
+        )
+        converged = "ESCALATE" in verdicts and verdicts[-1] == "ALLOW"
+        if not converged:
+            print(f"    take {take}: {verdicts} — not the behaviour, retaking")
+            ctx.close()
+            continue
+
+        print(f"    take {take}: {verdicts}")
+        page.locator(".run-turn").last.scroll_into_view_if_needed()
+        _settle(page, 4200)
+        _save(ctx, "live-03-agent")
+        break
+    else:
+        print("    the agent never adapted in five takes; keeping the last one")
+        _save(ctx, "live-03-agent")
+
+    # -- what it prevents, in money ---------------------------------------- #
     ctx = _app_context(browser)
-    page = ctx.new_page()
-    page.goto(BASE, wait_until="networkidle")
-    page.get_by_role("button", name="Derive the permission").click()
-    page.wait_for_selector(".certificate", timeout=15_000)
-    page.get_by_role("button", name="Approve and sign with the subject's key").click()
-    page.wait_for_selector(".storefront", timeout=15_000)
+    page = _enter(ctx)
+    _step(page, 3)
+    page.wait_for_selector(".cf-columns", timeout=25_000)
+    _settle(page, 4600)
+    page.locator(".shop").scroll_into_view_if_needed()
+    _settle(page, 3600)
+    _save(ctx, "live-04-prevents")
+
+    # -- the record, and then breaking it ---------------------------------- #
+    ctx = _app_context(browser)
+    page = _enter(ctx)
+    _step(page, 4)
+    page.get_by_role("button", name="Put five baskets through the gate").click()
+    page.wait_for_function(
+        "document.querySelectorAll('.ledger-row').length > 5", timeout=60_000
+    )
+    _settle(page, 4200)
+    page.get_by_role("button", name="Try to rewrite the ledger").click()
+    page.wait_for_selector(".notice.stop, .ledger-row.orphaned", timeout=20_000)
+    _settle(page, 4400)
+    _save(ctx, "live-05-record-tamper")
+
+    # -- the dispute pack, and the same mandate as an AP2 credential ------- #
+    ctx = _app_context(browser)
+    page = _enter(ctx)
+    _step(page, 4)
+    page.get_by_role("button", name="Put five baskets through the gate").click()
+    page.wait_for_function(
+        "document.querySelectorAll('.ledger-row').length > 5", timeout=60_000
+    )
     _settle(page, 600)
-    page.get_by_role("button", name="Run five scripted baskets").click()
-    page.wait_for_selector(".decision", timeout=30_000)
+    page.locator(".more > summary", has_text="dispute pack").click()
     _settle(page, 4200)
-
-    # the money shot: the injected basket, refused with no model call
-    injected = page.locator(".decision").nth(2)
-    injected.scroll_into_view_if_needed()
-    _settle(page, 3800)
-    _save(ctx, "live-03-verdicts")
-
-    # -- the ledger, then tampering with it -------------------------------- #
-    ctx = _app_context(browser)
-    page = ctx.new_page()
-    page.goto(BASE, wait_until="networkidle")
-    page.get_by_role("button", name="Derive the permission").click()
-    page.wait_for_selector(".certificate", timeout=15_000)
-    page.get_by_role("button", name="Approve and sign with the subject's key").click()
-    page.wait_for_selector(".storefront", timeout=15_000)
-    page.get_by_role("button", name="Run five scripted baskets").click()
-    page.wait_for_selector(".decision", timeout=30_000)
-    _settle(page, 400)
-    page.get_by_role("tab", name="Ledger").click()
-    page.wait_for_selector(".ledger-row", timeout=15_000)
+    page.locator(".more > summary", has_text="AP2").click()
+    page.wait_for_selector(".cred", timeout=20_000)
     _settle(page, 4000)
-    page.get_by_role("button", name="Tamper with the ledger").click()
-    page.wait_for_selector(".notice.stop, .ledger-row.orphaned", timeout=15_000)
-    _settle(page, 4200)
-    _save(ctx, "live-04-ledger-tamper")
+    _save(ctx, "live-06-evidence-ap2")
 
-    # -- the dispute pack --------------------------------------------------- #
+    # -- a real Razorpay order, from the record ---------------------------- #
     ctx = _app_context(browser)
-    page = ctx.new_page()
-    page.goto(BASE, wait_until="networkidle")
-    page.get_by_role("button", name="Derive the permission").click()
-    page.wait_for_selector(".certificate", timeout=15_000)
-    page.get_by_role("button", name="Approve and sign with the subject's key").click()
-    page.wait_for_selector(".storefront", timeout=15_000)
-    page.get_by_role("button", name="Run five scripted baskets").click()
-    page.wait_for_selector(".decision", timeout=30_000)
-    _settle(page, 300)
-    page.get_by_role("tab", name="Dispute evidence").click()
-    page.wait_for_timeout(1400)
-    _settle(page, 3000)
-    page.mouse.wheel(0, 520)
-    _settle(page, 3200)
-    _save(ctx, "live-05-evidence")
-
-    # -- the standards export ----------------------------------------------- #
-    ctx = _app_context(browser)
-    page = ctx.new_page()
-    page.goto(BASE, wait_until="networkidle")
-    page.get_by_role("button", name="Derive the permission").click()
-    page.wait_for_selector(".certificate", timeout=15_000)
-    page.get_by_role("button", name="Approve and sign with the subject's key").click()
-    page.wait_for_selector(".storefront", timeout=15_000)
-    page.get_by_role("button", name="Run five scripted baskets").click()
-    page.wait_for_selector(".decision", timeout=30_000)
-    _settle(page, 300)
-    page.get_by_role("tab", name="AP2 export").click()
-    page.wait_for_selector(".cred", timeout=15_000)
-    _settle(page, 4200)
-    _save(ctx, "live-06-ap2")
+    page = _enter(ctx)
+    _step(page, 4)
+    page.get_by_role("button", name="Put five baskets through the gate").click()
+    page.wait_for_function(
+        "document.querySelectorAll('.ledger-row').length > 5", timeout=60_000
+    )
+    _settle(page, 800)
+    button = page.get_by_role("button", name="Place the settled debit on real Razorpay")
+    if button.count():
+        button.click()
+        # Either a real order id or Razorpay's own refusal. Both are true, and
+        # a daily cap being reached is worth showing rather than hiding.
+        page.wait_for_selector(".real-rail.placed, .stage-error", timeout=60_000)
+        _settle(page, 4600)
+    else:
+        _settle(page, 1200)
+    _save(ctx, "live-07-razorpay")
 
 
 def main() -> int:

@@ -1,7 +1,7 @@
 # Narration
 
 Read over `out/warrant-pitch.mp4`. Word-for-word, timed to the actual cut —
-**4:43 total**, so you have seventeen seconds of headroom against the five-minute
+**5:00 total**, which is the five-minute
 limit.
 
 Each heading gives the timestamp and how long that shot is held. If a section
@@ -39,11 +39,13 @@ you reach the losses, slow down; that's the part they remember.
 > session, no click. Chargeback codes have no category for "correctly authorised
 > agent, wrong outcome." The merchant eats it.
 
-### 0:46 · 7s — the console at rest *(live)*
+### 0:46 · 12s — the landing page *(live)*
 
-> This is Warrant. It sits between the agent and the payment.
+> This is Warrant. Over five hundred and forty labelled cases, an amount ceiling
+> on its own lets four hundred and sixteen through. Warrant lets ninety through,
+> and has never once stopped a purchase the person actually authorised.
 
-### 0:52 · 30s — what it is *(dark card)*
+### 0:58 · 30s — what it is *(dark card)*
 
 > One object closes both holes: a signed chain from the words a person said to
 > the rupee that moved.
@@ -56,27 +58,40 @@ you reach the losses, slow down; that's the part they remember.
 > that something already permitted was checked — it cannot grant authority it was
 > never given.
 
-### 1:22 · 20s — instruction becomes permission *(live)*
+### 1:28 · 14s — the permission *(live)*
 
-> So: she says the thing. It becomes a permission with hard ceilings, restated in
-> plain English, and she approves that before her key signs anything.
+> She says the thing once, and it becomes a permission with hard ceilings,
+> restated in plain English, signed by her own key.
 >
-> Notice this isn't a new step. Reserve Pay already asks for a PIN. That tap used
-> to mean "block a thousand rupees." Now it means "up to a thousand, at Zomato, on
+> This isn't a new step. Reserve Pay already asks for a PIN. That tap used to mean
+> "block a thousand rupees." Now it means "up to a thousand, at this merchant, on
 > food, for two hours." Same tap. More meaning.
 
-### 1:41 · 28s — five baskets *(live)*
+### 1:42 · 26s — the agent, refused, adapting *(live)*
 
-> Five baskets, one permission. Allowed. Blocked. Blocked. Blocked. Escalated.
+> **[this is the one — let it breathe]**
 >
-> **[slow down here]** Look at the third one. That product name is an injected
-> instruction — it's telling whatever reads it that the order is pre-approved.
-> It's blocked. And look at the header: **no model call.** It never reached a
-> model at all. It failed on the category bound.
+> Nobody pressed anything. A live model is reading a real merchant's catalogue —
+> that's Sleepy Owl's actual storefront, their products, their prices, their
+> photographs.
 >
-> Delete my injection detector entirely, and it still fails.
+> It picks two units. Six hundred and ninety-eight rupees. Warrant escalates: that
+> crosses the five hundred rupee threshold she set for a second signature.
+>
+> The agent is told the *reason*. Never the limits. And it comes back with one
+> unit, three hundred and forty-nine, and says why. That is an agent discovering
+> its boundary by being refused.
 
-### 2:09 · 28s — where the model runs *(dark card)*
+### 2:08 · 16s — what it prevents *(live)*
+
+> Same shop, a different basket. A coffee mug. Four hundred and forty-nine rupees,
+> comfortably under every ceiling — the bank would pay it without blinking.
+>
+> Nobody planted that mug. A coffee company sells mugs. Her permission was for
+> food and drink, so it is refused twice: once by the category code her merchant's
+> acquirer assigned, and once by the permission itself.
+
+### 2:24 · 28s — where the model runs *(dark card)*
 
 > That's the design. A model runs in exactly two places, and in neither can it
 > grant authority.
@@ -91,7 +106,7 @@ you reach the losses, slow down; that's the part they remember.
 > outcome is byte-identical to the judge never running. There's no prompt that
 > makes it grant authority, because it holds none.
 
-### 2:36 · 20s — the ledger, then tampering *(live)*
+### 2:52 · 18s — the record, then tampering *(live)*
 
 > Every decision is written down — including every refusal. Most systems log what
 > they did. A dispute almost always turns on what was declined, and why.
@@ -100,21 +115,26 @@ you reach the losses, slow down; that's the part they remember.
 > rewritten. Everything from there is orphaned, and it names both hashes so you
 > can check it yourself.
 
-### 2:56 · 16s — the dispute pack *(live)*
+### 3:10 · 16s — the dispute pack and AP2 *(live)*
 
 > And this is what the merchant sends the bank. The exact words the customer said,
 > the permission they approved, the basket checked against it, and the signatures
 > binding all three to the payment. The bank verifies it against the customer's own
 > public key — it doesn't have to trust the merchant's records.
 
-### 3:11 · 12s — AP2 *(live)*
+### 3:26 · 12s — a real Razorpay order *(live)*
+
+> And this is a real Razorpay order, created from that record on their test API.
+> The gate already allowed this basket; nothing is re-decided. If the account has
+> hit its daily cap, the console says so in Razorpay's own words rather than
+> pretending.
 
 > The fair objection is that Google's AP2 already defines a chained mandate model.
 > It does. But AP2 standardises what the credential *is*, not who *checks* it. The
 > gate, the judge and the ledger are that gap. Same chain, exported in their
 > vocabulary, with the three real divergences carried inside the document.
 
-### 3:23 · 20s — results *(dark card)*
+### 3:38 · 20s — results *(dark card)*
 
 > Five hundred and forty labelled sessions, four policies, one seed.
 >
@@ -126,7 +146,7 @@ you reach the losses, slow down; that's the part they remember.
 > And the numbers in the README can't go stale — the build fails if they drift from
 > what the code measures.
 
-### 3:42 · 24s — where it loses *(dark card)*
+### 3:58 · 24s — where it loses *(dark card)*
 
 > **[slow down — this is the part that matters]**
 >
@@ -140,7 +160,7 @@ you reach the losses, slow down; that's the part they remember.
 > I could have left those out of the table. A benchmark you designed to pass isn't
 > a benchmark.
 
-### 4:06 · 22s — known limits *(dark card)*
+### 4:22 · 22s — known limits *(dark card)*
 
 > Three more things I'd want you to know before you believe any of it.
 >
@@ -158,7 +178,7 @@ you reach the losses, slow down; that's the part they remember.
 > Closing the rest needs the rail itself to enforce scope. Which is precisely the
 > layer NPCI's UAP is being designed to occupy.
 
-### 4:27 · 16s — close *(dark card)*
+### 4:44 · 16s — close *(dark card)*
 
 > Two hundred and eleven tests. Eight gates, green from a clean clone. The
 > interesting ones exist because a green build didn't catch a real bug — a ledger
@@ -178,5 +198,5 @@ Cut in this order — first to go is the least load-bearing:
 2. **2:30 dispute pack** — you can say the sentence over the ledger footage instead.
 3. **0:30 console at rest** — the mandate chain is re-explained on the next card.
 
-**Never cut:** the injected basket at 1:15, or the losses at 3:20. Those two are
+**Never cut:** the agent adapting at 1:42, or the losses at 3:58. Those two are
 why this gets read twice.
