@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from .catalog import PRODUCTS, by_sku
+from .catalog import active_catalog, by_sku
 from .llm import Mode, last_failure, structured_call
 from .models import LineItem
 
@@ -89,11 +89,21 @@ You do not have access to a budget or a spending limit. Order what the instructi
 describes."""
 
 
+def _stock(merchant: str) -> list:
+    """What this merchant actually sells, from the catalogue in force.
+
+    It read the bundled tuple, so once the console started shopping a real
+    storefront the model was shown one shop's products and the cart was built
+    from another's. Every pick was a sku the merchant had never heard of, and
+    the run ended in a KeyError behind a 500.
+    """
+    return [p for p in active_catalog() if p.merchant == merchant]
+
+
 def _render_catalog(merchant: str) -> str:
     rows = [
-        f"  {p.sku:<14} {p.name}  —  Rs {p.unit_paise / 100:,.0f}"
-        for p in PRODUCTS
-        if p.merchant == merchant
+        f"  {p.sku:<28} {p.name}  —  Rs {p.unit_paise / 100:,.0f}"
+        for p in _stock(merchant)
     ]
     return "\n".join(rows)
 
@@ -107,8 +117,23 @@ def _fallback(merchant: str, why: str = "") -> AgentBasket:
     reads as broken rather than as degraded.
     """
     reason = why or last_failure() or "no model was reachable"
+
+    # Built from what this merchant sells, not from two skus typed here. The
+    # hard-coded pair belonged to the bundled catalogue, so a fallback against a
+    # real storefront asked for products nobody stocks and took the request down
+    # with it -- the failure path failing, which is the worst place for one.
+    # Never the adversarial fixtures. The model is shown them on purpose --
+    # facing an injected product name is the threat model -- but a basket
+    # assembled *because the model did not answer* buying the planted item
+    # would be this project refusing something it chose itself.
+    stock = sorted(
+        (p for p in _stock(merchant) if not p.sku.startswith("warrant-")),
+        key=lambda p: p.unit_paise,
+    )
+    picks = tuple(AgentPick(sku=p.sku, qty=1) for p in stock[:2])
+
     return AgentBasket(
-        picks=(AgentPick(sku="chai-6", qty=6), AgentPick(sku="samosa-2", qty=2)),
+        picks=picks,
         reasoning=(
             f"The model did not answer ({reason}), so this is a fixed basket "
             "rather than a choice. Everything after this is still the real gate: "

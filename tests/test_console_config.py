@@ -140,3 +140,43 @@ def test_the_blockable_injection_is_the_one_that_fails_on_a_bound():
 
     assert roles["injection"].category not in {"food_beverage"}
     assert roles["injection_in_scope"].category == "food_beverage"
+
+
+def test_the_agent_is_shown_the_catalogue_the_cart_is_built_from(configured):
+    """It read the bundled tuple while the cart priced from the active one.
+
+    Once the console started shopping a real storefront the model was handed one
+    shop's products and asked to pick from another's, so every choice was a sku
+    nobody stocked and the run ended in a KeyError behind a 500 -- with the
+    agent act auto-running, that was the first thing a visitor saw.
+    """
+    name, api = configured
+    from warrant.agent import _render_catalog, _stock
+    from warrant.catalog import active_catalog
+
+    merchant = api.console_scope().merchants[0]
+    shown = {row.split()[0] for row in _render_catalog(merchant).splitlines() if row.strip()}
+    stocked = {p.sku for p in active_catalog() if p.merchant == merchant}
+
+    assert shown, f"{name}: the model is shown an empty catalogue"
+    assert shown <= stocked, f"{name}: shown skus the merchant does not sell"
+    assert _stock(merchant), f"{name}: no stock for {merchant}"
+
+
+def test_the_fallback_basket_is_orderable_from_this_merchant(configured):
+    """The failure path must not fail. It hard-coded two bundled skus."""
+    name, api = configured
+    from warrant.agent import _fallback
+    from warrant.catalog import active_catalog
+
+    merchant = api.console_scope().merchants[0]
+    basket = _fallback(merchant, "test")
+    stocked = {p.sku for p in active_catalog() if p.merchant == merchant}
+
+    assert basket.picks, f"{name}: the fallback bought nothing"
+    for pick in basket.picks:
+        assert pick.sku in stocked, f"{name}: fallback wants {pick.sku}"
+        # and never the adversarial fixtures: a basket assembled *because the
+        # model did not answer* buying the planted item would be this project
+        # refusing something it chose itself.
+        assert not pick.sku.startswith("warrant-")
