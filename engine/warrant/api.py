@@ -1026,6 +1026,49 @@ def chain(session_id: str) -> dict[str, Any]:
     return _chain_status(_session(session_id))
 
 
+@app.post("/api/sessions/{session_id}/razorpay/{index}")
+def place_on_razorpay(session_id: str, index: int) -> dict[str, Any]:
+    """Place an already-authorized cart on the real Razorpay rail.
+
+    The walkthrough runs on the simulator so the audit trail completes -- a real
+    payment cannot be finished server to server, so a real rail leaves every
+    debit at settled=false and the evidence pack empty. This puts the same
+    signed cart on the real rail on demand, which is what produces a real
+    ``order_...`` and a real rzp.io link a reviewer can open.
+
+    The gate has already allowed this cart. Nothing here re-decides anything,
+    and nothing here can widen what was signed: it takes the cart as it was
+    authorized, at the amount it was authorized for.
+    """
+    session = _session(session_id)
+    try:
+        cart, _ = session.documents[index]
+    except IndexError:
+        raise HTTPException(404, detail=f"no authorized cart at {index}") from None
+
+    try:
+        rail = RazorpayRail()
+    except RazorpayNotConfigured as exc:
+        raise HTTPException(
+            409,
+            detail=(
+                f"{exc} The walkthrough itself needs no keys; this button is the "
+                "only thing that does."
+            ),
+        ) from exc
+
+    result = rail.attempt(cart, idempotency_key=cart.digest[:40])
+    if not result.ok:
+        raise HTTPException(502, detail=f"Razorpay refused it: {result.failure_summary}")
+
+    return {
+        "order_id": result.ref.order_id,
+        "payment_link": result.raw.get("payment_link"),
+        "amount_paise": result.amount_paise,
+        "settled": result.settled,
+    }
+
+
 @app.post("/api/sessions/{session_id}/tamper")
 def tamper(session_id: str) -> dict[str, Any]:
     """Edit a settled ledger entry directly in SQLite, the way an insider would.

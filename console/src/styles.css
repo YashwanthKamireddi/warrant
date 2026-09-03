@@ -2942,3 +2942,17 @@ a.btn {
 .product.planted .product-note {
   color: var(--hold);
 }
+
+/* The real rail, offered on a decision that already cleared the gate. */
+.real-rail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.real-rail a.btn { text-decoration: none; }

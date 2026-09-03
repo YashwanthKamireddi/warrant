@@ -58,7 +58,12 @@ export function App() {
   const [chain, setChain] = useState<ChainStatus | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
-  const [rail, setRail] = useState<"simulated" | "razorpay">("simulated");
+  const [rail] = useState<"simulated" | "razorpay">("simulated");
+  const [razorpayReady, setRazorpayReady] = useState(false);
+  /** Real order ids and rzp.io links, keyed by the decision they belong to. */
+  const [realOrders, setRealOrders] = useState<
+    Record<number, { order_id: string | null; payment_link: string | null }>
+  >({});
   const [cosign, setCosign] = useState(false);
   const [step, setStep] = useState(1);
   const [comparison, setComparison] = useState<Comparison | null>(null);
@@ -88,8 +93,7 @@ export function App() {
         // choose between "simulated" and "real" put the most credible thing in
         // the product -- a real Razorpay order id -- behind a decision most
         // people never made.
-        const best = m.rails.find((r) => r.id === "razorpay" && r.available);
-        if (best) setRail("razorpay");
+        setRazorpayReady(m.rails.some((r) => r.id === "razorpay" && r.available));
       })
       .catch((e: ApiError) => setError(e.message));
   }, []);
@@ -258,6 +262,16 @@ export function App() {
       }
     });
 
+  /** Put an authorized cart on the real rail. The walkthrough runs on the
+   *  simulator so the audit trail completes; this is what produces a real
+   *  Razorpay order and a link a reviewer can open. */
+  const placeOnRazorpay = (index: number) =>
+    run(async () => {
+      if (!sessionId) return;
+      const placed = await api.placeOnRazorpay(sessionId, index);
+      setRealOrders((prev) => ({ ...prev, [index]: placed }));
+    });
+
   const tamper = () =>
     run(async () => {
       if (!sessionId) return;
@@ -301,6 +315,18 @@ export function App() {
     setBooting(true);
     void (async () => {
       try {
+        // Deliberately the simulator, and the chip says so.
+        //
+        // A real Razorpay payment cannot be completed server to server -- the
+        // customer authorises on their own device, which is exactly the property
+        // that makes the rail trustworthy. Defaulting the walkthrough to it
+        // therefore leaves every debit at settled=false forever: no receipt, no
+        // evidence pack, and an AP2 export missing its PaymentMandate. The
+        // audit trail is the thing being demonstrated, so it has to complete.
+        //
+        // The real rail is one click away on any allowed decision, and it
+        // creates a real order and a real payment link. Nothing here pretends
+        // to be Razorpay while running on the simulator.
         const started = await api.start(meta.default_utterance, "simulated");
         setSessionId(started.session_id);
         setPending(started.pending);
@@ -544,7 +570,16 @@ export function App() {
             {outcomes.length > 0 && (
               <div className="decisions">
                 {outcomes.map((outcome, i) => (
-                  <DecisionCard key={`${outcome.cart.id}-${i}`} outcome={outcome} index={i} />
+                  <DecisionCard
+                    key={`${outcome.cart.id}-${i}`}
+                    outcome={outcome}
+                    index={i}
+                    realOrder={realOrders[i]}
+                    onPlaceOnRazorpay={
+                      razorpayReady && outcome.receipt ? () => placeOnRazorpay(i) : undefined
+                    }
+                    busy={busy}
+                  />
                 ))}
               </div>
             )}

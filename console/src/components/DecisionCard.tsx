@@ -50,7 +50,21 @@ function Checks({ checks }: { checks: Check[] }) {
   );
 }
 
-export function DecisionCard({ outcome, index }: { outcome: Outcome; index: number }) {
+export function DecisionCard({
+  outcome,
+  index,
+  realOrder,
+  onPlaceOnRazorpay,
+  busy = false,
+}: {
+  outcome: Outcome;
+  index: number;
+  /** The real Razorpay order this decision produced, once somebody asked for one. */
+  realOrder?: { order_id: string | null; payment_link: string | null };
+  /** Absent when there are no Razorpay keys, or the debit never settled. */
+  onPlaceOnRazorpay?: () => void;
+  busy?: boolean;
+}) {
   // Allowed baskets collapse, because a clean pass has nothing to read. The one
   // exception is a debit placed on a real rail but not yet settled: the payment
   // link is the only actionable thing on the page and must not sit behind a click.
@@ -142,6 +156,39 @@ export function DecisionCard({ outcome, index }: { outcome: Outcome; index: numb
                   rel="noreferrer"
                 >
                   Open the real payment link ↗
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* The walkthrough settles on the simulator so the record completes.
+              This is the same signed cart, placed on the real rail, which is
+              what produces an order id and a link somebody can actually open.
+              Nothing is re-decided: the gate allowed this basket already. */}
+          {onPlaceOnRazorpay && !realOrder && (
+            <div className="real-rail">
+              <button className="btn btn-sm" onClick={onPlaceOnRazorpay} disabled={busy}>
+                {busy ? "Placing…" : "Place this on real Razorpay"}
+              </button>
+              <span>Creates a real Order and Payment Link in test mode.</span>
+            </div>
+          )}
+
+          {realOrder && (
+            <div className="real-rail placed">
+              <span className="placed-head">
+                <Badge kind="pass" />
+                <b>On Razorpay</b>
+                <span className="mono">{realOrder.order_id}</span>
+              </span>
+              {realOrder.payment_link && (
+                <a
+                  className="btn btn-sm"
+                  href={realOrder.payment_link}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open the real checkout ↗
                 </a>
               )}
             </div>

@@ -102,6 +102,16 @@ export const api = {
 
   chain: (sessionId: string) => request<ChainStatus>(`/sessions/${sessionId}/chain`),
 
+  /** Put an already-authorized cart on the real rail, and get back the real
+   *  order id and rzp.io link it produced. */
+  placeOnRazorpay: (sessionId: string, index: number) =>
+    request<{
+      order_id: string | null;
+      payment_link: string | null;
+      amount_paise: number;
+      settled: boolean;
+    }>(`/sessions/${sessionId}/razorpay/${index}`, { method: "POST" }),
+
   tamper: (sessionId: string) =>
     request<{ tampered_seq: number; what: string; chain: ChainStatus }>(
       `/sessions/${sessionId}/tamper`,

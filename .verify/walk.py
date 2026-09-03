@@ -5,6 +5,7 @@ page renders, whether the API answers, or whether anything throws at runtime.
 This walks the whole flow and fails loudly on any console error.
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -32,6 +33,19 @@ with sync_playwright() as pw:
             if m.type in ("error", "warning") else None)
     page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
 
+    started_with: list[str] = []
+
+    def _watch_session_start(request) -> None:
+        if request.method != "POST" or not request.url.endswith("/api/sessions"):
+            return
+        try:
+            started_with.append(json.loads(request.post_data or "{}").get("rail", ""))
+        except ValueError:
+            started_with.append("")
+
+    page.on("request", _watch_session_start)
+
+
     print("the landing page")
     page.goto(BASE, wait_until="networkidle")
     page.wait_for_selector(".lp-open h1", timeout=10_000)
@@ -56,7 +70,24 @@ with sync_playwright() as pw:
     page.wait_for_selector(".shell", timeout=10_000)
 
     print(f"opening {BASE}")
+
+    # What the console actually asked the API for, so the chip can be held to
+    # it. The app bar said "Razorpay test mode" while the bootstrap posted
+    # rail="simulated" -- the console asserting a real rail and running on the
+    # simulator, which is incident 2 in INCIDENTS.md happening a second time.
     drive.enter(page, BASE)
+
+    claimed = page.locator(".appbar .pill").last.inner_text().strip().lower()
+    asked_for = started_with[-1] if started_with else ""
+    if not asked_for:
+        errors.append("the console never told the API which rail to use")
+    elif ("razorpay" in claimed) != (asked_for == "razorpay"):
+        errors.append(
+            f"the app bar claims {claimed!r} while the session was started on "
+            f"{asked_for!r}"
+        )
+    else:
+        print(f"  rail claimed and used agree: {asked_for}")
     page.wait_for_timeout(500)
     shot(page, "01-initial")
 
