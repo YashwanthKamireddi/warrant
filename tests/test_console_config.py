@@ -180,3 +180,44 @@ def test_the_fallback_basket_is_orderable_from_this_merchant(configured):
         # model did not answer* buying the planted item would be this project
         # refusing something it chose itself.
         assert not pick.sku.startswith("warrant-")
+
+
+def test_an_unorderable_pick_is_skipped_not_raised():
+    """A 500 on the agent act is the first thing a visitor would see.
+
+    `shop()` filters picks the merchant does not sell, so reaching here means a
+    transcript recorded against a different catalogue, or a basket built before
+    one was swapped. The answer to an unorderable line is that it is
+    unorderable.
+    """
+    from warrant.agent import AgentBasket, AgentPick
+
+    basket = AgentBasket(
+        picks=(AgentPick(sku="a-sku-no-catalogue-has", qty=6),),
+        reasoning="replayed from a transcript taken against another catalogue",
+        merchant="sleepyowl",
+        source="transcript",
+    )
+    assert basket.line_items() == ()
+
+
+def test_the_agent_endpoint_reports_an_empty_basket_rather_than_crashing(configured):
+    name, api = configured
+    from fastapi.testclient import TestClient
+
+    with TestClient(api.app) as client:
+        meta = client.get("/api/meta").json()
+        sid = client.post(
+            "/api/sessions",
+            json={"utterance": meta["default_utterance"], "rail": "simulated"},
+        ).json()["session_id"]
+        client.post(f"/api/sessions/{sid}/approve", json={})
+
+        # A merchant this catalogue has never heard of: nothing is orderable.
+        r = client.post(
+            f"/api/sessions/{sid}/agent-run",
+            json={"merchant": "a-shop-that-does-not-exist", "attempts": 1},
+        )
+        assert r.status_code != 500, f"{name}: a stack trace reached the browser"
+        assert r.status_code == 502
+        assert "sells" in r.json()["detail"]

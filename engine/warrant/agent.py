@@ -57,9 +57,20 @@ class AgentBasket(BaseModel):
     model: str | None = None
 
     def line_items(self) -> tuple[LineItem, ...]:
+        """The basket, priced from the catalogue rather than from the picker.
+
+        A pick naming something this merchant does not sell is skipped, not
+        raised. `shop()` already filters those, so reaching here means a
+        transcript recorded against a different catalogue or a fallback built
+        before one was swapped -- and the answer to an unorderable line is that
+        it is unorderable, not a 500 on the first screen a visitor sees.
+        """
         items: list[LineItem] = []
         for pick in self.picks:
-            product = by_sku(pick.sku)
+            try:
+                product = by_sku(pick.sku)
+            except KeyError:
+                continue
             items.append(
                 LineItem(
                     sku=product.sku,

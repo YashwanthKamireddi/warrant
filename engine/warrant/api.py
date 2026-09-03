@@ -885,6 +885,17 @@ def agent_run(session_id: str, body: AgentRunRequest) -> dict[str, Any]:
             client=session.authorizer.model_client,
         )
         items = basket.line_items()
+        if not items:
+            # Nothing the agent named is orderable here. That is a real outcome
+            # of pointing a model at a catalogue, and it is not a server error:
+            # answering 500 put a stack trace on the first screen a visitor sees.
+            raise HTTPException(
+                502,
+                detail=(
+                    f"The agent named nothing {basket.merchant} sells. "
+                    f"{basket.reasoning}"
+                ),
+            )
         now = session.tick()
         cart = session.authorizer.propose_cart(
             session.intent,
