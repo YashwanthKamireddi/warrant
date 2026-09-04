@@ -438,7 +438,7 @@ git clone https://github.com/YashwanthKamireddi/warrant && cd warrant
 
 make demo      # the five-cart scenario. no API key, no network, no install step
 make bench     # 540 labelled sessions, four policies
-make console   # the walkthrough at http://127.0.0.1:8787
+make console   # the console at http://127.0.0.1:8787
 make verify    # every gate, from a clean checkout
 ```
 
@@ -586,7 +586,7 @@ engine/warrant/
   py.typed       PEP 561. Without it every annotation here is invisible.
   rails/         Razorpay test mode, a real UPI mandate, and a simulator.
 bench/           The labelled corpus, the four policies, the harness.
-console/         The walkthrough. A view onto the engine, never a second one.
+console/         The console. A view onto the engine, never a second one.
 docs/            The integration guide. Its examples are run by the build.
 .verify/         Secrets, tokens, contrast, overlap, layout, docs and browser gates.
 warrant.example.toml   Merchants and their MCCs. Yours goes here.

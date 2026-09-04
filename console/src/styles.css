@@ -197,11 +197,34 @@ a {
    Frame
    ========================================================================== */
 
+/* Flex, not fixed grid rows.
+ *
+ * This was `grid-template-rows: var(--appbar) auto 1fr auto`, which assigns
+ * rows by position and so assumed exactly four children. The error strip and
+ * the revoked/broken banner are both conditional, so on the ordinary case --
+ * neither showing -- the three real children landed on the first three rows:
+ * the work area took the `auto` row and stopped growing, and the money bar took
+ * the `1fr` row and stretched. The result was a band of empty white between the
+ * feed and the totals, and totals pinned to the bottom of it.
+ *
+ * A column that grows one child is what this always meant. */
 .shell {
-  display: grid;
-  grid-template-rows: var(--appbar) auto 1fr auto;
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-width: 0;
+}
+
+.shell > .appbar,
+.shell > .stage-error,
+.shell > .spent-banner,
+.shell > .money {
+  flex: 0 0 auto;
+}
+
+.shell > .work {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* ==========================================================================
@@ -212,6 +235,8 @@ a {
   display: flex;
   align-items: center;
   gap: var(--s-4);
+  /* Its height came from the shell's grid row, which no longer exists. */
+  min-height: var(--appbar);
   padding: 0 var(--s-5);
   background: var(--surface);
   border-bottom: 1px solid var(--line);

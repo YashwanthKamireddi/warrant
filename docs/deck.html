@@ -130,12 +130,21 @@
   .tag.ok { background: #ecfdf3; color: var(--ok); }
   .tag.hold { background: #fffaeb; color: var(--hold); }
 
+  /* A slide is a fixed 1280x720 box. A screenshot set to width:100% is
+     whatever height its aspect ratio makes it, which ran off the bottom of the
+     page and was cropped in the PDF. Fit it to the space instead. */
   .shot {
-    width: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    margin: 0 auto;
     border: 1px solid var(--line);
     border-radius: 12px;
     display: block;
+    object-fit: contain;
   }
+  .fill:has(> .shot) { min-height: 0; }
+  .grid2 > div { min-height: 0; }
 
   .dark { background: var(--brand); color: #fff; }
   .dark h1, .dark h2, .dark em { color: #fff; }
