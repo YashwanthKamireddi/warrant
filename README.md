@@ -20,7 +20,7 @@ checked *before* settlement, provable *after* dispute.
 
 *Built for the Razorpay AI Buildathon · Track 01, AI Growth & Agentic Commerce*
 
-[The deck](docs/deck.html) · [What the form asks for](SUBMISSION.md) · [Architecture](ARCHITECTURE.md) · [Integrating it](docs/INTEGRATION.md)
+[The deck](docs/deck.html) · [Architecture](ARCHITECTURE.md) · [Integrating it](docs/INTEGRATION.md)
 
 </div>
 
@@ -37,7 +37,7 @@ checked *before* settlement, provable *after* dispute.
 | **Bounded** | A hard `Envelope` no derived scope may exceed, and inside it a scope the person signed with their own device key. The narrower of the two always wins. |
 | **Gated** | `gate.evaluate()` is the only thing that can block, and it is a pure function of the signed documents and the state. [No model can change a verdict](#where-the-model-runs--and-where-it-deliberately-doesnt). |
 | **Audit trail** | A hash-chained ledger where **refusals are entries, not silences**. Edit any entry and every entry after it orphans — the console has a button that lets you try. |
-| **One failure handled gracefully** | The agent proposes two units of a real ₹349 coffee — ₹698 — and Warrant refuses to decide it: that crosses the ₹500 the person said needs their say-so. The run stops and the console asks *them*. Approving signs the basket with their own key, the same gate runs again, and the check that failed now passes — because a signature exists that did not before. Ten more failures are written up in **[INCIDENTS.md](INCIDENTS.md)**. |
+| **One failure handled gracefully** | The agent proposes two units of a real ₹349 coffee — ₹698 — and Warrant refuses to decide it: that crosses the ₹500 the person said needs their say-so. The run stops and the console asks *them*. Approving signs the basket with their own key, the same gate runs again, and the check that failed now passes — because a signature exists that did not before. |
 
 *"...or that makes a merchant transactable by an AI buyer end to end"* — that is
 this project. An AI buyer arrives with a signed permission, the merchant checks
@@ -529,26 +529,32 @@ cloned into an empty directory and run, not asserted.
 Screenshots of every state land in `.verify/shots/`.
 
 <details>
-<summary><b>Why these gates exist — each traces to a real bug a green build did not catch</b></summary>
+<summary><b>Why each gate is here</b></summary>
 
 <br>
 
-- **The storefront had drifted by one SKU** between two files while all 75 tests passed
-- **The top bar reported "credentials configured"** while actually replaying a transcript
-- **A component rendered `className="signer seal"`**, and `seal` was a standalone rule
-  elsewhere setting a 46px circle, so the label was clamped and its text spilled
-- **Four numbers in this README had stopped being true** — a corpus described as 405
-  sessions that had grown to 540, a headline figure of 13.3% where the code measured 81.8%
-- **The ledger forked under concurrent writes** — 320 appends produced 69 entries
-- **Concurrent carts overspent a mandate** — six baskets settled ₹360 against a ₹100 ceiling
-- **A test that was flaky 3 runs in 5** turned out to be the bug, not the harness: ledger
-  reads were returning rows with a `None` kind while a writer moved underneath them
+None of these are decoration. Each one holds a property that a passing test
+suite and a working demo were both happy to let through:
 
-The last one is worth reading in full. The first detector written for the CSS
-collision *did not work* — sibling-box overlap cannot catch a cascade collision,
-because overflowing text does not change its element's bounding box. The check that
-does catch it is *content larger than its own box while overflow is visible*,
-confirmed by reintroducing the bug and watching the detector name it:
+- **The ledger holds under concurrent writes.** It is a hash chain, so a fork is
+  not a slow query — it is a broken record.
+- **A mandate's budget holds under concurrent carts**, so parallel baskets cannot
+  each see the same remaining balance.
+- **The console never claims a capability it does not have** — a live model, a
+  replayed transcript and a deterministic fallback are labelled distinctly
+  wherever they appear.
+- **The catalogue cannot drift** between the file the gate prices from and the
+  file the console renders.
+- **Nothing in the interface overlaps, spills or fails contrast**, at eleven
+  viewports from 1920px down to a 390px phone.
+- **Every number in the documentation matches what the code measures**, across
+  the README, the landing page and the deck.
+
+The most useful discipline came from a check that looked right and did nothing.
+Sibling-box overlap cannot catch a cascade collision, because overflowing text
+does not change its element's bounding box. The check that does catch it is
+*content larger than its own box while overflow is visible* — confirmed by
+reintroducing the bug and watching the detector name it:
 
 ```
 span.link-signer.seal spills 145x0px outside its box
@@ -633,7 +639,7 @@ catalog.example.toml   Products. Half of them exist to be refused.
 
 **[INTEGRATION.md](docs/INTEGRATION.md)** — how to put this in your own product
 · **[ARCHITECTURE.md](ARCHITECTURE.md)** — trust boundaries and the decision record
-· **[INCIDENTS.md](INCIDENTS.md)** — what broke, kept as it happened
+· **[INCIDENTS.md](INCIDENTS.md)** — the engineering log, kept as it happened
 
 <br>
 

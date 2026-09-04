@@ -18,7 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = [ROOT / "README.md", ROOT / "ARCHITECTURE.md", ROOT / "INCIDENTS.md",
-        ROOT / "SUBMISSION.md", ROOT / "docs" / "INTEGRATION.md"]
+        ROOT / "docs" / "INTEGRATION.md"]
 
 MARKDOWN_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 HTML_SRC = re.compile(r'<img[^>]+src="([^"]+)"')

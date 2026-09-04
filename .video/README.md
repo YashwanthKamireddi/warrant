@@ -12,8 +12,7 @@ python3 .video/compose.py --list        # the cut, with durations
 python3 .video/compose.py               # writes out/warrant-pitch.mp4
 ```
 
-Then open `out/warrant-pitch.mp4`, hit play, and read [NARRATION.md](NARRATION.md)
-over it.
+Then open `out/warrant-pitch.mp4` and narrate over it.
 
 ## What is source and what is output
 
@@ -22,7 +21,6 @@ over it.
 | `scenes/*.html` | the eight title cards — source, committed |
 | `record.py` | drives the console and captures footage — source |
 | `compose.py` | the cut order and the crossfade chain — source |
-| `NARRATION.md` | word-for-word, timed to the cut — source |
 | `clips/`, `work/`, `out/` | build output — gitignored |
 
 ## The agent is recorded, not staged

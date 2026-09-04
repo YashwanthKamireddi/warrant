@@ -282,8 +282,12 @@ else:
 
 SUBMISSION = ROOT / "SUBMISSION.md"
 
+# Both this and the narration are submission material, kept out of the
+# repository and handed to the people judging it directly. They are checked when
+# they are here and skipped when they are not, so a clone stays green while the
+# numbers a reviewer actually reads stay gated on the machine that writes them.
 if not SUBMISSION.is_file():
-    failures.append("SUBMISSION.md is missing")
+    print("  --   SUBMISSION.md                    not present, skipped")
 else:
     filed = re.sub(r"[,\s]+", "", SUBMISSION.read_text())
 
@@ -339,7 +343,7 @@ def spell(n: int) -> str:
 
 
 if not NARRATION.is_file():
-    failures.append(".video/NARRATION.md is missing")
+    print("  --   .video/NARRATION.md            not present, skipped")
 else:
     # The script is a wrapped markdown blockquote, so a spoken number routinely
     # straddles a line break and a "> " marker: "thirty thousand two\n> hundred".
@@ -408,5 +412,5 @@ if failures:
         print("  -", f)
     sys.exit(1)
 
-print("every number in the README, the landing page, the deck, the submission "
-      "and the narration matches what the code measures")
+print("every number in the README, the landing page and the deck matches what "
+      "the code measures")

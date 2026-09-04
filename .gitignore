@@ -22,3 +22,9 @@ notes/
 
 # TypeScript build cache. Local, machine-specific, and it was tracked.
 *.tsbuildinfo
+
+# Submission material. Written for the people judging this, and handed to them
+# directly -- form answers and a script to read aloud are not part of the
+# product, and a repository is not where either belongs.
+SUBMISSION.md
+.video/NARRATION.md
