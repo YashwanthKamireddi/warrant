@@ -331,17 +331,32 @@ def load_catalog(path: str | Path | None = None) -> Catalog:
         return bundled_catalog()
 
 
-_active: Catalog = load_catalog()
+_active: Catalog | None = None
 
 
 def active_catalog() -> Catalog:
+    """The catalog in force, loaded on first use.
+
+    Loaded lazily, and that is not a preference. This was
+    ``_active = load_catalog()`` at module scope, which made the answer depend on
+    import order: ``storefront`` imports ``catalog``, so importing storefront
+    first ran that line while storefront was still half-initialised, the
+    ``from .storefront import load_snapshot`` inside ``load_catalog`` raised
+    ImportError, and the fallback quietly handed back the eleven bundled
+    products. Same process, same configuration, a different catalog depending on
+    which module something happened to import first -- and the failure is
+    invisible, because a bundled catalog looks like a working one.
+    """
+    global _active
+    if _active is None:
+        _active = load_catalog()
     return _active
 
 
 def use_catalog(catalog: Catalog) -> Catalog:
     """Install a catalog process-wide. Returns the one it replaced."""
     global _active
-    previous, _active = _active, catalog
+    previous, _active = active_catalog(), catalog
     return previous
 
 

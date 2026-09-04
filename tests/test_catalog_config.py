@@ -152,3 +152,37 @@ def test_the_example_catalogue_contains_things_that_must_be_refused():
     assert any(
         "ignore all previous instructions" in p.name.lower() for p in catalog
     ), "no injected instruction to demonstrate against"
+
+
+@pytest.mark.catalog
+def test_the_catalog_does_not_depend_on_import_order():
+    """Importing storefront first must not quietly hand back the bundled products.
+
+    `storefront` imports `catalog`, and `catalog` used to call `load_catalog()`
+    at module scope. Importing storefront first therefore ran that call while
+    storefront was half-initialised: the deferred `from .storefront import
+    load_snapshot` raised ImportError, the fallback caught it, and the process
+    ran on eleven bundled products while everything written about it described a
+    real merchant's catalogue of sixty-two. Same code, same config, different
+    answer depending on what something imported first — and nothing looked wrong,
+    because a bundled catalog behaves exactly like a working one.
+    """
+    import subprocess
+    import sys
+
+    def size(first: str) -> int:
+        out = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                f"import warrant.{first}\n"
+                "from warrant.catalog import active_catalog\n"
+                "print(len(active_catalog()))",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return int(out.stdout.strip())
+
+    assert size("storefront") == size("catalog")
