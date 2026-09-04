@@ -27,7 +27,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "engine"))
 
 import drive  # noqa: E402
 
-from warrant.catalog import line_item  # noqa: E402
+from warrant.catalog import PRODUCTS, Product  # noqa: E402
 from warrant.crypto import SigningKey  # noqa: E402
 from warrant.gate import MandateState, evaluate  # noqa: E402
 from warrant.models import (  # noqa: E402
@@ -41,15 +41,42 @@ from warrant.rails.razorpay_mandate import (  # noqa: E402
     MandateNotAuthorised,
     RazorpayMandate,
 )
+from warrant.storefront import StorefrontUnavailable, load_snapshot  # noqa: E402
 
 CEILING = 100_000  # Rs 1,000, the ceiling the sentence asked for
 failures: list[str] = []
+skipped: list[str] = []
 
 
 
 
-def sku(name: str) -> LineItem:
-    return line_item(name, 1)
+def one(product: Product) -> LineItem:
+    return LineItem(
+        sku=product.sku,
+        name=product.name,
+        category=product.category,
+        qty=1,
+        unit_paise=product.unit_paise,
+    )
+
+
+def pick() -> tuple[str, Product, Product]:
+    """One thing the permission covers and one it does not, from a real shop.
+
+    Naming SKUs here was a promise about somebody else's inventory. It broke the
+    moment the default catalogue became a real storefront's: ``chai-6`` is not
+    something Sleepy Owl sells, so the script died before it reached the mandate
+    it exists to test.
+    """
+    try:
+        catalog = load_snapshot("sleepyowl")
+        merchant = "sleepyowl"
+    except StorefrontUnavailable:
+        catalog, merchant = PRODUCTS, "zomato"
+    orderable = [p for p in catalog if not p.sku.startswith("warrant-")]
+    covered = next(p for p in orderable if p.category == "food_beverage")
+    other = next(p for p in orderable if p.category != "food_beverage")
+    return merchant, covered, other
 
 
 def main() -> int:
@@ -60,11 +87,12 @@ def main() -> int:
 
     drive.load_env()
     now = int(time.time())
+    merchant, covered, uncovered = pick()
 
     # ---------------------------------------------------------- the promise
     subject = SigningKey.from_seed("warrant/mandate-walk/subject")
     scope = Scope(
-        merchants=("zomato",),
+        merchants=(merchant,),
         categories=("food_beverage",),
         max_total_paise=CEILING,
         max_per_txn_paise=CEILING,
@@ -75,21 +103,29 @@ def main() -> int:
     intent = IntentMandate(
         subject="user_priya",
         agent="agent_claude",
-        utterance="order chai and samosas for my team from zomato, keep it under 1000",
+        utterance=f"order coffee for my team from {merchant}, keep it under 1000",
         scope=scope,
         issued_at=now,
         nonce="mandate-walk",
     )
     intent = intent.signed_by(subject)
     print(f"1. signed permission  {intent.id}")
-    print(f"   ceiling Rs {CEILING // 100:,} · zomato · food_beverage · 2 orders · 2 hours")
+    print(f"   ceiling Rs {CEILING // 100:,} · {merchant} · food_beverage · 2 orders · 2 hours")
 
     # ------------------------------------------------------- the real mandate
     mandate = RazorpayMandate()
-    handle = mandate.register(
-        ceiling_paise=scope.max_total_paise,
-        description=f"Authorise up to Rs {CEILING // 100:,} for 2 hours",
-    )
+    try:
+        handle = mandate.register(
+            ceiling_paise=scope.max_total_paise,
+            description=f"Authorise up to Rs {CEILING // 100:,} for 2 hours",
+        )
+    except Exception as exc:  # noqa: BLE001 - a live API limit is not a crash
+        # A test account gets 30 payment links a day and registering a mandate
+        # spends one. Hitting that is a fact about the account, not a fault in
+        # anything under test, and a traceback tells the reader the opposite.
+        print(f"\n2. Razorpay would not register a mandate: {exc}")
+        skipped.append("the real mandate, the debit and the revocation")
+        return report()
     print(f"\n2. real {handle.method} mandate   {handle.invoice_id}")
     print(f"   max_amount Rs {handle.ceiling_paise // 100:,}, frequency as_presented")
     print(f"   authorise it here: {handle.short_url}")
@@ -104,9 +140,9 @@ def main() -> int:
         mandate.attempt(
             CartMandate(
                 intent_digest=intent.digest,
-                merchant="zomato",
-                line_items=(sku("chai-6"),),
-                total_paise=sku("chai-6").line_paise,
+                merchant=merchant,
+                line_items=(one(covered),),
+                total_paise=one(covered).line_paise,
                 issued_at=now,
                 nonce="pre-auth",
             ),
@@ -118,7 +154,7 @@ def main() -> int:
 
     if args.skip_auth:
         print("\n3. --skip-auth: not waiting for authorisation")
-        print("   skipped: the gate check and the live debit")
+        skipped.append("the gate check and the live debit")
         return report()
 
     # ---------------------------------------------------------- authorisation
@@ -130,7 +166,8 @@ def main() -> int:
             break
         time.sleep(3)
     if not status.authorised:
-        print("   nobody authorised it in time; skipping the debit steps")
+        print("   nobody authorised it in time")
+        skipped.append("the debit and the revocation")
         return report()
     print(f"   authorised. token {status.token_id}")
     print("   from here the agent can debit with nobody asked anything.")
@@ -138,13 +175,13 @@ def main() -> int:
     # ------------------------------------------------------------- the gate
     state = MandateState(intent_digest=intent.digest)
     baskets = [
-        ("in scope", sku("chai-6"), True),
-        ("out of scope", sku("powerbank"), False),
+        ("in scope", one(covered), True),
+        ("out of scope", one(uncovered), False),
     ]
     for label, item, should_allow in baskets:
         cart = CartMandate(
             intent_digest=intent.digest,
-            merchant="zomato",
+            merchant=merchant,
             line_items=(item,),
             total_paise=item.line_paise,
             issued_at=int(time.time()),
@@ -187,14 +224,21 @@ def main() -> int:
     return report()
 
 
+def plural(n: int) -> str:
+    return "one leg" if n == 1 else f"{n} legs"
+
+
 def report() -> int:
     print()
+    for s in skipped:
+        print(f"skipped: {s}")
     if failures:
         print(f"{len(failures)} problem(s):")
         for f in failures:
             print("  -", f)
         return 1
-    print("the mandate path holds")
+    print("the mandate path holds" if not skipped
+          else f"what ran, held. {plural(len(skipped))} never ran — see above.")
     return 0
 
 

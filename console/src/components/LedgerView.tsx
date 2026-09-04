@@ -5,6 +5,25 @@ import { Badge, Empty, Hash } from "./primitives";
 
 const REFUSALS = new Set(["cart_blocked", "debit_failed", "step_up_declined", "intent_revoked"]);
 
+/** What each entry is, in words.
+ *
+ *  The column used to print the engine's own event names -- `cart_proposed`,
+ *  `step_up_requested` -- which are exactly right in a log and mean nothing to
+ *  a person reading the screen for the first time. The engine name is still
+ *  there on hover, because for anyone who wants it, it is the thing to grep. */
+const SAID: Record<string, string> = {
+  intent_issued: "She set the permission",
+  cart_proposed: "The agent proposed a basket",
+  cart_allowed: "Warrant allowed it",
+  cart_blocked: "Warrant refused it",
+  step_up_requested: "Warrant asked her to approve",
+  step_up_declined: "She declined",
+  debit_authorized: "Sent to the payment rail",
+  debit_settled: "Paid",
+  debit_failed: "The payment failed",
+  intent_revoked: "She revoked the permission",
+};
+
 /** One line of detail per entry kind, read from the payload the engine wrote.
  *  Nothing here is reconstructed or inferred. */
 function detail(entry: LedgerEntry): string {
@@ -63,9 +82,11 @@ export function LedgerView({
         <div className="notice ok">
           <Badge kind="pass" />
           <span>
-            <b>Chain intact.</b> {entries.length}{" "}
-            {entries.length === 1 ? "entry" : "entries"}, each one committing to the
-            hash before it. Head <Hash value={chain.head} chars={14} />.
+            <b>Nothing here has been altered.</b> {entries.length}{" "}
+            {entries.length === 1 ? "entry" : "entries"}. Each fingerprint on the
+            right is computed from that entry <em>and</em> the one before it, so
+            editing any entry changes every fingerprint after it. Latest:{" "}
+            <Hash value={chain.head} chars={14} />.
           </span>
         </div>
       )}
@@ -74,8 +95,8 @@ export function LedgerView({
         <div className="notice stop">
           <Badge kind="fail" />
           <span>
-            <b>Chain broken at entry {chain.break.seq}.</b> {chain.break.reason}. Every entry from
-            there on is orphaned. Recomputing found{" "}
+            <b>Entry {chain.break.seq} was altered.</b> {chain.break.reason}. Every
+            entry from there on no longer adds up. Recomputing the fingerprint found{" "}
             <span className="mono">{chain.break.found.slice(7, 21)}…</span> where the record claims{" "}
             <span className="mono">{chain.break.expected.slice(7, 21)}…</span>.
           </span>
@@ -88,7 +109,7 @@ export function LedgerView({
           <span>event</span>
           <span>detail</span>
           <span style={{ textAlign: "right" }}>time</span>
-          <span style={{ textAlign: "right" }}>hash</span>
+          <span style={{ textAlign: "right" }}>fingerprint</span>
         </div>
         {entries.map((entry) => {
           const refusal = REFUSALS.has(entry.kind);
@@ -99,7 +120,9 @@ export function LedgerView({
               key={entry.seq}
             >
               <span className="ledger-seq">{entry.seq}</span>
-              <span className="ledger-kind">{entry.kind}</span>
+              <span className="ledger-kind" title={entry.kind}>
+                {SAID[entry.kind] ?? entry.kind}
+              </span>
               <span className="ledger-detail" title={detail(entry)}>
                 {detail(entry)}
               </span>

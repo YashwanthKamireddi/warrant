@@ -1,5 +1,5 @@
 import { rupees } from "../format";
-import type { AgentAttempt } from "../types";
+import type { AgentAttempt, Outcome } from "../types";
 import { Basket } from "./icons";
 import { Empty } from "./primitives";
 
@@ -15,9 +15,23 @@ import { Empty } from "./primitives";
 export function AgentRun({
   attempts,
   running,
+  cosigned,
+  declined,
+  busy,
+  onApprove,
+  onDecline,
+  onPlaceOnRazorpay,
+  realOrder,
 }: {
   attempts: AgentAttempt[];
   running: boolean;
+  cosigned: Outcome | null;
+  declined: boolean;
+  busy: boolean;
+  onApprove: (attempt: AgentAttempt) => void;
+  onDecline: () => void;
+  onPlaceOnRazorpay?: () => void;
+  realOrder?: { order_id: string | null; payment_link: string | null };
 }) {
   if (attempts.length === 0 && !running) {
     return (
@@ -28,6 +42,12 @@ export function AgentRun({
       </Empty>
     );
   }
+
+  const final = attempts[attempts.length - 1];
+  const pendingAsk =
+    !running && !cosigned && !declined && final?.outcome.verdict === "escalate"
+      ? final
+      : null;
 
   return (
     <div className="run">
@@ -113,6 +133,154 @@ export function AgentRun({
           </div>
         </div>
       )}
+
+      {pendingAsk && (
+        <Ask
+          attempt={pendingAsk}
+          busy={busy}
+          onApprove={() => onApprove(pendingAsk)}
+          onDecline={onDecline}
+        />
+      )}
+
+      {declined && !cosigned && (
+        <div className="ask settled declined">
+          <p className="ask-said">
+            You said no, so the basket was never submitted and no money moved.
+            Warrant asking is already in the record as a <code>step_up_requested</code>{" "}
+            entry — a dispute usually turns on what was stopped, so the stop is
+            written down whether or not you go on to approve it.
+          </p>
+        </div>
+      )}
+
+      {cosigned && (
+        <Approved
+          outcome={cosigned}
+          busy={busy}
+          onPlaceOnRazorpay={onPlaceOnRazorpay}
+          realOrder={realOrder}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Warrant escalating means one thing: a human has to say yes to this one. The
+ *  human is sitting right here, so ask them. */
+function Ask({
+  attempt,
+  busy,
+  onApprove,
+  onDecline,
+}: {
+  attempt: AgentAttempt;
+  busy: boolean;
+  onApprove: () => void;
+  onDecline: () => void;
+}) {
+  return (
+    <div className="ask">
+      <span className="run-who">
+        <span className="role-glyph person" aria-hidden>
+          P
+        </span>
+        Warrant is asking you
+      </span>
+      <p className="ask-said">
+        The agent wants to spend <b className="num">{rupees(attempt.agent.total_paise)}</b>.
+        That is over the amount you said needs your say-so, so Warrant stopped and
+        came back to you. It cannot approve this by itself, and neither can the
+        agent.
+      </p>
+      <div className="ask-do">
+        <button className="btn btn-primary" onClick={onApprove} disabled={busy}>
+          {busy ? "Signing…" : "Yes — sign it with my key"}
+        </button>
+        <button className="btn" onClick={onDecline} disabled={busy}>
+          No
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** What approving actually did, in the gate's own words.
+ *
+ *  This must never assume it worked. A co-signature satisfies exactly one
+ *  check -- the step-up -- and satisfies nothing else: if the mandate's budget
+ *  is already spent, or the basket is out of category, the same signature that
+ *  cleared the step-up leaves it blocked. Saying "the money moved" under a
+ *  BLOCK is the kind of lie that makes everything else on the page suspect,
+ *  and an earlier version of this panel said exactly that. */
+function Approved({
+  outcome,
+  busy,
+  onPlaceOnRazorpay,
+  realOrder,
+}: {
+  outcome: Outcome;
+  busy: boolean;
+  onPlaceOnRazorpay?: () => void;
+  realOrder?: { order_id: string | null; payment_link: string | null };
+}) {
+  const allowed = outcome.verdict === "allow";
+  return (
+    <div className={`ask settled ${allowed ? "" : "refused"}`}>
+      <span className="run-who">
+        <span className={`verdict ${outcome.verdict}`}>
+          {outcome.verdict.toUpperCase()}
+        </span>
+        Warrant, again
+      </span>
+      {allowed ? (
+        <p className="ask-said">
+          Your key signed the basket, the same gate ran again, and the check that
+          failed a moment ago now passes — because a signature exists that did
+          not before. The money moved.
+        </p>
+      ) : (
+        <>
+          <p className="ask-said">
+            Your signature cleared the step-up. It is not an override — it
+            satisfies that one check and nothing else, so these still refuse it:
+          </p>
+          <ul className="run-reasons">
+            {outcome.reasons.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {allowed &&
+        (realOrder ? (
+          <span className="real-rail placed">
+            <b>On Razorpay</b>
+            <span className="mono">{realOrder.order_id}</span>
+            {realOrder.payment_link && (
+              <a
+                className="btn btn-sm"
+                href={realOrder.payment_link}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open the real checkout ↗
+              </a>
+            )}
+          </span>
+        ) : (
+          onPlaceOnRazorpay && (
+            <div className="ask-do">
+              <button
+                className="btn btn-primary"
+                onClick={onPlaceOnRazorpay}
+                disabled={busy}
+              >
+                {busy ? "Placing…" : "Put this on real Razorpay"}
+              </button>
+            </div>
+          )
+        ))}
     </div>
   );
 }

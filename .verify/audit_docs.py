@@ -221,4 +221,85 @@ if failures:
     for f in failures:
         print("  -", f)
     sys.exit(1)
-print("every number in the README matches what the code measures")
+# -- the narration script --------------------------------------------------- #
+#
+# NARRATION.md is read aloud over the film, so its numbers are the ones a judge
+# actually hears. It had drifted furthest of anything in the repo -- it claimed
+# 211 tests and 8 gates against 367 and 11, and quoted two money figures that
+# were never measured -- because nothing checked it. Now something does.
+#
+# It spells numbers out, the way a person reads them, so the check is written
+# the other way round: take the measured value, spell it, and require the words
+# to appear.
+
+NARRATION = ROOT / ".video" / "NARRATION.md"
+
+ONES = [
+    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
+    "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+    "sixteen", "seventeen", "eighteen", "nineteen",
+]
+TENS = ["twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"]
+
+
+def spell(n: int) -> str:
+    """British-English words for a number, the way the script says them."""
+    if n < 20:
+        return ONES[n]
+    if n < 100:
+        tens, rest = divmod(n, 10)
+        return TENS[tens - 2] + (f"-{ONES[rest]}" if rest else "")
+    if n < 1000:
+        hundreds, rest = divmod(n, 100)
+        head = f"{ONES[hundreds]} hundred"
+        return f"{head} and {spell(rest)}" if rest else head
+    thousands, rest = divmod(n, 1000)
+    head = f"{spell(thousands)} thousand"
+    return f"{head} {spell(rest)}" if rest else head
+
+
+if not NARRATION.is_file():
+    failures.append(".video/NARRATION.md is missing")
+else:
+    spoken = NARRATION.read_text().lower()
+
+    def spoken_claim(label: str, value: int) -> None:
+        """The film says this number out loud, so the words have to be there."""
+        words = spell(value)
+        if words not in spoken:
+            failures.append(
+                f"narration: says nothing matching {label} = {value} "
+                f'(expected the words "{words}")'
+            )
+
+    spoken_claim("the corpus size", results["cases"])
+    spoken_claim("what an amount ceiling misses", policies["amount_only"]["misses"])
+    spoken_claim("what Warrant misses", policies["warrant"]["misses"])
+    if actual_tests:
+        spoken_claim("the test count", int(actual_tests.group(1)))
+    spoken_claim("the gate count", gate_targets)
+
+    # Money is spoken to the nearest thousand -- "thirty thousand two hundred"
+    # for Rs 30,208 -- because nobody reads paise aloud.
+    for policy, label in (("warrant", "what Warrant leaks"),
+                          ("no_gate", "what no gate leaks"),
+                          ("amount_only", "what an amount ceiling leaks")):
+        rounded = round(policies[policy]["leaked_paise"] / 100 / 100) * 100
+        if spell(rounded) not in spoken:
+            failures.append(
+                f"narration: says nothing matching {label} "
+                f'(expected the words "{spell(rounded)}" for '
+                f'{rupees(policies[policy]["leaked_paise"])})'
+            )
+
+    # The console picks which ledger entry to rewrite at runtime, so naming one
+    # is a promise the footage breaks on the next take.
+    if re.search(r"entry (one|two|three|four|five|six|seven|eight|nine|\d+)", spoken):
+        failures.append(
+            "narration: names a specific ledger entry for the tamper. The console "
+            "chooses that entry at runtime, so the number is wrong on some runs."
+        )
+
+    print("  ok   .video/NARRATION.md            numbers match")
+
+print("every number in the README and the narration matches what the code measures")

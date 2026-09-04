@@ -267,6 +267,35 @@ def test_cosigned_cart_over_the_threshold_is_allowed(intent, state, user_key):
     assert _run(intent, cosigned, state, user_key).verdict is Verdict.ALLOW
 
 
+def test_a_cosignature_clears_the_step_up_and_overrides_nothing_else(
+    intent, state, user_key
+):
+    """The console tells the person their signature "is not an override".
+
+    That sentence has to be true. A co-signature satisfies exactly one check --
+    the step-up -- and a basket that fails on anything else fails just as hard
+    with one attached. Here the item is over the threshold *and* out of the
+    permitted category: co-signing clears the first and the second still blocks.
+    """
+    off_scope = LineItem(
+        sku="tv", name="Television", category="electronics", qty=1, unit_paise=55_000
+    )
+    cart = CartMandate(
+        intent_digest=intent.digest,
+        merchant="zomato",
+        line_items=(off_scope,),
+        total_paise=off_scope.line_paise,
+        issued_at=NOW,
+        nonce="cart-cosigned-off-scope",
+    )
+    cosigned = cart.model_copy(update={"user_cosignature": user_key.sign(cart.body())})
+    decision = _run(intent, cosigned, state, user_key)
+
+    assert _rule(decision, "step_up.cosignature").status == "pass"
+    assert _rule(decision, "scope.category").status == "fail"
+    assert decision.verdict is Verdict.BLOCK
+
+
 # -- determinism ------------------------------------------------------------ #
 
 

@@ -37,7 +37,7 @@ checked *before* settlement, provable *after* dispute.
 | **Bounded** | A hard `Envelope` no derived scope may exceed, and inside it a scope the person signed with their own device key. The narrower of the two always wins. |
 | **Gated** | `gate.evaluate()` is the only thing that can block, and it is a pure function of the signed documents and the state. [No model can change a verdict](#where-the-model-runs--and-where-it-deliberately-doesnt). |
 | **Audit trail** | A hash-chained ledger where **refusals are entries, not silences**. Edit any entry and every entry after it orphans — the console has a button that lets you try. |
-| **One failure handled gracefully** | The agent proposes ₹960, Warrant escalates, the agent is told *only the reason* and comes back with ₹480 to stay under the co-signature threshold. Live, in about four seconds. Ten more are written up in **[INCIDENTS.md](INCIDENTS.md)**. |
+| **One failure handled gracefully** | The agent proposes two units of a real ₹349 coffee — ₹698 — and Warrant escalates: it crosses the ₹500 co-signature threshold. The agent is told *only the reason*, never the limits, and comes back with one unit. Live, in about four seconds. Ten more are written up in **[INCIDENTS.md](INCIDENTS.md)**. |
 
 *"...or that makes a merchant transactable by an AI buyer end to end"* — that is
 this project. An AI buyer arrives with a signed permission, the merchant checks
@@ -54,8 +54,8 @@ repeatedly **with no further PIN**.
 That leaves two holes, and both are open today.
 
 > **Nothing checks the debit against the intent before the money moves.**
-> The customer said *"chai and samosas for my team, under ₹1,000."* The block is
-> authorized. What stops a ₹499 charge for something nobody asked for?
+> The customer said *"coffee for my team, under ₹1,000."* The block is authorized.
+> What stops a ₹449 charge for a mug nobody asked for?
 
 > **When the dispute lands, the merchant has no evidence.**
 > An agent-initiated payment has no device fingerprint, no browsing session, no
@@ -80,6 +80,25 @@ to the rupee that moved.**
 </div>
 
 ---
+
+## Nothing here is a mock
+
+The single fastest way to dismiss a project like this is to notice the demo was
+written by its own author. So it is not.
+
+| | |
+| :--- | :--- |
+| **The merchant** | [Sleepy Owl Coffee](https://sleepyowl.co), a real Indian brand. 62 products read from the `products.json` feed every Shopify storefront publishes — their titles, their SKUs, their prices, their photographs. No key, no account, no onboarding. |
+| **The refusal** | *The Ground Coffee Mug*, ₹449, which they genuinely sell. Nobody planted it: a coffee company sells mugs, and a permission for food and drink refuses one — twice, once by the category code an acquirer assigns a coffee brand and once by the permission itself. |
+| **The agent** | A live model choosing from that catalogue. It is never told the limits, only the reason it was refused. |
+| **The payment** | Real Razorpay test-mode Orders and Payment Links. `order_TXWQzyVGRIHmSH` was created by pressing the button in the console. |
+| **The record** | A hash-chained ledger you can break from the UI and watch orphan. |
+
+Two things *are* ours, and both say so on screen: the two product names carrying
+injected instructions — no real merchant has planted one yet, and claiming
+otherwise would be a lie about a company that exists — and the committed
+snapshot of the catalogue, so a clone never depends on somebody else's site
+being up. `make catalog-refresh` re-fetches it.
 
 ## How it works
 
@@ -194,10 +213,14 @@ spelled `auth=NO_AUTH`.
 | Products | `WARRANT_CATALOG` | [`catalog.example.toml`](catalog.example.toml) |
 | API keys | `WARRANT_API_KEYS` | — |
 
-The bundled Indian merchants and their chai exist so a clone runs with nothing
-configured, and so the benchmark measures the same thing on every machine. They
-are a default, not a dependency: start the console with `WARRANT_CATALOG` set
-and it sells whatever you sell.
+With nothing configured the console reads the committed snapshot of a real
+storefront, which is what you see when you clone this and run it. Point
+`WARRANT_CATALOG` at your own file and it sells whatever you sell.
+
+The bundled product list is the last resort, and the deliberate choice of the
+scripted demo and the benchmark — those two have to produce identical output on
+every machine, so they read it explicitly rather than whatever happens to be
+configured.
 
 **[Full integration guide →](docs/INTEGRATION.md)** — three calls, the verdict
 table, retries, endpoints, and a production-notes section that says plainly
@@ -335,16 +358,36 @@ exactly what makes the rail trustworthy.
 
 ## The console
 
+In a real integration there is no console — Warrant is a call inside a
+merchant's checkout, and it is invisible. This exists so a person can watch the
+invisible part happen. Four screens, one idea each, and it signs a permission on
+arrival so there is something real on screen before you click anything.
+
+| | |
+| :--- | :--- |
+| **1 · The permission** | What the person said, and the bounds derived from it: how much, where, how long. Signed by their own key. |
+| **2 · Her agent shops** | A live model reading the merchant's catalogue. It runs on arrival — no button — and is told only *why* it was refused, never the limits. |
+| **3 · What it prevents** | The same basket in two worlds, in money. |
+| **4 · The record** | Every decision in order, the dispute pack, the AP2 export, and a button that edits the ledger so you can watch it break. |
+
 <table>
 <tr>
+<td width="50%"><img src="docs/screenshots/02-decisions.png" alt="Verdicts with the rule that produced each one"><br><em><b>Verdicts</b> — each names its rule, its numbers, and whether a model was consulted.</em></td>
 <td width="50%"><img src="docs/screenshots/03-ledger.png" alt="Hash-chained ledger"><br><em><b>Ledger</b> — refusals are entries, not silences.</em></td>
-<td width="50%"><img src="docs/screenshots/05-tampered.png" alt="Tamper detection"><br><em><b>Tampered</b> — entry 5 onward orphaned, with both hashes named.</em></td>
 </tr>
 <tr>
+<td width="50%"><img src="docs/screenshots/05-tampered.png" alt="Tamper detection"><br><em><b>Tampered</b> — the edited entry and every entry after it, orphaned, with both hashes named.</em></td>
 <td width="50%"><img src="docs/screenshots/04-evidence.png" alt="Dispute evidence pack"><br><em><b>Dispute evidence</b> — mapped to Razorpay's real contest schema.</em></td>
+</tr>
+<tr>
 <td width="50%"><img src="docs/screenshots/06-ap2.png" alt="AP2 export"><br><em><b>AP2 export</b> — with the divergences carried inside the document.</em></td>
+<td width="50%"><img src="docs/screenshots/07-razorpay.png" alt="The counterfactual in money"><br><em><b>What it prevents</b> — the same basket, with and without.</em></td>
 </tr>
 </table>
+
+Revoking the permission and breaking the chain are both meant to be pressed, and
+both are permanent. The console says so and offers a fresh permission, because a
+demonstration you can brick and cannot un-brick is one people press once.
 
 ---
 
@@ -429,7 +472,7 @@ Runs in order, and fails on the first problem:
 | :--- | :--- |
 | `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 367 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering, concurrency, merchant registry loading, mandate lifecycle, Shopify catalog boundary, the documented SDK example |
+| `test` | 367 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering, concurrency, merchant registry loading, mandate lifecycle, storefront snapshot parsing, idempotent retries under concurrency, the documented SDK example |
 | `typecheck` | the console compiles under `strict` |
 | `docs-check` | every number in this README matches what the code measures |
 | `docs-examples` | fail if any code example in the documentation does not run. Prose is not executed, so nothing else can catch a README that has quietly stopped being true |

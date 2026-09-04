@@ -60,6 +60,15 @@ export function App() {
 
   const [rail] = useState<"simulated" | "razorpay">("simulated");
   const [razorpayReady, setRazorpayReady] = useState(false);
+
+  /** What the person answered when Warrant escalated to them. An escalation is
+   *  the gate working -- it means "a human has to say yes to this one" -- and
+   *  the walkthrough used to end there, with nobody asked. The run dead-ended,
+   *  nothing settled, and the real Razorpay order at the end of the story was
+   *  unreachable: the console said "nothing has settled yet" and gave no way to
+   *  make it. This is the missing half. */
+  const [cosigned, setCosigned] = useState<Outcome | null>(null);
+  const [declined, setDeclined] = useState(false);
   /** Real order ids and rzp.io links, keyed by the decision they belong to. */
   const [realOrders, setRealOrders] = useState<
     Record<number, { order_id: string | null; payment_link: string | null }>
@@ -195,6 +204,24 @@ export function App() {
       if (result.outcome.receipt) void refreshEvidence(sessionId);
     });
 
+  /** Approve the basket Warrant escalated, as the person who set the limit.
+   *
+   *  This is a real Ed25519 co-signature by the subject's key over the cart
+   *  body, and the same gate that escalated re-runs against it -- there is no
+   *  branch that waves it through. `step_up.cosignature` goes from fail to
+   *  pass because a signature now exists that did not before. */
+  const approveEscalation = (attempt: AgentAttempt) =>
+    run(async () => {
+      if (!sessionId) return;
+      const picks = attempt.agent.picks.map((p) => ({ sku: p.sku, qty: p.qty }));
+      const result = await api.submitCart(sessionId, merchant, picks, true);
+      setCosigned(result.outcome);
+      setScope(result.scope);
+      setLedger((prev) => [...prev, ...result.ledger_added]);
+      setChain(await api.chain(sessionId));
+      if (result.outcome.receipt) void refreshEvidence(sessionId);
+    });
+
   /** Runs the scripted baskets one at a time and keeps whatever succeeded. A
    *  single failing step used to discard the whole run, hiding the failure
    *  behind an empty screen instead of showing it. */
@@ -248,6 +275,8 @@ export function App() {
     run(async () => {
       if (!sessionId) return;
       setAttempts([]);
+      setCosigned(null);
+      setDeclined(false);
       
       setAgentRunning(true);
       try {
@@ -309,6 +338,8 @@ export function App() {
       setChain(null);
       setAttempts([]);
       setAgentStarted(false);
+      setCosigned(null);
+      setDeclined(false);
       setQuantities({});
       setRealOrders({});
       setEvidence(null);
@@ -571,7 +602,19 @@ export function App() {
                 </span>
               )}
             </div>
-            <AgentRun attempts={attempts} running={agentRunning} />
+            <AgentRun
+              attempts={attempts}
+              running={agentRunning}
+              cosigned={cosigned}
+              declined={declined}
+              busy={busy}
+              onApprove={approveEscalation}
+              onDecline={() => setDeclined(true)}
+              onPlaceOnRazorpay={
+                razorpayReady && cosigned?.receipt ? () => placeOnRazorpay(-1) : undefined
+              }
+              realOrder={latestRealOrder}
+            />
           </section>
         )}
 

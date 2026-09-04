@@ -98,7 +98,7 @@ def main() -> int:
     intent = IntentMandate(
         subject="user_priya",
         agent="agent_claude",
-        utterance="order chai and samosas for my team, keep it under 1000",
+        utterance=f"order coffee for my team from {merchant}, keep it under 1000",
         scope=Scope(
             merchants=(merchant,),
             categories=("food_beverage",),
@@ -222,6 +222,10 @@ def main() -> int:
     return report()
 
 
+def plural(n: int) -> str:
+    return "one leg" if n == 1 else f"{n} legs"
+
+
 def report() -> int:
     print()
     for s in skipped:
@@ -231,7 +235,11 @@ def report() -> int:
         for p in problems:
             print("  -", p)
         return 1
-    print("\nthe live chain holds")
+    # Saying it holds when half of it was skipped is the one thing this
+    # script must never do: a green line under a list of skips is worse
+    # than a red one, because it is read and believed.
+    print("\nthe live chain holds" if not skipped
+          else f"\nwhat ran, held. {plural(len(skipped))} never ran — see above.")
     return 0
 
 

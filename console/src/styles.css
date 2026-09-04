@@ -2693,3 +2693,61 @@ a.btn {
   font-size: var(--size-small);
   color: var(--hold);
 }
+
+/* --- Warrant escalating to the person -------------------------------------
+   An escalation means a human has to say yes to this one, and the human is
+   sitting right here. This is where they answer. It is deliberately the
+   warmest surface in the console: everything else is a machine reporting, and
+   this is the one moment the product turns around and asks. */
+.ask {
+  margin-top: var(--s-4);
+  padding: var(--s-4) var(--s-5);
+  border: 1px solid var(--hold-line);
+  border-left: 3px solid var(--hold);
+  border-radius: var(--r-md);
+  background: var(--hold-bg);
+}
+
+.ask .run-who {
+  margin-bottom: var(--s-2);
+}
+
+.ask-said {
+  margin: 0;
+  max-width: 58ch;
+  font-size: var(--size-body);
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.ask-do {
+  display: flex;
+  gap: var(--s-3);
+  align-items: center;
+  margin-top: var(--s-4);
+  flex-wrap: wrap;
+}
+
+.ask.settled {
+  border-color: var(--ok-line);
+  border-left-color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.ask.settled .real-rail {
+  margin-top: var(--s-4);
+}
+
+.ask.declined {
+  border-color: var(--line);
+  border-left-color: var(--ink-3);
+  background: var(--surface-2);
+}
+
+/* A co-signature that cleared the step-up and was still refused by something
+   else. It reads as a stop, because it is one. */
+.ask.settled.refused {
+  border-color: var(--stop-line);
+  border-left-color: var(--stop);
+  background: var(--stop-bg);
+}
