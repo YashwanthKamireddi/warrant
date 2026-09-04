@@ -57,6 +57,13 @@ def _save(context, name: str) -> None:
     src = Path(video.path())
     dst = CLIPS / f"{name}.webm"
     shutil.move(str(src), dst)
+
+    # Any other page the context opened -- Razorpay's simulated bank window --
+    # was recorded too, and left a page@<hash>.webm beside the clip. It is not
+    # in the cut, so it only ever showed up as a wrong clip count.
+    for stray in CLIPS.glob("page@*.webm"):
+        stray.unlink()
+
     size = dst.stat().st_size // 1024
     print(f"  {name:<22} {size:>6} KB")
 
@@ -99,6 +106,41 @@ def _agent_done(page: Page) -> list[str]:
     return page.eval_on_selector_all(
         ".entry .verdict", "els => els.map(e => e.innerText.trim())"
     )
+
+
+def _pay_on_razorpay(page: Page) -> None:
+    """Pay the open Razorpay sheet in test mode, and wait for the confirmation.
+
+    Netbanking, because this account has UPI disabled and its test cards come
+    back "international cards not supported" -- an Indian test account cannot
+    accept them. The number is typed rather than filled: Razorpay's validator
+    listens for keystrokes, so a value set directly reads as invalid.
+    """
+    sheet = page.frame_locator("iframe.razorpay-checkout-frame")
+
+    box = sheet.locator("input[type='tel']").first
+    box.click()
+    box.press_sequentially("9812345678", delay=80)
+    page.wait_for_timeout(900)
+    sheet.get_by_role("button", name="Continue").first.click()
+    page.wait_for_timeout(3500)
+
+    sheet.locator("[role='button'], button, li, div").filter(
+        has_text="Bank of Baroda"
+    ).first.click(timeout=10_000)
+    page.wait_for_timeout(2500)
+    sheet.get_by_role("button", name="Pay").first.click(timeout=10_000)
+
+    # Razorpay's simulated bank opens in its own window.
+    page.wait_for_timeout(6000)
+    bank = page.context.pages[-1]
+    if bank is not page:
+        bank.get_by_role("button", name="Success").first.click(timeout=20_000)
+
+    # Nothing on screen claims the payment happened until the server has
+    # recomputed the signature, so this is waiting for that answer.
+    page.wait_for_selector(".entry-rail.paid", timeout=60_000)
+    page.wait_for_timeout(5200)
 
 
 def _open_record(page: Page) -> None:
@@ -217,7 +259,13 @@ def record_live(browser) -> None:
     _settle(page, 4000)
     _save(ctx, "live-06-evidence-ap2")
 
-    # -- Razorpay's own payment sheet, on a real order --------------------- #
+    # -- Razorpay's own payment sheet, paid, and verified ------------------ #
+    #
+    # The payment is completed here, not just opened. An open payment sheet
+    # shows that an order exists; a captured payment with the server's
+    # verification beside it shows that money moved and that this process
+    # checked the signature before saying so. That is the difference between
+    # the claim and the evidence for it.
     ctx = _app_context(browser)
     page = _enter(ctx)
     _agent_done(page)
@@ -229,13 +277,12 @@ def record_live(browser) -> None:
     button = page.get_by_role("button", name="Pay ")
     if button.count():
         button.first.click()
-        # Either Razorpay Checkout opens over the page, or Razorpay refuses for
-        # a reason of its own. Both are true, and a daily cap being reached is
-        # worth showing rather than hiding.
         try:
             page.wait_for_selector("iframe.razorpay-checkout-frame", timeout=60_000)
-            _settle(page, 6000)
-        except Exception:  # noqa: BLE001 - a stated refusal is a real outcome
+            _settle(page, 3000)
+            _pay_on_razorpay(page)
+        except Exception as exc:  # noqa: BLE001 - a stated refusal is a real outcome
+            print(f"    razorpay: {str(exc)[:90]}")
             _settle(page, 3000)
     else:
         _settle(page, 1200)
