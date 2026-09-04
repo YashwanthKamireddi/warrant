@@ -1,90 +1,148 @@
 # Submission
 
-Everything the form asks for, ready to paste. Twelve fields.
+The form's fields, in the form's order, ready to paste.
 
 ---
 
-## About the build
+## Track Selection
 
-**Track** — 01, AI Growth & Agentic Commerce
+**Track 01 — AI Growth & Agentic Commerce**
 
-**Project name** — Warrant
+---
 
-**What it solves**
+## Project Name / Title
+
+**Warrant**
+
+---
+
+## Project Objectives — what does it solve?
 
 > Since February 2026, Razorpay and NPCI have run agentic UPI payments in
-> production on Claude, with Zomato, Swiggy and Zepto. They use UPI Reserve Pay:
-> the customer blocks funds once, and the agent then debits against that block
-> repeatedly with no further PIN.
+> production with Zomato, Swiggy and Zepto. The mechanism is UPI Reserve Pay: the
+> customer approves once with their PIN, funds are blocked, and the agent then
+> debits against that block repeatedly with no further PIN.
 >
-> That leaves two holes. Nothing checks the debit against the customer's actual
-> intent before the money moves — a basket can sit under every ceiling, at the
-> right merchant, and still be something nobody asked for. And when the dispute
-> arrives, the merchant has no evidence: an agent-initiated payment has no device
-> fingerprint, no browsing session, no click, and chargeback reason codes have no
-> category for "correctly authorised agent, wrong outcome."
+> That leaves two holes, and both are open today.
 >
-> Warrant closes both with one object: a signed chain from the words a person said
-> to the rupee that moved. The customer's own key signs a bounded permission.
-> Every basket is checked against it by deterministic code before settlement. Every
-> decision — including every refusal — lands in a hash-chained ledger that later
-> renders as dispute evidence a bank can verify without trusting the merchant.
+> **Nothing checks what the agent buys against what the customer asked for.** The
+> bank never sees a basket, only a debit. A ceiling is equally happy to buy the
+> thing that was asked for and the thing that was not — and no fraud signal
+> fires, because none of this is fraud. Real card, real device, real customer.
+> It simply is not what they agreed to.
 >
-> Measured across 540 labelled sessions: 81.8% of violations stopped, ₹30,208
-> leaked against ₹302,663 with no gate at all — and ₹1,69,825 with the amount
-> ceiling a mandate already gives you, which is the comparison that matters. Two
-> categories score zero and are printed in the same table as the rest.
+> **And when the dispute arrives, the merchant has nothing.** An agent-initiated
+> payment has no device fingerprint, no browsing session, no click. Chargeback
+> reason codes have no category for "correctly authorised agent, wrong outcome",
+> so the merchant absorbs it.
 >
-> The payment leg is Razorpay's own. An allowed basket opens Razorpay Checkout on
-> an order created against the real test API, and what Checkout hands back is
+> Warrant closes both with one object: a signed chain from the words a person
+> said to the rupee that moved. The customer's own device key signs a bounded
+> permission — an amount, a merchant, a category, a deadline. Every basket the
+> agent proposes is checked against it by deterministic code before settlement.
+> Every decision, including every refusal, is appended to a hash-chained ledger
+> that later renders as dispute evidence a bank can verify without trusting the
+> merchant's records.
+>
+> Measured over 540 labelled sessions: Warrant stops 81.8% of violations and
+> leaks ₹30,208, against ₹1,69,825 with the amount ceiling a mandate already
+> gives you and ₹3,02,663 with no gate at all — and it has never once stopped a
+> purchase the person actually authorised. Two categories score zero, and they
+> are printed in the same table as the wins.
+>
+> Nothing in the demonstration is a mock. The catalogue is 62 products read from
+> a real Indian coffee brand's public Shopify feed. The agent is a live model
+> that is never told the limits, only the reason it was refused. The payment is
+> Razorpay's own Checkout on a real test-mode order, and what Checkout returns is
 > verified server-side against the key secret before anything claims the payment
 > happened.
-
-**GitHub repo** — `https://github.com/YashwanthKamireddi/warrant`
-
-**Video** — *(unlisted link)*
+>
+> No model can change a verdict. The gate is a pure function of the signed
+> documents and the state; a model can propose and can advise, and neither can
+> grant authority. Prompt injection in a product name is inert by construction
+> rather than by filtering.
 
 ---
 
-## What broke, and how you got out
+## GitHub Repository URL
 
-*They say this is the one they read first. Paste this; the long version is in
-[INCIDENTS.md](INCIDENTS.md).*
+`https://github.com/YashwanthKamireddi/warrant`
 
+374 tests, 11 gates, green from a cold clone with no credentials.
+
+---
+
+## 5-min Pitch Video Link
+
+*(paste the unlisted link once uploaded — the film is 4:53, built by
+`.video/record.py` and `.video/compose.py`, narration in
+[.video/NARRATION.md](.video/NARRATION.md))*
+
+---
+
+## Build Challenges & Technical Obstacles
+
+*The long version, with commits, is in [INCIDENTS.md](INCIDENTS.md).*
+
+> **A simulator agrees with whatever assumption you built into it.**
+>
 > Ten minutes after I got Razorpay test keys, the first run against the real rail
-> printed `4  The same cart, replayed → ALLOW (expected block)`. The simulator had
-> passed that step for days.
+> printed `the same cart, replayed → ALLOW (expected block)`. The simulated rail
+> had passed that step for days, across 155 tests.
 >
-> Replay protection consumed a cart's nonce on settlement. The simulated rail
-> settles synchronously, so the nonce was always spent before a replay arrived. A
-> real rail doesn't work that way — Razorpay issues an order and a payment link
+> Replay protection consumed a cart's nonce on *settlement*. The simulator
+> settles synchronously, so the nonce was always spent before a replay could
+> arrive. A real rail does not work that way: Razorpay issues an order
 > server-side and reports `settled=false` until the customer authorises on their
-> own device, which is exactly the property that makes the rail trustworthy. So on
-> any real rail there was a window between *placed* and *settled* where the same
-> cart could be presented again and again, placing an order every time. With
-> Reserve Pay each of those can capture. That's a double-spend, not a cosmetic bug.
+> own device — which is exactly the property that makes the rail trustworthy. So
+> on any real rail there was a window between *placed* and *settled* where the
+> same cart could be presented again and again, placing an order every time.
+> Under Reserve Pay each of those can capture. That is a double-spend, not a
+> cosmetic bug.
 >
-> I split the state transition, because it had always been two things wearing one
-> name: `record_authorized()` consumes the nonce the moment the cart reaches the
-> rail, and `record_settled()` charges spend and attempt count so an abandoned
-> payment doesn't burn the mandate's budget.
+> The fix was to split a state transition that had always been two things wearing
+> one name: `record_authorized()` consumes the nonce the moment the cart reaches
+> the rail, and `record_settled()` charges spend and attempt count so an abandoned
+> payment does not burn the mandate's budget. Every argument I had made for
+> getting real keys was about credibility with a reviewer. The actual return was a
+> double-spend vector found in the first minute, in a path that a passing test
+> suite and a working demo both agreed was fine.
 >
-> Every argument I'd made for getting real keys was about credibility with a
-> reviewer. The actual return was a double-spend vector found in the first minute,
-> in a code path that 155 tests and a passing demo agreed was fine. A simulator
-> agrees with whatever assumption you built into it.
+> **A check you have never watched fail is not a check.**
 >
-> Two others worth naming. I wrote a detector for a CSS collision that was painting
-> a label over the text beneath it — then reintroduced the bug on purpose to check
-> the detector fired, and it didn't. Overflowing text doesn't change its element's
-> bounding box, so sibling-box overlap can never catch a cascade collision; I'd
-> written a check that would have passed forever while telling me it worked. And I
-> found four numbers in my own README that had quietly stopped being true — a
-> corpus described as 405 sessions that had grown to 540, a headline figure of
-> 13.3% where the code measured 81.8%. For a project whose whole argument is honest
-> reporting, that's worse than a bug. Both are now generated and gated:
-> `make docs-check` fails the build if any number in the README drifts from what
-> the code measures.
+> I wrote a detector for a CSS collision that was painting a label over the text
+> beneath it — then reintroduced the bug deliberately to confirm the detector
+> fired. It did not. Overflowing text does not change its element's bounding box,
+> so sibling-box overlap can never catch a cascade collision. I had written
+> something that would have passed forever while reporting that it worked.
+>
+> That happened a second time, and I only caught it because I now look. I added a
+> gate that checks the numbers in the video narration against what the code
+> measures. Its checks ran *after* the block that reports failures and exits, so
+> everything it found was collected and thrown away — it printed "numbers match"
+> over a script claiming 211 tests when there were 373. Both are fixed, and both
+> are now verified by breaking them on purpose.
+>
+> **A real payment, reported as a failure.**
+>
+> `POST /razorpay/{index}` was declared before `POST /razorpay/verify`, and
+> FastAPI matches routes in declaration order — so every verification call was
+> read as the index route with `index="verify"` and answered 422. Razorpay had
+> taken the money and returned a signed payment id the whole time. The console,
+> which will not claim a payment happened until the server has recomputed that
+> signature, correctly said nothing. It looked exactly like a payment failing,
+> and it was a routing bug. There is now a test asserting the route resolves,
+> because nothing else would have caught it.
+>
+> **Numbers rot faster than code.**
+>
+> I found four figures in my own README that had quietly stopped being true — a
+> corpus described as 405 sessions that had grown to 540, a headline of 13.3%
+> where the code measured 81.8%. For a project whose entire argument is honest
+> reporting, that is worse than a bug. `make docs-check` now fails the build if
+> any number in the README, the landing page, the deck, the submission or the
+> video narration drifts from what the code measures. It has caught a stale count
+> four times since.
 
 ---
 

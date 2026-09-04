@@ -37,7 +37,7 @@ checked *before* settlement, provable *after* dispute.
 | **Bounded** | A hard `Envelope` no derived scope may exceed, and inside it a scope the person signed with their own device key. The narrower of the two always wins. |
 | **Gated** | `gate.evaluate()` is the only thing that can block, and it is a pure function of the signed documents and the state. [No model can change a verdict](#where-the-model-runs--and-where-it-deliberately-doesnt). |
 | **Audit trail** | A hash-chained ledger where **refusals are entries, not silences**. Edit any entry and every entry after it orphans — the console has a button that lets you try. |
-| **One failure handled gracefully** | The agent proposes two units of a real ₹349 coffee — ₹698 — and Warrant escalates: it crosses the ₹500 co-signature threshold. The agent is told *only the reason*, never the limits, and comes back with one unit. Live, in about four seconds. Ten more are written up in **[INCIDENTS.md](INCIDENTS.md)**. |
+| **One failure handled gracefully** | The agent proposes two units of a real ₹349 coffee — ₹698 — and Warrant refuses to decide it: that crosses the ₹500 the person said needs their say-so. The run stops and the console asks *them*. Approving signs the basket with their own key, the same gate runs again, and the check that failed now passes — because a signature exists that did not before. Ten more failures are written up in **[INCIDENTS.md](INCIDENTS.md)**. |
 
 *"...or that makes a merchant transactable by an AI buyer end to end"* — that is
 this project. An AI buyer arrives with a signed permission, the merchant checks
@@ -75,8 +75,8 @@ to the rupee that moved.**
 <br>
 
 <div align="center">
-<img src="docs/screenshots/02-decisions.png" alt="Five baskets checked against a signed permission" width="100%">
-<br><em>Five baskets, one signed permission. Every verdict names the rule that produced it.</em>
+<img src="docs/screenshots/02-decisions.png" alt="A live model proposing a basket, and the gate answering" width="100%">
+<br><em>A live model shops a real merchant's catalogue against a signed permission. Every verdict names the rule that produced it — and when one needs a human, it stops and asks.</em>
 </div>
 
 ---
@@ -91,7 +91,7 @@ written by its own author. So it is not.
 | **The merchant** | [Sleepy Owl Coffee](https://sleepyowl.co), a real Indian brand. 62 products read from the `products.json` feed every Shopify storefront publishes — their titles, their SKUs, their prices, their photographs. No key, no account, no onboarding. |
 | **The refusal** | *The Ground Coffee Mug*, ₹449, which they genuinely sell. Nobody planted it: a coffee company sells mugs, and a permission for food and drink refuses one — twice, once by the category code an acquirer assigns a coffee brand and once by the permission itself. |
 | **The agent** | A live model choosing from that catalogue. It is never told the limits, only the reason it was refused. |
-| **The payment** | Real Razorpay test-mode Orders and Payment Links. `order_TXWQzyVGRIHmSH` was created by pressing the button in the console. |
+| **The payment** | Razorpay's own Checkout, on a real test-mode order this server created. `pay_TXuokhWC59OdV3` is a captured payment, and the signature over it was recomputed here against the key secret before anything on screen said so. `make browser-razorpay` drives that whole path and asserts the captured id. |
 | **The record** | A hash-chained ledger you can break from the UI and watch orphan. |
 
 Two things *are* ours, and both say so on screen: the two product names carrying
@@ -104,7 +104,7 @@ being up. `make catalog-refresh` re-fetches it.
 
 ```
 IntentMandate    signed by the PERSON's device key
-    │            "up to ₹1,000 at Zomato on food, for 2 hours"
+    │            "up to ₹1,000 at this merchant, on food, for 2 hours"
     ▼
 CartMandate      signed by the AUTHORISER
     │            "I checked this basket against that intent. It fits."
@@ -121,7 +121,7 @@ that something already permitted was checked; it cannot grant authority it was
 never given.
 
 <details>
-<summary><b>Being precise about what that buys — because the tempting claim is wrong</b></summary>
+<summary><b>Exactly what the chain guarantees, stated precisely</b></summary>
 
 <br>
 
@@ -132,11 +132,12 @@ the remaining block on anything. The chain does not prevent that — it makes it
 intent, and anyone with the subject's public key can see the purchase fell
 outside what was signed.
 
-**Detection with attribution, not prevention.**
+**Detection with attribution.** That is the strongest claim a merchant-side
+layer can make honestly, and it is the claim this makes.
 
-Preventing it outright needs the *rail* to enforce scope, not just an amount —
-which is the layer NPCI's UAP is being designed to occupy. This is what that layer
-has to do; it runs merchant-side today because that is where it can run.
+Enforcing it outright needs the *rail* to carry scope, not just an amount — which
+is precisely the layer NPCI's UAP is being designed to occupy. This is a working
+specification of what that layer has to do, running today where it can run.
 
 </details>
 
@@ -257,12 +258,12 @@ assumed: **p50 under 300µs and p99 under 3ms** across 540 in-process decisions 
 no model call. Stated as bounds rather than a point, because a hardware figure
 quoted to the microsecond is a claim about my laptop.
 
-### What a deterministic gate cannot see, measured
+### Measured to the edge of what arithmetic can reach
 
-Every number above comes from data this repository generates, and the run is
-reproducible from a clean clone. This section says precisely which cases
-arithmetic reaches and which it does not — the reason the advisory judge exists
-at all.
+Every number above comes from data this repository generates, reproducibly, from
+a clean clone. Most benchmarks stop at the headline. This one maps exactly where
+deterministic checking ends and reading begins — which is the reason the advisory
+judge exists, and the reason its authority is capped in code.
 
 **`injection_subtle`: 0 of 45. `semantic_drift`: 0 of 45.** Both sit inside every
 bound the subject signed — right merchant, right category, under every ceiling — so
@@ -335,24 +336,44 @@ payload.** Delete the injection heuristic entirely and it still fails.
 
 ## The real rail
 
-`--rail razorpay` creates **real Orders and Payment Links** in your test account and
-refuses to start against any key not beginning `rzp_test_`.
+`--rail razorpay` creates **real Orders** in your test account and refuses to start
+against any key not beginning `rzp_test_`.
 
-<div align="center">
-<img src="docs/screenshots/07-razorpay.png" alt="A real Razorpay order and payment link" width="100%">
-<br><em>A real order in Razorpay test mode, with a live payment link.</em>
-</div>
+An allowed basket is paid through **Razorpay Checkout** — their script, their
+payment sheet — and what Checkout hands back is not taken at face value:
 
-<br>
+```
+the gate allows a basket
+  →  this server creates a real test-mode Order
+  →  Razorpay Checkout opens over the page
+  →  the customer pays; Razorpay returns an order id, a payment id,
+     and an HMAC of the two under the key secret
+  →  this server recomputes that HMAC
+  →  only now does anything say the payment happened
+```
 
-It reports `settled=false` until the rail confirms a capture, because **a script
-cannot fake a customer authorising on their own device** — and that property is
-exactly what makes the rail trustworthy.
+A browser claiming it paid is not evidence. The key secret never leaves this
+process — the console holds only the publishable key id, which appears in the
+page source of every Razorpay checkout on the internet. Three tests cover the
+verification, including a genuine signature replayed onto a different order.
+
+`make browser-razorpay` drives that path end to end against the live test API
+and asserts the captured payment id. Razorpay refusing for a reason of its own —
+a daily cap, say — is reported verbatim and treated as a fact about the account
+rather than a fault in the chain.
+
+Debits report `settled=false` until the rail confirms a capture, because **a
+script cannot fake a customer authorising on their own device** — and that
+property is exactly what makes the rail trustworthy.
 
 > It is also what found a **double-spend** the simulator had hidden for days.
 > Replay protection consumed a cart's nonce on *settlement*; a real rail settles
 > asynchronously, leaving a window where the same cart could be presented again and
 > again, placing an order every time. See [INCIDENTS.md](INCIDENTS.md) §7.
+
+Also implemented against the real API, and tested: **UPI Autopay mandate**
+registration, debit and revocation — the reachable primitive, since Reserve Pay
+is a closed pilot. `make mandate` walks it.
 
 ---
 
@@ -466,7 +487,7 @@ running `make verify` cold.
 ```bash
 cp .env.example .env      # add your rzp_test_ key id and secret
 uv run warrant demo --rail razorpay
-make browser-razorpay     # asserts a real order_… and an https://rzp.io/… link
+make browser-razorpay     # pays a basket through Razorpay Checkout, asserts the captured pay_…
 ```
 
 The rail refuses any key not beginning `rzp_test_`, so it cannot touch live money.
@@ -481,7 +502,9 @@ The rail refuses any key not beginning `rzp_test_`, so it cannot touch live mone
 make verify
 ```
 
-Runs in order, and fails on the first problem:
+Eleven gates, in order, failing on the first problem. **They pass from a cold
+clone of this repository with no `.env`, no Razorpay keys and no model key** —
+cloned into an empty directory and run, not asserted.
 
 | gate | what it proves |
 | :--- | :--- |
@@ -489,13 +512,13 @@ Runs in order, and fails on the first problem:
 | `lint` | ruff over engine, bench and tests |
 | `test` | 374 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering, concurrency, merchant registry loading, mandate lifecycle, storefront snapshot parsing, idempotent retries under concurrency, the documented SDK example |
 | `typecheck` | the console compiles under `strict` |
-| `docs-check` | every number in this README matches what the code measures |
+| `docs-check` | every number in this README, the landing page, the deck, the submission and the video narration matches what the code measures. Five documents, one source of truth |
 | `docs-examples` | fail if any code example in the documentation does not run. Prose is not executed, so nothing else can catch a README that has quietly stopped being true |
 | `docs-links` | fail if any relative link or image in the documentation is broken. A broken link is invisible to whoever wrote it and is the first thing a reviewer clicks |
 | `audit-tokens` | no colour outside `:root`, no undefined token, no hex in a component |
 | `audit-contrast` | all 37 rendered pairs meet WCAG AA, computed from the tokens |
 | `audit-overlap` | nothing spills outside its box or paints over a sibling, across 6 states |
-| `browser` | the frame holds at 5 viewports; the real flow runs with no console errors, and the console's verdicts match what `warrant demo` prints |
+| `browser` | the frame holds at 11 viewports from 1920px to a 390px phone, and the record's two destructive actions stay reachable without scrolling past the record; the real flow runs with no console errors |
 
 Screenshots of every state land in `.verify/shots/`.
 
@@ -532,7 +555,10 @@ check that it fails.**
 
 ---
 
-## Scope
+## Where the boundary sits
+
+A control layer is only worth what its weakest binding is worth, so each one is
+stated here exactly — with the test that holds it.
 
 - **Categories come from the merchant's own catalog, and are checked against its
   acquirer.** Half of that is closed outright:
@@ -543,17 +569,19 @@ check that it fails.**
   the item actually purchased, which no metadata layer can see.
   `test_the_known_gap_is_documented_by_a_test` asserts the gap so nobody later mistakes
   the MCC rule for a complete fix.
-- **The committed benchmark runs deterministically, with no model.** That is what
-  makes it byte-identical on every machine. Every interpretation is labelled with
-  the path it actually took — `live`, `transcript` or `fallback` — in
-  the ledger, the CLI and the console, and a replayed one is never presented as
-  live. That is why `injection_subtle` and `semantic_drift` read zero in the table
-  above. Set either API key and rerun `make bench-live` to move them.
-- **Disputes cannot be created through Razorpay's API** — they are bank-initiated. The
-  evidence pack is assembled and verified in full and maps onto the real contest schema,
-  but submitting it needs a real dispute.
-- **A payment cannot be completed server to server**, so the Razorpay rail reports
-  `settled=false` until it confirms a capture.
+- **The committed benchmark is deterministic by design, with no model in it.** That
+  is what makes it byte-identical on every machine and reproducible by a reviewer.
+  Every interpretation is labelled with the path it actually took — `live`,
+  `transcript` or `fallback` — in the ledger, the CLI and the console, and a
+  replayed one is never presented as live. `make bench-live` runs the same corpus
+  with a model reachable.
+- **Disputes are bank-initiated, by design of the card networks.** The evidence pack
+  is assembled, self-verified and mapped onto Razorpay's real contest schema; filing
+  one needs a bank to raise it.
+- **A payment completes on the customer's own device, never server to server** —
+  which is the property that makes the rail worth trusting. Warrant treats it as
+  one: debits report `settled=false` until the rail confirms a capture, and that
+  discipline is what surfaced a double-spend the simulator had hidden for days.
 
 ---
 
