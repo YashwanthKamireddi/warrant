@@ -592,6 +592,7 @@ export function App() {
             onApprove={approveEscalation}
             onDecline={() => setDeclined(true)}
             onPay={razorpayReady && meta?.razorpay_key_id ? payOnRazorpay : undefined}
+            payUnavailable={meta?.rails.find((r) => r.id === "razorpay" && !r.available)?.note}
             payments={paid}
             payError={payError}
           />

@@ -21,6 +21,7 @@ export function Feed({
   onApprove,
   onDecline,
   onPay,
+  payUnavailable,
   payments,
   payError,
 }: {
@@ -33,6 +34,8 @@ export function Feed({
   onDecline: () => void;
   /** Absent when this deployment has no Razorpay credentials. */
   onPay?: (item: FeedItem) => void;
+  /** Razorpay's own reason for being unreachable, when it is. */
+  payUnavailable?: string;
   payments: Record<string, VerifiedPayment>;
   payError: string | null;
 }) {
@@ -47,6 +50,7 @@ export function Feed({
           onApprove={() => onApprove(item)}
           onDecline={onDecline}
           onPay={onPay}
+          payUnavailable={payUnavailable}
           payment={payments[item.id]}
           payError={payError}
         />
@@ -74,6 +78,7 @@ function Entry({
   onApprove,
   onDecline,
   onPay,
+  payUnavailable,
   payment,
   payError,
 }: {
@@ -83,6 +88,7 @@ function Entry({
   onApprove: () => void;
   onDecline: () => void;
   onPay?: (item: FeedItem) => void;
+  payUnavailable?: string;
   payment?: VerifiedPayment;
   payError: string | null;
 }) {
@@ -184,8 +190,26 @@ function Entry({
               </em>
             </span>
           </div>
+        ) : !onPay ? (
+          // A clone with no Razorpay keys has no button, and used to be told
+          // nothing at all -- so the one leg that makes this a payments project
+          // was invisible to anyone who had not configured it.
+          <div className="entry-rail">
+            <span className="entry-meta">
+              <b>Razorpay is not configured here</b>, so this settled on the
+              simulator. Set <code>RAZORPAY_KEY_ID</code> and{" "}
+              <code>RAZORPAY_KEY_SECRET</code> and this basket opens
+              Razorpay&rsquo;s own payment sheet on a real test-mode order.
+              {/* The rail's own reason, but only when it is something other
+                  than "no keys" -- refusing a live key, say. Repeating "set the
+                  keys" underneath a sentence that just said it is noise. */}
+              {payUnavailable && !payUnavailable.startsWith("Set RAZORPAY_KEY_ID")
+                ? ` ${payUnavailable}`
+                : ""}
+            </span>
+          </div>
         ) : (
-          onPay && (
+          (
             <div className="entry-rail">
               <button className="btn btn-primary" onClick={() => onPay(item)} disabled={busy}>
                 {busy ? "Opening Razorpay…" : `Pay ${rupees(total)} on Razorpay`}
