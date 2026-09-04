@@ -12,16 +12,16 @@ const REFUSALS = new Set(["cart_blocked", "debit_failed", "step_up_declined", "i
  *  a person reading the screen for the first time. The engine name is still
  *  there on hover, because for anyone who wants it, it is the thing to grep. */
 const SAID: Record<string, string> = {
-  intent_issued: "She set the permission",
+  intent_issued: "You set the permission",
   cart_proposed: "The agent proposed a basket",
   cart_allowed: "Warrant allowed it",
   cart_blocked: "Warrant refused it",
-  step_up_requested: "Warrant asked her to approve",
-  step_up_declined: "She declined",
+  step_up_requested: "Warrant asked you to approve",
+  step_up_declined: "You declined",
   debit_authorized: "Sent to the payment rail",
   debit_settled: "Paid",
   debit_failed: "The payment failed",
-  intent_revoked: "She revoked the permission",
+  intent_revoked: "You revoked the permission",
 };
 
 /** One line of detail per entry kind, read from the payload the engine wrote.
@@ -111,7 +111,8 @@ export function LedgerView({
           <span style={{ textAlign: "right" }}>time</span>
           <span style={{ textAlign: "right" }}>fingerprint</span>
         </div>
-        {entries.map((entry) => {
+        <div className="ledger-rows">
+          {entries.map((entry) => {
           const refusal = REFUSALS.has(entry.kind);
           const orphaned = brokenAt !== null && entry.seq >= brokenAt;
           return (
@@ -131,8 +132,9 @@ export function LedgerView({
                 <Hash value={entry.hash} />
               </span>
             </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </>
   );

@@ -36,8 +36,8 @@ export function AgentRun({
   if (attempts.length === 0 && !running) {
     return (
       <Empty icon={<Basket />} title="Let the agent shop">
-        A model reads Priya's instruction and the merchant's catalog, picks a basket, and
-        says why. Warrant checks it before any payment exists. It is never told her
+        A model reads your instruction and the merchant's catalog, picks a basket, and
+        says why. Warrant checks it before any payment exists. It is never told your
         spending limits — if it is refused, it only learns the reason.
       </Empty>
     );
@@ -109,7 +109,7 @@ export function AgentRun({
                   </ul>
                 ) : (
                   <p className="run-said">
-                    Every bound Priya signed is satisfied. The debit proceeds.
+                    Every bound you signed is satisfied. The debit proceeds.
                   </p>
                 )}
                 {verdict !== "allow" && !last && (

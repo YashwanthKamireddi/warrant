@@ -269,7 +269,7 @@ export function App() {
       }
     });
 
-  /** Let the model shop. It is never told Priya's limits — only, if refused,
+  /** Let the model shop. It is never told the customer's limits — only, if refused,
    *  the reason. Watching it work that out is the demonstration. */
   const runAgent = () =>
     run(async () => {
@@ -449,10 +449,34 @@ export function App() {
   }
 
   const STEPS = [
-    { n: 1, label: "The permission", who: "You are Priya" },
-    { n: 2, label: "Her agent shops", who: "You are the agent" },
-    { n: 3, label: "What it prevents", who: "You are the agent" },
-    { n: 4, label: "The record", who: "You are the risk team" },
+    // One viewpoint the whole way through: you are the person whose money it
+    // is. The walkthrough used to cast the viewer as three different people --
+    // "You are Priya", then the agent, then the risk team -- without ever
+    // saying who Priya was, and then Warrant would escalate and address "you"
+    // as the customer while the band still said you were the agent.
+    // The line under each title says what you are looking at. It used to name
+    // which character you were playing, which is only useful if you already
+    // understand the product.
+    {
+      n: 1,
+      label: "You set a permission",
+      who: "What you told your agent it may spend — and the hard bounds that came out of it.",
+    },
+    {
+      n: 2,
+      label: "Your agent shops",
+      who: "A live model buying from a real shop, with no idea what your limits are.",
+    },
+    {
+      n: 3,
+      label: "What it prevents",
+      who: "The same basket in two worlds — with Warrant, and without — priced in rupees.",
+    },
+    {
+      n: 4,
+      label: "The record",
+      who: "Everything that happened, in order, and what a merchant could show a bank.",
+    },
   ];
   const here = STEPS[step - 1] ?? STEPS[0]!;
 
@@ -523,13 +547,12 @@ export function App() {
 
       {/* ----------------------------------------------------------- stage */}
       <main className="stage">
-        <p className="stage-who">{here!.who}</p>
-
         {step === 1 && (
           <section className="act">
             <h1 className="act-head">
-              She said this once. Her key signed it. Nothing can be spent outside it.
+              You say it once. Your key signs it. Nothing can be spent outside it.
             </h1>
+            <p className="act-sub">{here!.who}</p>
             {pending ? (
               <>
                 <blockquote className="said-big">{utterance}</blockquote>
@@ -572,8 +595,9 @@ export function App() {
         {step === 2 && (
           <section className="act">
             <h1 className="act-head">
-              The agent is never told her limits. It finds them by being refused.
+              Your agent is never told your limits. It finds them by being refused.
             </h1>
+            <p className="act-sub">{here!.who}</p>
             <div className="act-do">
               <button
                 className="btn btn-primary"
@@ -621,8 +645,9 @@ export function App() {
         {step === 3 && (
           <section className="act">
             <h1 className="act-head">
-              Put something in the basket she never permitted.
+              Put something in the basket you never permitted.
             </h1>
+            <p className="act-sub">{here!.who}</p>
             <Counterfactual
               comparison={comparison}
               empty="Add anything below to see what it costs with and without Warrant."
@@ -683,6 +708,7 @@ export function App() {
             <h1 className="act-head">
               Every decision, in order, and provable after the fact.
             </h1>
+            <p className="act-sub">{here!.who}</p>
             {ledger.length < 3 && (
               <div className="act-do">
                 <button

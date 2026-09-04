@@ -60,7 +60,7 @@ export function Counterfactual({
           <p className="cf-amount num bad">−{rupees(comparison.without.amount_paise)}</p>
           <p className="cf-sub">This is today. Nothing checks the basket.</p>
 
-          <h4>If she disputes it, the merchant has</h4>
+          <h4>If you dispute it, the merchant has</h4>
           <ul className="cf-evidence">
             {comparison.without.evidence.map((e) => (
               <li key={e.item} className={e.present ? "yes" : "no"}>
@@ -103,7 +103,7 @@ export function Counterfactual({
             </ul>
           )}
 
-          <h4>If she disputes it, the merchant has</h4>
+          <h4>If you dispute it, the merchant has</h4>
           <ul className="cf-evidence">
             {comparison.with.evidence.map((e) => (
               <li key={e.item} className={e.present ? "yes" : "no"}>

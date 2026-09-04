@@ -8,6 +8,7 @@ invariants below are the ones that would actually cost someone a demo:
   * long content scrolls inside the stage rather than pushing the frame
   * the walkthrough and its next/back control are always reachable
   * the act being read is never wider than its measure
+  * the record's two actions are reachable without scrolling past the record
 """
 
 from __future__ import annotations
@@ -97,6 +98,30 @@ with sync_playwright() as pw:
             problems.append("the act is wider than a readable measure")
         if checks["decisions"] != 5:
             problems.append(f"expected 5 decisions, rendered {checks['decisions']}")
+
+        # The record grows an entry per decision, and the two things worth
+        # pressing on that screen sat underneath all of them. On a laptop you
+        # scrolled past a table to discover there was anything to do, which is
+        # the difference between a demo that lands and one that reads as a log
+        # viewer. The table scrolls inside itself now; this is what holds it.
+        if height >= 700:
+            drive.step(page, "record")
+            page.wait_for_selector(".ledger-row", timeout=20_000)
+            page.wait_for_timeout(400)
+            hidden = page.evaluate(
+                """() => {
+                    const names = ['Try to rewrite the ledger', 'Revoke the permission'];
+                    const buttons = [...document.querySelectorAll('button')];
+                    return names.filter(name => {
+                        const el = buttons.find(b => b.innerText.trim().startsWith(name));
+                        if (!el) return true;
+                        const r = el.getBoundingClientRect();
+                        return r.top < 0 || r.bottom > window.innerHeight;
+                    });
+                }"""
+            )
+            for name in hidden:
+                problems.append(f"the record's “{name}” is not reachable without scrolling")
 
         if problems:
             failures.extend(f"{label}: {p}" for p in problems)

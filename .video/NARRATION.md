@@ -111,7 +111,7 @@ you reach the losses, slow down; that's the part they remember.
 > Every decision is written down — including every refusal. Most systems log what
 > they did. A dispute almost always turns on what was declined, and why.
 >
-> The chain is hash-linked, so let me break it on purpose. That is entry five
+> The chain is hash-linked, so let me break it on purpose. That entry has been
 > rewritten. Everything after it is orphaned, and it names both hashes — the one
 > the chain expected and the one it found — so you can check it yourself.
 
@@ -182,7 +182,7 @@ you reach the losses, slow down; that's the part they remember.
 
 ### 4:38 · 16s — close *(dark card)*
 
-> Two hundred and eleven tests. Eight gates, green from a clean clone. The
+> Three hundred and sixty-eight tests. Eleven gates, green from a clean clone. The
 > interesting ones exist because a green build didn't catch a real bug — a ledger
 > that forked under concurrent writes, six baskets that overspent a hundred-rupee
 > mandate, and a detector I'd written that didn't detect the thing it was for. I

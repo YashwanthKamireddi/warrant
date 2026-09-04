@@ -992,11 +992,23 @@ a {
   background: var(--surface);
   box-shadow: var(--sh-sm);
   overflow: hidden;
+  /* The record grows an entry per decision, and the two things worth pressing
+     on this screen -- break the chain, revoke the permission -- sat under all
+     of it. By the tenth entry you had to scroll past a table to find out there
+     was anything to do. The table keeps its own scrollbar so the page does
+     not grow and the actions stay where they were. */
+  display: flex;
+  flex-direction: column;
+  max-height: clamp(118px, 24vh, 340px);
+}
+.ledger-rows {
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .ledger-head,
 .ledger-row {
   display: grid;
-  grid-template-columns: 44px 168px 1fr 92px 84px;
+  grid-template-columns: 44px 210px 1fr 92px 88px;
   gap: var(--s-3);
   align-items: baseline;
   padding: 9px var(--s-4);
@@ -1034,9 +1046,11 @@ a {
   color: var(--ink-4);
   text-align: right;
 }
+/* Plain English, set as plain English. This was monospaced back when it
+   printed the engine's event names, and kept the code face after it stopped
+   being code -- which made every row read like something to decipher. */
 .ledger-kind {
-  font-family: var(--mono);
-  font-size: var(--size-micro);
+  font-size: var(--size-small);
   color: var(--ink-2);
 }
 .ledger-row.refusal .ledger-kind {
@@ -2343,11 +2357,14 @@ a {
   gap: 22px;
 }
 
-.stage-who {
-  max-width: 760px;
-  margin: 0 auto 14px;
-  font-size: var(--size-small);
-  letter-spacing: 0.04em;
+/* The sentence under each headline that says what you are looking at. It sits
+   below the claim, not above it: an eyebrow is for a two-word label, and this
+   is a sentence doing the orienting the console never used to do. */
+.act-sub {
+  margin: var(--s-3) 0 0;
+  max-width: 60ch;
+  font-size: var(--size-lead);
+  line-height: 1.55;
   color: var(--ink-3);
 }
 
@@ -2750,4 +2767,35 @@ a.btn {
   border-color: var(--stop-line);
   border-left-color: var(--stop);
   background: var(--stop-bg);
+}
+
+
+/* Short screens -- a 1280x720 projector, a laptop with a browser toolbar, a
+   phone. The record has the most to fit: a headline, the sentence explaining
+   the fingerprints, the table, and two actions. Everything above the table
+   gives up a little so the actions stay reachable without scrolling past the
+   thing you are meant to act on. */
+@media (max-height: 800px) {
+  .act-sub {
+    margin-top: var(--s-2);
+    font-size: var(--size-body);
+    line-height: 1.45;
+  }
+
+  .act-head {
+    font-size: clamp(19px, 2.2vw, 24px);
+  }
+
+  .ledger {
+    max-height: clamp(110px, 20vh, 240px);
+  }
+}
+
+/* On a phone the record is 23px too tall for its own actions, because every
+   block above the table wraps to more lines than it does on a laptop. The
+   table gives up two rows rather than the actions going under the fold. */
+@media (max-width: 480px) {
+  .ledger {
+    max-height: clamp(88px, 11vh, 200px);
+  }
 }

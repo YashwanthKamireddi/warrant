@@ -216,11 +216,6 @@ if SHOTS.is_dir() and CONSOLE_SRC.is_dir():
         print(f"  ok   screenshots                    {len(list(SHOTS.glob('*.png')))} current")
 
 print()
-if failures:
-    print(f"{len(failures)} documentation drift(s):")
-    for f in failures:
-        print("  -", f)
-    sys.exit(1)
 # -- the narration script --------------------------------------------------- #
 #
 # NARRATION.md is read aloud over the film, so its numbers are the ones a judge
@@ -261,13 +256,17 @@ def spell(n: int) -> str:
 if not NARRATION.is_file():
     failures.append(".video/NARRATION.md is missing")
 else:
-    spoken = NARRATION.read_text().lower()
+    # The script is a wrapped markdown blockquote, so a spoken number routinely
+    # straddles a line break and a "> " marker: "thirty thousand two\n> hundred".
+    # Matching the raw text finds none of them.
+    spoken = re.sub(r"[\s>]+", " ", NARRATION.read_text().lower())
+    spoken_drift: list[str] = []
 
     def spoken_claim(label: str, value: int) -> None:
         """The film says this number out loud, so the words have to be there."""
         words = spell(value)
         if words not in spoken:
-            failures.append(
+            spoken_drift.append(
                 f"narration: says nothing matching {label} = {value} "
                 f'(expected the words "{words}")'
             )
@@ -279,27 +278,49 @@ else:
         spoken_claim("the test count", int(actual_tests.group(1)))
     spoken_claim("the gate count", gate_targets)
 
-    # Money is spoken to the nearest thousand -- "thirty thousand two hundred"
-    # for Rs 30,208 -- because nobody reads paise aloud.
+    # Money is rounded when it is read aloud, and there is more than one honest
+    # way to round it: Rs 302,663 is "three hundred and two thousand" to one
+    # speaker and "three hundred and three thousand" to another. Any of those
+    # is fine. What this is here to catch is the figure that was never measured
+    # at all -- the script said "two hundred and eighty-one thousand" for a
+    # while, which is not a rounding of anything.
+    def spoken_money(label: str, paise: int) -> None:
+        rupees_ = paise / 100
+        candidates = {
+            spell(int(rupees_ // 1000) * 1000),
+            spell(round(rupees_ / 1000) * 1000),
+            spell(int(rupees_ // 100) * 100),
+            spell(round(rupees_ / 100) * 100),
+        }
+        # Said aloud, "one hundred" is usually just "a hundred".
+        candidates |= {c.replace("one hundred", "a hundred") for c in candidates}
+        if not any(c in spoken for c in candidates):
+            spoken_drift.append(
+                f"narration: says nothing matching {label} = {rupees(paise)} "
+                f"(any of: {', '.join(sorted(candidates))})"
+            )
+
     for policy, label in (("warrant", "what Warrant leaks"),
                           ("no_gate", "what no gate leaks"),
                           ("amount_only", "what an amount ceiling leaks")):
-        rounded = round(policies[policy]["leaked_paise"] / 100 / 100) * 100
-        if spell(rounded) not in spoken:
-            failures.append(
-                f"narration: says nothing matching {label} "
-                f'(expected the words "{spell(rounded)}" for '
-                f'{rupees(policies[policy]["leaked_paise"])})'
-            )
+        spoken_money(label, policies[policy]["leaked_paise"])
 
     # The console picks which ledger entry to rewrite at runtime, so naming one
     # is a promise the footage breaks on the next take.
     if re.search(r"entry (one|two|three|four|five|six|seven|eight|nine|\d+)", spoken):
-        failures.append(
+        spoken_drift.append(
             "narration: names a specific ledger entry for the tamper. The console "
             "chooses that entry at runtime, so the number is wrong on some runs."
         )
 
-    print("  ok   .video/NARRATION.md            numbers match")
+    failures.extend(spoken_drift)
+    if not spoken_drift:
+        print("  ok   .video/NARRATION.md            numbers match")
+
+if failures:
+    print(f"\n{len(failures)} documentation drift(s):")
+    for f in failures:
+        print("  -", f)
+    sys.exit(1)
 
 print("every number in the README and the narration matches what the code measures")

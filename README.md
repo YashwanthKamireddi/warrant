@@ -10,7 +10,7 @@ checked *before* settlement, provable *after* dispute.
 
 <br>
 
-[![tests](https://img.shields.io/badge/tests-367%20passing-0b6e54?style=flat-square)](#verifying-it)
+[![tests](https://img.shields.io/badge/tests-368%20passing-0b6e54?style=flat-square)](#verifying-it)
 [![gates](https://img.shields.io/badge/gates-11%20green-0b6e54?style=flat-square)](#verifying-it)
 [![latency](https://img.shields.io/badge/p50-under%20300µs-16264f?style=flat-square)](#results)
 [![rail](https://img.shields.io/badge/rail-Razorpay%20test%20mode-16264f?style=flat-square)](#the-real-rail)
@@ -472,7 +472,7 @@ Runs in order, and fails on the first problem:
 | :--- | :--- |
 | `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 367 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering, concurrency, merchant registry loading, mandate lifecycle, storefront snapshot parsing, idempotent retries under concurrency, the documented SDK example |
+| `test` | 368 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering, concurrency, merchant registry loading, mandate lifecycle, storefront snapshot parsing, idempotent retries under concurrency, the documented SDK example |
 | `typecheck` | the console compiles under `strict` |
 | `docs-check` | every number in this README matches what the code measures |
 | `docs-examples` | fail if any code example in the documentation does not run. Prose is not executed, so nothing else can catch a README that has quietly stopped being true |
