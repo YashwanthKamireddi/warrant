@@ -1063,6 +1063,53 @@ def chain(session_id: str) -> dict[str, Any]:
     return _chain_status(_session(session_id))
 
 
+class RazorpayVerifyRequest(BaseModel):
+    """What Razorpay Checkout hands back when a payment succeeds."""
+
+    razorpay_order_id: str = Field(min_length=1, max_length=64)
+    razorpay_payment_id: str = Field(min_length=1, max_length=64)
+    razorpay_signature: str = Field(min_length=1, max_length=256)
+
+
+@app.post("/api/sessions/{session_id}/razorpay/verify")
+def razorpay_verify(session_id: str, body: RazorpayVerifyRequest) -> dict[str, Any]:
+    """Check the signature Razorpay Checkout returned, the way a merchant must.
+
+    The browser is not a trustworthy reporter of whether it paid. Razorpay signs
+    ``order_id|payment_id`` with the key secret, and only the server holds that
+    secret -- so this is the step that turns "the popup said it worked" into
+    something a merchant can act on. A forged or replayed payment id fails here.
+
+    The secret never leaves this process. The console holds only the key id,
+    which is publishable and appears in the page source of every Razorpay
+    checkout on the internet.
+    """
+    _session(session_id)
+    try:
+        rail = RazorpayRail()
+    except RazorpayNotConfigured as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    try:
+        rail.verify_checkout_signature(
+            order_id=body.razorpay_order_id,
+            payment_id=body.razorpay_payment_id,
+            signature=body.razorpay_signature,
+        )
+    except SignatureRejected as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    payment = rail.payment(body.razorpay_payment_id)
+    return {
+        "verified": True,
+        "payment_id": body.razorpay_payment_id,
+        "order_id": body.razorpay_order_id,
+        "amount_paise": payment.get("amount"),
+        "method": payment.get("method"),
+        "status": payment.get("status"),
+    }
+
+
 @app.post("/api/sessions/{session_id}/razorpay/{index}")
 def place_on_razorpay(session_id: str, index: int) -> dict[str, Any]:
     """Place an already-authorized cart on the real Razorpay rail.
@@ -1136,53 +1183,6 @@ def place_on_razorpay(session_id: str, index: int) -> dict[str, Any]:
             }
 
     raise HTTPException(502, detail=f"Razorpay refused it: {result.failure_summary}")
-
-
-class RazorpayVerifyRequest(BaseModel):
-    """What Razorpay Checkout hands back when a payment succeeds."""
-
-    razorpay_order_id: str = Field(min_length=1, max_length=64)
-    razorpay_payment_id: str = Field(min_length=1, max_length=64)
-    razorpay_signature: str = Field(min_length=1, max_length=256)
-
-
-@app.post("/api/sessions/{session_id}/razorpay/verify")
-def razorpay_verify(session_id: str, body: RazorpayVerifyRequest) -> dict[str, Any]:
-    """Check the signature Razorpay Checkout returned, the way a merchant must.
-
-    The browser is not a trustworthy reporter of whether it paid. Razorpay signs
-    ``order_id|payment_id`` with the key secret, and only the server holds that
-    secret -- so this is the step that turns "the popup said it worked" into
-    something a merchant can act on. A forged or replayed payment id fails here.
-
-    The secret never leaves this process. The console holds only the key id,
-    which is publishable and appears in the page source of every Razorpay
-    checkout on the internet.
-    """
-    _session(session_id)
-    try:
-        rail = RazorpayRail()
-    except RazorpayNotConfigured as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-    try:
-        rail.verify_checkout_signature(
-            order_id=body.razorpay_order_id,
-            payment_id=body.razorpay_payment_id,
-            signature=body.razorpay_signature,
-        )
-    except SignatureRejected as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    payment = rail.payment(body.razorpay_payment_id)
-    return {
-        "verified": True,
-        "payment_id": body.razorpay_payment_id,
-        "order_id": body.razorpay_order_id,
-        "amount_paise": payment.get("amount"),
-        "method": payment.get("method"),
-        "status": payment.get("status"),
-    }
 
 
 @app.post("/api/sessions/{session_id}/tamper")

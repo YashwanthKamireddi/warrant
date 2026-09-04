@@ -191,13 +191,13 @@ function Entry({
                 {busy ? "Opening Razorpay…" : `Pay ${rupees(total)} on Razorpay`}
               </button>
               <span className="entry-meta">
-                Opens Razorpay&rsquo;s real payment sheet, in test mode. Enter a
-                mobile number — Razorpay asks for one whatever is prefilled, and
-                validates the format — then pick any bank under <b>Netbanking</b>{" "}
-                and press <b>Success</b> on the page it opens. Cards are refused as
-                international cards, because a test account is an Indian account.
-                Nothing is sent to that number, and no real money can move on a
-                test key.
+                Opens Razorpay&rsquo;s real payment sheet, in test mode. Type a
+                mobile number (any valid Indian one, <code>9812345678</code> works)
+                and <b>Continue</b>, pick a bank under <b>Netbanking</b>, press{" "}
+                <b>Pay</b>, then <b>Success</b> on the bank page. Cards are refused
+                as international cards, because a test account is an Indian
+                account. Nothing is sent to that number, and no real money can move
+                on a test key.
               </span>
               {payError && <span className="entry-payerror">{payError}</span>}
             </div>

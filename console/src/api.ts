@@ -23,6 +23,29 @@ class ApiError extends Error {
   }
 }
 
+/** Turn whatever the engine said into one line a person can read.
+ *
+ *  FastAPI answers a rejected body with `detail` as a *list* of objects, not a
+ *  string. Passing that straight to `new Error(...)` produced the message
+ *  "[object Object]" on screen -- an error that tells you something failed and
+ *  nothing else, in the place where knowing what failed matters most.
+ */
+function explain(body: unknown, status: number): string {
+  const detail = (body as { detail?: unknown } | null)?.detail;
+  if (typeof detail === "string" && detail) return detail;
+  if (Array.isArray(detail)) {
+    const said = detail
+      .map((d) => {
+        const item = d as { loc?: unknown[]; msg?: string };
+        const where = Array.isArray(item.loc) ? item.loc.slice(1).join(".") : "";
+        return where ? `${where}: ${item.msg ?? "invalid"}` : (item.msg ?? "invalid");
+      })
+      .filter(Boolean);
+    if (said.length) return said.join(" · ");
+  }
+  return `Request failed (${status})`;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
@@ -35,7 +58,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    throw new ApiError(body?.detail ?? `Request failed (${response.status})`, response.status);
+    throw new ApiError(explain(body, response.status), response.status);
   }
   return response.json() as Promise<T>;
 }

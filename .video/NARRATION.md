@@ -189,7 +189,7 @@ you reach the losses, slow down; that's the part they remember.
 
 ### 4:38 · 16s — close *(dark card)*
 
-> Three hundred and seventy-three tests. Eleven gates, green from a clean clone. The
+> Three hundred and seventy-four tests. Eleven gates, green from a clean clone. The
 > interesting ones exist because a green build didn't catch a real bug — a ledger
 > that forked under concurrent writes, six baskets that overspent a hundred-rupee
 > mandate, and a detector I'd written that didn't detect the thing it was for. I

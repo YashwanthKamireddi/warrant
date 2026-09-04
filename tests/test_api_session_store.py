@@ -217,3 +217,29 @@ def test_nonce_derivation_reserves_in_one_step(client):
     issued = {session.next_nonce() for _ in range(50)}
     assert len(issued) == 50
     assert len(session.nonces) == 50
+
+
+# -- route ordering ---------------------------------------------------------- #
+
+
+def test_the_verify_route_is_not_shadowed_by_the_index_route(client):
+    """`/razorpay/verify` must not be read as `/razorpay/{index}`.
+
+    FastAPI matches routes in declaration order, and `{index}` is an int. With
+    the parameterised route declared first, a POST to `.../razorpay/verify`
+    was answered with a 422 complaining that "verify" is not an integer -- so
+    a real, completed Razorpay payment came back and the console could never
+    confirm it. The failure looked like the payment had failed; it had not.
+    """
+    response = client.post(
+        "/api/sessions/does-not-exist/razorpay/verify",
+        json={
+            "razorpay_order_id": "order_x",
+            "razorpay_payment_id": "pay_x",
+            "razorpay_signature": "deadbeef",
+        },
+    )
+    # Any answer but "verify is not an integer" means the right route matched.
+    assert response.status_code != 422, response.json()
+    body = response.json()
+    assert "valid integer" not in str(body)
