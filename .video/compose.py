@@ -36,7 +36,14 @@ XFADE = 0.45  # seconds of crossfade between clips
 # extended by holding its final frame -- a title card has finished animating by
 # then and the console is static, so the freeze is invisible and it beats
 # re-recording to chase a duration.
-CUT: list[tuple[str, float]] = [
+# A third element of "end" takes the LAST n seconds instead of the first.
+# Trimming always took the head, which is right for a clip that opens on its
+# subject and wrong for one that has to set something up first: the Razorpay
+# clip has to get a basket allowed before there is anything to pay for, so its
+# first fifteen seconds are the agent working and its subject -- Razorpay's
+# payment sheet -- only appears at the end. The film showed the setup and cut
+# away before the sheet, under narration describing the sheet.
+CUT: list[tuple[str, float] | tuple[str, float, str]] = [
     # Five minutes exactly. The live clips are the current product: a real
     # merchant's catalogue, a live model choosing from it, the gate, the record,
     # and a real Razorpay order. The old cut showed a two-pane console that no
@@ -51,7 +58,7 @@ CUT: list[tuple[str, float]] = [
     ("card-04-boundary", 28.0),
     ("live-05-record-tamper", 18.0),
     ("live-06-evidence-ap2", 16.0),
-    ("live-07-razorpay", 12.0),
+    ("live-07-razorpay", 12.0, "end"),   # the sheet, not the setup before it
     ("card-05-results", 20.0),
     ("card-06-losses", 24.0),
     ("card-07-limits", 22.0),
@@ -68,14 +75,18 @@ def duration(path: Path) -> float:
     return float(json.loads(out)["format"]["duration"])
 
 
-def normalise(src: Path, dst: Path, target: float) -> None:
+def normalise(src: Path, dst: Path, target: float, take: str = "head") -> None:
     """Constant frame rate, fixed size, and held to exactly ``target`` seconds.
 
-    Short clips are padded by cloning the final frame; long ones are trimmed.
+    Short clips are padded by cloning the final frame; long ones are trimmed --
+    from the front by default, or from the back when ``take`` is "end", for a
+    clip whose subject is the last thing that happens in it.
+
     Letterboxed rather than stretched, on the same navy the cards use, so a
     mismatched aspect never shows a black bar against a coloured card.
     """
     have = duration(src)
+    start = max(0.0, have - target) if take == "end" else 0.0
     pad = max(0.0, target - have)
     chain = (
         f"scale={W}:{H}:force_original_aspect_ratio=decrease,"
@@ -88,7 +99,9 @@ def normalise(src: Path, dst: Path, target: float) -> None:
 
     subprocess.run(
         [
-            "ffmpeg", "-y", "-loglevel", "error", "-i", str(src),
+            "ffmpeg", "-y", "-loglevel", "error",
+            *(("-ss", f"{start:.3f}") if start > 0.01 else ()),
+            "-i", str(src),
             "-vf", chain, "-t", f"{target:.3f}",
             "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "18",
             str(dst),
@@ -97,12 +110,14 @@ def normalise(src: Path, dst: Path, target: float) -> None:
     )
 
 
-def build(order: list[tuple[str, float]]) -> Path:
+def build(order: list) -> Path:
     WORK.mkdir(exist_ok=True)
     OUT.mkdir(exist_ok=True)
 
     normalised: list[Path] = []
-    for name, target in order:
+    for entry in order:
+        name, target = entry[0], entry[1]
+        take = entry[2] if len(entry) > 2 else "head"
         src = CLIPS / f"{name}.webm"
         if not src.is_file():
             raise SystemExit(f"missing clip: {src}")
@@ -112,7 +127,7 @@ def build(order: list[tuple[str, float]]) -> Path:
         # retaken, the cached mp4 predated it by four minutes, and the film that
         # came out contained the run this recorder had explicitly rejected.
         if not dst.is_file() or dst.stat().st_mtime < src.stat().st_mtime:
-            normalise(src, dst, target)
+            normalise(src, dst, target, take)
         normalised.append(dst)
 
     # Chain xfades: each transition overlaps the previous output by XFADE.
@@ -152,18 +167,21 @@ def main() -> int:
     if not CLIPS.is_dir():
         raise SystemExit("no clips/ directory — run .video/record.py first")
 
-    present = [(n, t) for n, t in CUT if (CLIPS / f"{n}.webm").is_file()]
-    missing = [n for n, _ in CUT if (CLIPS / f"{n}.webm") not in
-               [CLIPS / f"{p}.webm" for p, _ in present]]
+    present = [e for e in CUT if (CLIPS / f"{e[0]}.webm").is_file()]
+    missing = [e[0] for e in CUT if not (CLIPS / f"{e[0]}.webm").is_file()]
 
     if "--list" in sys.argv:
         total = 0.0
-        for name, target in present:
+        for entry in present:
+            name, target = entry[0], entry[1]
+            take = entry[2] if len(entry) > 2 else "head"
             have = duration(CLIPS / f"{name}.webm")
             total += target
             kind = "card" if name.startswith("card") else "live"
-            hold = f"+{target - have:.1f}s hold" if target > have + 0.05 else ""
-            print(f"  {kind:<5} {name:<26} {have:>5.1f}s -> {target:>5.1f}s  {hold}")
+            note = f"+{target - have:.1f}s hold" if target > have + 0.05 else ""
+            if take == "end" and have > target + 0.05:
+                note = f"last {target:.0f}s"
+            print(f"  {kind:<5} {name:<26} {have:>5.1f}s -> {target:>5.1f}s  {note}")
         overlap = XFADE * max(0, len(present) - 1)
         final = total - overlap
         print(f"\n  {len(present)} clips · {final:.0f}s "
