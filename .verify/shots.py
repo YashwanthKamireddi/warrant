@@ -79,22 +79,25 @@ with sync_playwright() as pw:
     page = browser.new_page(viewport=VIEWPORT, device_scale_factor=2)
     drive.enter(page, BASE)
     page.wait_for_timeout(500)
-    shoot(page, "09-permission", ".act")
+    shoot(page, "09-permission", ".perm")
+
+    # The live agent, and the escalation it comes back with. This is the one
+    # frame that cannot be faked in a slide.
+    drive.agent_settled(page)
+    page.wait_for_timeout(400)
+    shoot(page, "02-decisions", ".feed")
+
+    # No product named: the console asks the catalogue for whatever this
+    # merchant sells that the permission does not cover. Naming one was a
+    # promise about somebody else's inventory, and it broke the moment the
+    # catalogue became a real storefront's.
+    page.get_by_role("button", name="Try to buy something you never asked for").click()
+    page.wait_for_selector(".entry-cost", timeout=25_000)
+    page.wait_for_timeout(600)
+    shoot(page, "07-razorpay", ".entry.block")
 
     drive.scripted_baskets(page)
-    page.wait_for_timeout(400)
-    shoot(page, "02-decisions", ".decisions")
-
-    # No click: the act seeds itself with whatever this merchant sells that the
-    # permission does not cover. Naming a product here was a promise about
-    # somebody else's inventory, and it broke the moment the catalogue became
-    # a real storefront's.
-    drive.step(page, "prevents")
-    page.wait_for_selector(".cf-columns", timeout=20_000)
-    page.wait_for_timeout(700)
-    shoot(page, "07-razorpay", ".cf")
-
-    drive.step(page, "record")
+    drive.open_proof(page)
     page.wait_for_selector(".ledger-row", timeout=10_000)
     page.wait_for_timeout(400)
     shoot(page, "03-ledger", ".ledger")

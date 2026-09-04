@@ -80,18 +80,30 @@ def _app_context(browser):
     )
 
 
-def _enter(ctx) -> Page:
+def _enter(ctx, *, agent: str = "auto") -> Page:
     """Open the console with a signed permission already in force."""
     page = ctx.new_page()
-    page.goto(f"{BASE}/#workspace", wait_until="networkidle")
-    page.wait_for_selector(".certificate", timeout=30_000)
-    page.wait_for_selector(".seal:not(.unsigned)", timeout=30_000)
+    query = "" if agent == "auto" else f"?agent={agent}"
+    page.goto(f"{BASE}/{query}#workspace", wait_until="networkidle")
+    page.wait_for_selector(".perm-sig", timeout=30_000)
     return page
 
 
-def _step(page: Page, n: int) -> None:
-    page.locator(f".stepbtn:nth-of-type({n})").click()
-    page.wait_for_selector(".act", timeout=20_000)
+def _agent_done(page: Page) -> list[str]:
+    """Wait out the live agent and report what the gate said to each basket."""
+    page.wait_for_function(
+        "document.querySelectorAll('.entry:not(.pending)').length > 0",
+        timeout=120_000,
+    )
+    page.wait_for_function("!document.querySelector('.entry.pending')", timeout=120_000)
+    return page.eval_on_selector_all(
+        ".entry .verdict", "els => els.map(e => e.innerText.trim())"
+    )
+
+
+def _open_record(page: Page) -> None:
+    page.get_by_role("button", name="See the record").click()
+    page.wait_for_selector(".proof", timeout=20_000)
     page.wait_for_timeout(200)
 
 
@@ -122,10 +134,10 @@ def record_live(browser) -> None:
 
     # -- the permission, signed before anybody clicks anything ------------- #
     ctx = _app_context(browser)
-    page = _enter(ctx)
-    _settle(page, 4200)
-    page.locator(".terms-more > summary").click()
-    _settle(page, 3600)
+    page = _enter(ctx, agent="manual")
+    _settle(page, 5200)
+    page.locator(".bounds").scroll_into_view_if_needed()
+    _settle(page, 3200)
     _save(ctx, "live-02-permission")
 
     # -- the centrepiece: a live model, refused, adapting ------------------ #
@@ -141,53 +153,48 @@ def record_live(browser) -> None:
     for take in range(1, 6):
         ctx = _app_context(browser)
         page = _enter(ctx)
-        _step(page, 2)
         # No click. The agent runs on arrival, which is the point.
-        page.wait_for_function(
-            "document.querySelectorAll('.run-turn').length > 0", timeout=120_000
-        )
+        verdicts = _agent_done(page)
         _settle(page, 2600)
-        page.wait_for_function(
-            "!document.querySelector('.run-thinking')", timeout=120_000
-        )
-        _settle(page, 2000)
 
-        verdicts = page.eval_on_selector_all(
-            ".run-turn .verdict", "els => els.map(e => e.innerText.trim())"
-        )
-        converged = "ESCALATE" in verdicts and verdicts[-1] == "ALLOW"
-        if not converged:
-            print(f"    take {take}: {verdicts} — not the behaviour, retaking")
+        # The behaviour being filmed is the gate coming back to a person and
+        # the person answering. If the model happens to stay under the
+        # threshold on its own there is no ask to film, so retake.
+        if page.locator(".ask .btn-primary").count() == 0:
+            print(f"    take {take}: {verdicts} — no escalation to answer, retaking")
             ctx.close()
             continue
 
         print(f"    take {take}: {verdicts}")
-        page.locator(".run-turn").last.scroll_into_view_if_needed()
+        _settle(page, 3600)
+        page.locator(".ask .btn-primary").click()
+        page.wait_for_function("!document.querySelector('.ask')", timeout=60_000)
         _settle(page, 4200)
         _save(ctx, "live-03-agent")
         break
     else:
-        print("    the agent never adapted in five takes; keeping the last one")
+        print("    the agent never escalated in five takes; keeping the last one")
         _save(ctx, "live-03-agent")
 
     # -- what it prevents, in money ---------------------------------------- #
     ctx = _app_context(browser)
-    page = _enter(ctx)
-    _step(page, 3)
-    page.wait_for_selector(".cf-columns", timeout=25_000)
-    _settle(page, 4600)
-    page.locator(".shop").scroll_into_view_if_needed()
+    page = _enter(ctx, agent="manual")
+    page.get_by_role("button", name="Try to buy something you never asked for").click()
+    page.wait_for_selector(".entry-cost", timeout=30_000)
+    _settle(page, 5200)
+    page.locator(".entry-cost").scroll_into_view_if_needed()
     _settle(page, 3600)
     _save(ctx, "live-04-prevents")
 
     # -- the record, and then breaking it ---------------------------------- #
     ctx = _app_context(browser)
-    page = _enter(ctx)
-    _step(page, 4)
-    page.get_by_role("button", name="Put five baskets through the gate").click()
+    page = _enter(ctx, agent="manual")
+    page.get_by_role("button", name="Put five harder baskets through it").click()
     page.wait_for_function(
-        "document.querySelectorAll('.ledger-row').length > 5", timeout=60_000
+        "document.querySelectorAll('.entry').length >= 5", timeout=90_000
     )
+    _open_record(page)
+    page.wait_for_selector(".ledger-row", timeout=20_000)
     _settle(page, 4200)
     page.get_by_role("button", name="Try to rewrite the ledger").click()
     page.wait_for_selector(".notice.stop, .ledger-row.orphaned", timeout=20_000)
@@ -196,12 +203,12 @@ def record_live(browser) -> None:
 
     # -- the dispute pack, and the same mandate as an AP2 credential ------- #
     ctx = _app_context(browser)
-    page = _enter(ctx)
-    _step(page, 4)
-    page.get_by_role("button", name="Put five baskets through the gate").click()
+    page = _enter(ctx, agent="manual")
+    page.get_by_role("button", name="Put five harder baskets through it").click()
     page.wait_for_function(
-        "document.querySelectorAll('.ledger-row').length > 5", timeout=60_000
+        "document.querySelectorAll('.entry').length >= 5", timeout=90_000
     )
+    _open_record(page)
     _settle(page, 600)
     page.locator(".more > summary", has_text="dispute pack").click()
     _settle(page, 4200)
@@ -210,22 +217,26 @@ def record_live(browser) -> None:
     _settle(page, 4000)
     _save(ctx, "live-06-evidence-ap2")
 
-    # -- a real Razorpay order, from the record ---------------------------- #
+    # -- Razorpay's own payment sheet, on a real order --------------------- #
     ctx = _app_context(browser)
     page = _enter(ctx)
-    _step(page, 4)
-    page.get_by_role("button", name="Put five baskets through the gate").click()
-    page.wait_for_function(
-        "document.querySelectorAll('.ledger-row').length > 5", timeout=60_000
-    )
-    _settle(page, 800)
-    button = page.get_by_role("button", name="Place the settled debit on real Razorpay")
+    _agent_done(page)
+    if page.locator(".ask .btn-primary").count():
+        page.locator(".ask .btn-primary").click()
+        page.wait_for_function("!document.querySelector('.ask')", timeout=60_000)
+    _settle(page, 1000)
+
+    button = page.get_by_role("button", name="Pay ")
     if button.count():
-        button.click()
-        # Either a real order id or Razorpay's own refusal. Both are true, and
-        # a daily cap being reached is worth showing rather than hiding.
-        page.wait_for_selector(".real-rail.placed, .stage-error", timeout=60_000)
-        _settle(page, 4600)
+        button.first.click()
+        # Either Razorpay Checkout opens over the page, or Razorpay refuses for
+        # a reason of its own. Both are true, and a daily cap being reached is
+        # worth showing rather than hiding.
+        try:
+            page.wait_for_selector("iframe.razorpay-checkout-frame", timeout=60_000)
+            _settle(page, 6000)
+        except Exception:  # noqa: BLE001 - a stated refusal is a real outcome
+            _settle(page, 3000)
     else:
         _settle(page, 1200)
     _save(ctx, "live-07-razorpay")

@@ -81,9 +81,12 @@ def test_groq_without_a_key_refuses_to_construct(monkeypatch):
 
 
 class _Response:
-    def __init__(self, payload: str, status: int = 200):
+    def __init__(self, payload: str, status: int = 200, headers: dict | None = None):
         self._payload = payload
         self.status_code = status
+        # A real httpx.Response always has these. The fake did not, so the
+        # retry path read `.headers` off something that had none.
+        self.headers = headers or {}
 
     def raise_for_status(self) -> None:
         if self.status_code >= 400:
@@ -151,11 +154,57 @@ def test_a_non_json_reply_is_a_failed_call(monkeypatch):
 
 
 def test_an_http_error_is_not_swallowed(monkeypatch):
+    monkeypatch.setattr("time.sleep", lambda _: None)
     _capture(monkeypatch, "", status=429)
     with pytest.raises(RuntimeError, match="429"):
         GroqProvider(api_key="gsk_test").structured(
             output_format=Shape, system="s", content="c", model="m", max_tokens=100
         )
+
+
+def test_a_rate_limit_is_retried_before_giving_up(monkeypatch):
+    """The free tier 429s, and one agent run is several calls in a few seconds.
+
+    Falling back to a fixed basket because the second call landed a moment too
+    early is a worse answer than waiting, and it is the difference between a
+    live demonstration and an apology for one.
+    """
+    slept: list[float] = []
+    monkeypatch.setattr("time.sleep", slept.append)
+
+    calls = {"n": 0}
+    ok = json.dumps({"verdict": "allow", "reason": "fits"})
+
+    def fake_post(url, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _Response("", status=429, headers={"retry-after": "0.25"})
+        return _Response(ok)
+
+    monkeypatch.setattr("httpx.post", fake_post)
+    result = GroqProvider(api_key="gsk_test").structured(
+        output_format=Shape, system="s", content="c", model="m", max_tokens=100
+    )
+    assert result.verdict == "allow"
+    assert calls["n"] == 2
+    assert slept == [0.25]
+
+
+def test_a_rate_limit_asking_for_a_long_wait_is_not_waited_out(monkeypatch):
+    """Somebody is watching this run. A minute of silence is not a demo."""
+    monkeypatch.setattr("time.sleep", lambda _: pytest.fail("should not have slept"))
+    calls = {"n": 0}
+
+    def fake_post(url, **kwargs):
+        calls["n"] += 1
+        return _Response("", status=429, headers={"retry-after": "600"})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+    with pytest.raises(RuntimeError, match="429"):
+        GroqProvider(api_key="gsk_test").structured(
+            output_format=Shape, system="s", content="c", model="m", max_tokens=100
+        )
+    assert calls["n"] == 1
 
 
 # -- the anthropic path is unchanged --------------------------------------- #

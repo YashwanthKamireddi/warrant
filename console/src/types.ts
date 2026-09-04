@@ -171,6 +171,10 @@ export interface Meta {
   catalog: Product[];
   default_utterance: string;
   scripted_steps: ScriptedStep[];
+  /** The publishable half of the Razorpay pair, so the console can open
+   *  Razorpay's own Checkout. Null when the rail is not configured. The secret
+   *  never leaves the server. */
+  razorpay_key_id: string | null;
 }
 
 export interface EvidencePack {
@@ -225,4 +229,80 @@ export interface AgentAttempt {
     total_paise: number;
   };
   outcome: Outcome;
+}
+
+/** One thing that happened, in the order it happened.
+ *
+ * The console used to keep the agent's attempts and the baskets a person
+ * submitted in two different arrays rendered on two different screens, which
+ * is why the story only made sense if you already knew the running order.
+ * There is one stream now: every entry is something proposed and the verdict
+ * it got, whoever proposed it.
+ */
+export interface FeedItem {
+  id: string;
+  /** Present when a model chose this basket rather than a person. */
+  agent?: AgentAttempt["agent"];
+  outcome: Outcome;
+  /** Why this one is here, when it is not self-evident. */
+  note?: string;
+  /** What it would have cost with nothing checking. Only fetched for refusals,
+   *  because that is the only place the number means anything. */
+  counterfactual?: Comparison;
+}
+
+
+/** Razorpay Checkout, loaded from checkout.razorpay.com in index.html. */
+export interface RazorpayCheckoutResponse {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}
+
+export interface RazorpayCheckoutOptions {
+  key: string;
+  order_id: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description?: string;
+  theme?: { color?: string };
+  /** Opens the sheet on a chosen method. UPI is the one that always works on
+   *  an Indian test account; a test card is frequently declined as an
+   *  international card. */
+  prefill?: { method?: string; email?: string; contact?: string };
+  handler: (response: RazorpayCheckoutResponse) => void;
+  modal?: { ondismiss?: () => void };
+}
+
+/** What Checkout reports when a payment is attempted and fails. */
+export interface RazorpayCheckoutFailure {
+  error?: {
+    description?: string;
+    reason?: string;
+    step?: string;
+    source?: string;
+  };
+}
+
+export interface RazorpayCheckoutInstance {
+  open: () => void;
+  on: (event: string, handler: (payload: RazorpayCheckoutFailure) => void) => void;
+}
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayCheckoutOptions) => RazorpayCheckoutInstance;
+  }
+}
+
+
+/** A Razorpay payment the server confirmed against the key secret. */
+export interface VerifiedPayment {
+  verified: boolean;
+  payment_id: string;
+  order_id: string;
+  amount_paise: number | null;
+  method: string | null;
+  status: string | null;
 }

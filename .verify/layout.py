@@ -5,10 +5,11 @@ invariants below are the ones that would actually cost someone a demo:
 
   * the page itself never scrolls -- this is an app frame, not a document
   * nothing overflows horizontally, at any width a reviewer might open it at
-  * long content scrolls inside the stage rather than pushing the frame
-  * the walkthrough and its next/back control are always reachable
-  * the act being read is never wider than its measure
-  * the record's two actions are reachable without scrolling past the record
+  * long content scrolls inside the work area rather than pushing the frame
+  * what you permitted, and where the money stands, are always on screen
+  * the actions are reachable on arrival, not below whatever just happened
+  * nothing is ever wider than a readable measure
+  * inside the proof drawer, the two destructive actions stay in view
 """
 
 from __future__ import annotations
@@ -42,10 +43,9 @@ with sync_playwright() as pw:
     browser = pw.chromium.launch()
     for width, height in VIEWPORTS:
         page = browser.new_page(viewport={"width": width, "height": height})
-        drive.enter(page, BASE)
-        # Wait for every decision, not for the first one plus a guessed delay.
-        # The scripted run issues five sequential requests, so a fixed timeout
-        # races them and fails intermittently on a slower machine.
+        drive.enter(page, BASE, agent="manual")
+        # Wait for the live agent rather than a guessed delay, then add the
+        # five reference baskets so the feed is as long as it ever gets.
         drive.scripted_baskets(page)
 
         checks = page.evaluate(
@@ -55,25 +55,27 @@ with sync_playwright() as pw:
                     const r = el.getBoundingClientRect();
                     return r.top >= 0 && r.bottom <= window.innerHeight;
                 };
-                const stage = q('.stage');
+                const stage = q('.work');
                 return {
                     bodyScrollsY: document.documentElement.scrollHeight > window.innerHeight + 1,
                     bodyScrollsX: document.documentElement.scrollWidth > window.innerWidth + 1,
                     stageOverflowsX: stage.scrollWidth > stage.clientWidth + 1,
-                    stepsVisible: !!q('.stepbtn') && inView(q('.steps')),
-                    // Four bare numbers are not navigation. Whatever else the
-                    // stepper drops on a narrow screen, the step you are on
-                    // keeps its name.
-                    currentStepNamed:
-                        (q('.stepbtn.on')?.innerText || '').replace(/[0-9\s]/g, '')
-                            .length > 0,
-                    navVisible: inView(q('.stagenav')),
-                    nextInView: inView(q('.stagenav .btn-primary')),
+                    // What you permitted is the frame for everything else, so
+                    // it is on screen when you arrive.
+                    permVisible: !!q('.perm') && !!q('.bounds li'),
+                    // Where the money stands never scrolls away.
+                    moneyVisible: inView(q('.money')),
+                    // And the thing to press is reachable without first
+                    // scrolling past whatever the agent just did.
+                    actionInView: inView(q('.live-do .btn-primary')),
                     // A line of text wider than about 90 characters stops being
                     // readable. The measure is the whole reason for the column.
-                    actTooWide: q('.act').getBoundingClientRect().width > 820,
+                    tooWide: Math.max(
+                        q('.perm').getBoundingClientRect().width,
+                        q('.live').getBoundingClientRect().width,
+                    ) > 900,
                     stageScrolls: stage.scrollHeight > stage.clientHeight,
-                    decisions: document.querySelectorAll('.decision').length,
+                    decisions: document.querySelectorAll('.entry').length,
                 };
             }"""
         )
@@ -86,26 +88,24 @@ with sync_playwright() as pw:
             problems.append("the page scrolls horizontally")
         if checks["stageOverflowsX"]:
             problems.append("the stage overflows horizontally")
-        if not checks["stepsVisible"]:
-            problems.append("the walkthrough steps are not visible")
-        if not checks["currentStepNamed"]:
-            problems.append("the current step shows only a number, not its name")
-        if not checks["navVisible"]:
-            problems.append("the stage nav is not visible")
-        if not checks["nextInView"]:
+        if not checks["permVisible"]:
+            problems.append("what you permitted is not on screen")
+        if not checks["moneyVisible"]:
+            problems.append("where the money stands is not visible")
+        if not checks["actionInView"]:
             problems.append("the primary action is not in the viewport")
-        if checks["actTooWide"]:
-            problems.append("the act is wider than a readable measure")
-        if checks["decisions"] != 5:
-            problems.append(f"expected 5 decisions, rendered {checks['decisions']}")
+        if checks["tooWide"]:
+            problems.append("a column is wider than a readable measure")
+        if checks["decisions"] < 5:
+            problems.append(f"expected at least 5 entries, rendered {checks['decisions']}")
 
         # The record grows an entry per decision, and the two things worth
-        # pressing on that screen sat underneath all of them. On a laptop you
+        # pressing beside it sat underneath all of them. On a laptop you
         # scrolled past a table to discover there was anything to do, which is
         # the difference between a demo that lands and one that reads as a log
         # viewer. The table scrolls inside itself now; this is what holds it.
         if height >= 700:
-            drive.step(page, "record")
+            drive.open_proof(page)
             page.wait_for_selector(".ledger-row", timeout=20_000)
             page.wait_for_timeout(400)
             hidden = page.evaluate(
@@ -121,7 +121,7 @@ with sync_playwright() as pw:
                 }"""
             )
             for name in hidden:
-                problems.append(f"the record's “{name}” is not reachable without scrolling")
+                problems.append(f"the proof drawer's “{name}” is not reachable without scrolling")
 
         if problems:
             failures.extend(f"{label}: {p}" for p in problems)

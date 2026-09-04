@@ -10,7 +10,7 @@ checked *before* settlement, provable *after* dispute.
 
 <br>
 
-[![tests](https://img.shields.io/badge/tests-368%20passing-0b6e54?style=flat-square)](#verifying-it)
+[![tests](https://img.shields.io/badge/tests-373%20passing-0b6e54?style=flat-square)](#verifying-it)
 [![gates](https://img.shields.io/badge/gates-11%20green-0b6e54?style=flat-square)](#verifying-it)
 [![latency](https://img.shields.io/badge/p50-under%20300µs-16264f?style=flat-square)](#results)
 [![rail](https://img.shields.io/badge/rail-Razorpay%20test%20mode-16264f?style=flat-square)](#the-real-rail)
@@ -20,9 +20,9 @@ checked *before* settlement, provable *after* dispute.
 
 *Built for the Razorpay AI Buildathon · Track 01, AI Growth & Agentic Commerce*
 
-</div>
+[The deck](docs/deck.html) · [What the form asks for](SUBMISSION.md) · [Architecture](ARCHITECTURE.md) · [Integrating it](docs/INTEGRATION.md)
 
----
+</div>
 
 ---
 
@@ -360,30 +360,45 @@ exactly what makes the rail trustworthy.
 
 In a real integration there is no console — Warrant is a call inside a
 merchant's checkout, and it is invisible. This exists so a person can watch the
-invisible part happen. Four screens, one idea each, and it signs a permission on
-arrival so there is something real on screen before you click anything.
+invisible part happen.
+
+One screen. It signs a permission and sets the agent shopping on arrival, so
+there is real work on screen before you touch anything.
 
 | | |
 | :--- | :--- |
-| **1 · The permission** | What the person said, and the bounds derived from it: how much, where, how long. Signed by their own key. |
-| **2 · Her agent shops** | A live model reading the merchant's catalogue. It runs on arrival — no button — and is told only *why* it was refused, never the limits. |
-| **3 · What it prevents** | The same basket in two worlds, in money. |
-| **4 · The record** | Every decision in order, the dispute pack, the AP2 export, and a button that edits the ledger so you can watch it break. |
+| **At the top** | What you said, and the bounds derived from it — how much, where, on what, for how long — signed by your own key. |
+| **In the middle** | Every basket proposed and the verdict it got, in order. A live model reads the merchant's real catalogue and is told only *why* it was refused, never the limits. When a basket needs a human, it stops and asks you, right there. |
+| **At the bottom** | What has been spent against what was allowed, what was refused, and the Razorpay payment once one exists. |
+| **Behind one button** | The record: every decision including the refusals, the dispute pack, the AP2 export, and a control that edits the ledger so you can watch it break. |
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/02-decisions.png" alt="Verdicts with the rule that produced each one"><br><em><b>Verdicts</b> — each names its rule, its numbers, and whether a model was consulted.</em></td>
-<td width="50%"><img src="docs/screenshots/03-ledger.png" alt="Hash-chained ledger"><br><em><b>Ledger</b> — refusals are entries, not silences.</em></td>
+<td width="50%"><img src="docs/screenshots/09-permission.png" alt="The permission and its bounds"><br><em><b>The permission</b> — one sentence, and the bounds it produced, in words.</em></td>
+<td width="50%"><img src="docs/screenshots/02-decisions.png" alt="The agent proposing and Warrant answering"><br><em><b>The feed</b> — a live model proposes; the gate answers, and comes back to you when it must.</em></td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/screenshots/05-tampered.png" alt="Tamper detection"><br><em><b>Tampered</b> — the edited entry and every entry after it, orphaned, with both hashes named.</em></td>
+<td width="50%"><img src="docs/screenshots/07-razorpay.png" alt="A refusal priced in money"><br><em><b>A refusal, priced</b> — what it would have cost with nothing checking.</em></td>
+<td width="50%"><img src="docs/screenshots/03-ledger.png" alt="Hash-chained ledger"><br><em><b>The record</b> — refusals are entries, not silences.</em></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/05-tampered.png" alt="Tamper detection"><br><em><b>Tampered</b> — the edited entry and everything after it, orphaned, with both hashes named.</em></td>
 <td width="50%"><img src="docs/screenshots/04-evidence.png" alt="Dispute evidence pack"><br><em><b>Dispute evidence</b> — mapped to Razorpay's real contest schema.</em></td>
 </tr>
-<tr>
-<td width="50%"><img src="docs/screenshots/06-ap2.png" alt="AP2 export"><br><em><b>AP2 export</b> — with the divergences carried inside the document.</em></td>
-<td width="50%"><img src="docs/screenshots/07-razorpay.png" alt="The counterfactual in money"><br><em><b>What it prevents</b> — the same basket, with and without.</em></td>
-</tr>
 </table>
+
+### The payment is Razorpay's own
+
+An allowed basket offers to pay on Razorpay, and that opens **Razorpay
+Checkout** — their script, their sheet, their test cards and UPI handles, over
+an order this server created against the real test API.
+
+What comes back is not taken at face value. Checkout hands the page an order
+id, a payment id and an HMAC of the two under the key secret; the console posts
+all three to the server, which recomputes the signature and only then says the
+payment happened. A browser claiming it paid is not evidence. The key secret
+never leaves the server — the console holds only the publishable key id, which
+appears in the page source of every Razorpay checkout on the internet.
 
 Revoking the permission and breaking the chain are both meant to be pressed, and
 both are permanent. The console says so and offers a fresh permission, because a
@@ -472,7 +487,7 @@ Runs in order, and fails on the first problem:
 | :--- | :--- |
 | `audit-secrets` | no credential material tracked, staged, or anywhere in git history |
 | `lint` | ruff over engine, bench and tests |
-| `test` | 368 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering, concurrency, merchant registry loading, mandate lifecycle, storefront snapshot parsing, idempotent retries under concurrency, the documented SDK example |
+| `test` | 373 tests: signature forgery, chain tampering, replay, envelope escape, judge authority, evidence self-verification, rail error handling, write ordering, concurrency, merchant registry loading, mandate lifecycle, storefront snapshot parsing, idempotent retries under concurrency, the documented SDK example |
 | `typecheck` | the console compiles under `strict` |
 | `docs-check` | every number in this README matches what the code measures |
 | `docs-examples` | fail if any code example in the documentation does not run. Prose is not executed, so nothing else can catch a README that has quietly stopped being true |

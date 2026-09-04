@@ -19,3 +19,6 @@ notes/
 .video/clips/
 .video/work/
 .video/out/
+
+# TypeScript build cache. Local, machine-specific, and it was tracked.
+*.tsbuildinfo

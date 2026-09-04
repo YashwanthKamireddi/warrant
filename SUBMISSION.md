@@ -30,9 +30,15 @@ Everything the form asks for, ready to paste. Twelve fields.
 > decision — including every refusal — lands in a hash-chained ledger that later
 > renders as dispute evidence a bank can verify without trusting the merchant.
 >
-> Measured across 540 labelled sessions: 81.8% of violations stopped, ₹27,700
-> leaked against ₹281,635 at risk with no gate. Two categories score zero and are
-> printed in the same table as the rest.
+> Measured across 540 labelled sessions: 81.8% of violations stopped, ₹30,208
+> leaked against ₹302,663 with no gate at all — and ₹1,69,825 with the amount
+> ceiling a mandate already gives you, which is the comparison that matters. Two
+> categories score zero and are printed in the same table as the rest.
+>
+> The payment leg is Razorpay's own. An allowed basket opens Razorpay Checkout on
+> an order created against the real test API, and what Checkout hands back is
+> verified server-side against the key secret before anything claims the payment
+> happened.
 
 **GitHub repo** — `https://github.com/YashwanthKamireddi/warrant`
 
@@ -84,39 +90,40 @@ Everything the form asks for, ready to paste. Twelve fields.
 
 ## Video script — 5:00
 
-Record the console at 1580×960. Have a second tab open on your Razorpay test
-dashboard. `make console`, and pay one payment link before you start so the
-settlement beat is instant.
+Record the console at 1580×960, with a second tab on the Razorpay test
+dashboard. Run `make console`. Everything below is something happening on
+screen — do not narrate the architecture, read the README aloud, or scroll code.
 
 | time | beat | on screen |
 | --- | --- | --- |
-| **0:00** | *"Since February, Razorpay and NPCI have run agentic UPI in production with Zomato, Swiggy and Zepto. You approve once with your PIN, and then the agent spends from that block without asking again."* | first-run screen, mandate chain visible |
-| **0:20** | *"Two holes. Nothing checks what the agent buys against what you asked for. And when you dispute it, the merchant has no device fingerprint, no session, no click — nothing."* | — |
-| **0:40** | *"You say this."* Read the instruction. *"It becomes this."* | derive → certificate, seal stamps |
-| **1:00** | *"Same tap you already made. It just means something specific now. Note the envelope narrowed what the model proposed — the model can only ever make this smaller."* | terms grid, narrowing note |
-| **1:20** | Run five scripted baskets | ALLOW · BLOCK · BLOCK · BLOCK · ESCALATE |
-| **1:40** | **The strongest 20 seconds.** Expand basket 3. *"That product name is an injected instruction. It's blocked — and look at the header: no model call. It never reached a model. It failed on the category bound. Delete my injection detector entirely and it still fails."* | `scope.category` fail, `no model call` |
-| **2:10** | *"That's the design. A model runs in exactly two places, and in neither can it grant authority. The judge is hard-coded advisory — if an injected payload convinces it to say 'consistent', the outcome is byte-identical to it never running."* | — |
-| **2:30** | Switch to Razorpay test mode, authorise a basket | real `order_…`, live `rzp.io` link |
-| **2:50** | Cut to the Razorpay dashboard | the order, in their system |
-| **3:05** | *"It says settled=false. A script can't authorise a payment for the customer — and that property is what found a double-spend my simulator had hidden for days."* Click **Check the rail for settlement** | signed receipt appears |
-| **3:25** | Dispute evidence tab | the full pack |
-| **3:45** | Click **Tamper with the ledger** | entry striped, status bar red, pack refuses to vouch |
-| **4:05** | `make bench` in a terminal | the table, then scroll to **Where this loses** |
-| **4:20** | *"Two categories score zero. Baskets inside every bound that are still wrong. No arithmetic catches those — only a model does. It's in the same table as everything else, because a benchmark you designed to pass isn't a benchmark."* | `injection_subtle 0/45`, `semantic_drift 0/45` |
-| **4:40** | *"Categories still come from the merchant's own catalog. I check them against the acquirer's MCC, which closes half of it. The other half needs the rail — which is the argument for this living in NPCI's UAP."* | — |
+| **0:00** | *"Since February, Razorpay and NPCI have run agentic UPI payments in production — Zomato, Swiggy, Zepto. You approve once with your PIN, and the agent spends against that block without asking again."* | the landing page |
+| **0:20** | *"Two holes. Nothing checks what the agent buys against what you asked for. And when you dispute it, the merchant has no device fingerprint, no session, no click — chargeback codes have no category for 'correctly authorised agent, wrong outcome.'"* | scroll to the measured numbers |
+| **0:45** | Open the console. *"You said this once. It became a permission signed by your own key: an amount, a merchant, a category, a deadline."* | the permission, top of the console |
+| **1:05** | **The centrepiece — let it breathe.** *"Nobody pressed anything. A live model is reading Sleepy Owl's actual storefront — their products, their prices — and it has no idea what your limits are."* | the agent's own reasoning appearing |
+| **1:25** | *"It picks two packs. ₹698. Warrant will not decide this one — it crosses the ₹500 you said needs your say-so, so it stops and comes back to you. It cannot approve this itself, and neither can the agent."* | `Needs you`, and the ask |
+| **1:45** | Click **Approve — sign with my key**. *"Your key signs the basket, the same gate runs again, and the check that failed a moment ago passes — because a signature exists that did not before."* | `Allowed`, the money bar moves |
+| **2:05** | Click **Pay ₹698 on Razorpay**. *"That is Razorpay Checkout. Their script, their sheet, on an order this server created against the real test API."* Pay with UPI `success@razorpay`. | the real Razorpay sheet |
+| **2:25** | *"And it is not taken at face value. Checkout hands back an order id, a payment id and an HMAC of the two under the key secret. The server recomputes that signature before anything here says the payment happened."* | `Paid on Razorpay`, then the dashboard tab |
+| **2:45** | Click **Try to buy something you never asked for**. *"A coffee mug. ₹449, comfortably under every ceiling — the bank would pay it without blinking. Nobody planted it; a coffee company sells mugs."* | `Refused`, two rules named |
+| **3:05** | *"Refused twice: by the category code the merchant's acquirer assigned, and by the permission itself. And there is what it would have cost with nothing checking."* | the priced refusal |
+| **3:20** | *"A model runs in exactly two places here and in neither can it grant authority. If an injected product name convinces the advisory judge, the outcome is byte-identical to the judge never running."* | — |
+| **3:40** | Open **See the record**. *"Every decision, including every refusal. Most systems log what they did; a dispute turns on what was declined."* | the ledger, fingerprints explained |
+| **4:00** | Click **Try to rewrite the ledger**. *"Each fingerprint is computed from its entry and the one before, so editing any entry orphans everything after it — and it names both hashes so you can check."* | the break |
+| **4:15** | Open the dispute pack, then the AP2 export. | the pack, then the credentials |
+| **4:30** | `make bench`. *"540 labelled sessions. An amount ceiling alone lets 416 through. Warrant lets 90 through, and has never once stopped a purchase the person actually authorised."* | the table |
+| **4:45** | *"Two categories score zero, printed in the same table as the wins. A benchmark you designed to pass is not a benchmark."* | `injection_subtle 0/45`, `semantic_drift 0/45` |
 | **4:55** | *"Warrant. No agent spends without one."* | — |
 
-**Do not** narrate the architecture diagram, read the README aloud, or show code
-scrolling. Every beat above is something happening on screen.
+The timed, word-for-word version of this is [.video/NARRATION.md](.video/NARRATION.md),
+and `make film` cuts the footage to it.
 
 ---
 
 ## Pre-submission checklist
 
 ```bash
-make verify              # 8 gates, from a clean checkout
-make browser-razorpay    # a real order lands (needs keys)
+make verify              # 11 gates, from a clean checkout
+make browser-razorpay    # Razorpay Checkout opens on a real order (needs keys)
 ```
 
 - [ ] `make verify` green on a **fresh clone**, not just locally

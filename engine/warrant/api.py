@@ -13,6 +13,7 @@ a demo that needs no migrations is a demo a reviewer can actually run.
 from __future__ import annotations
 
 import copy
+import os
 import secrets
 import threading
 import time
@@ -46,7 +47,11 @@ from .models import (
     Scope,
     Verdict,
 )
-from .rails.razorpay_rail import RazorpayNotConfigured, RazorpayRail
+from .rails.razorpay_rail import (
+    RazorpayNotConfigured,
+    RazorpayRail,
+    SignatureRejected,
+)
 from .rails.simulated import SimulatedRail
 
 __all__ = ["app"]
@@ -360,7 +365,23 @@ def meta() -> dict[str, Any]:
         "catalog": catalog_json(),
         "default_utterance": console_utterance(),
         "scripted_steps": _scripted_steps(),
+        # The publishable half of the Razorpay pair, so the console can open
+        # Razorpay's own Checkout on an order this server created. It is public
+        # by design -- it appears in the page source of every Razorpay checkout
+        # on the internet -- and it is the only half that ever leaves the
+        # server. RAZORPAY_KEY_SECRET is never serialised anywhere.
+        "razorpay_key_id": _publishable_razorpay_key(),
     }
+
+
+def _publishable_razorpay_key() -> str | None:
+    """The key id, and only when the rail it belongs to actually works."""
+    try:
+        RazorpayRail()
+    except RazorpayNotConfigured:
+        return None
+    key_id = os.environ.get("RAZORPAY_KEY_ID", "").strip()
+    return key_id or None
 
 
 def console_merchant() -> str:
@@ -948,7 +969,12 @@ def agent_run(session_id: str, body: AgentRunRequest) -> dict[str, Any]:
             }
         )
 
-        if outcome.verdict is Verdict.ALLOW:
+        # An escalation is not something for the agent to work around. It means
+        # a person has to say yes to this one, so the run stops and the console
+        # asks them. Letting the loop continue produced four near-identical
+        # escalations in a row, none of them resolvable, and a reader watching
+        # an agent fail repeatedly with no way to help it.
+        if outcome.verdict is not Verdict.BLOCK:
             break
         # The agent is told why, not what the limits are. It has to infer.
         rejected.extend(outcome.decision.reasons)
@@ -1110,6 +1136,53 @@ def place_on_razorpay(session_id: str, index: int) -> dict[str, Any]:
             }
 
     raise HTTPException(502, detail=f"Razorpay refused it: {result.failure_summary}")
+
+
+class RazorpayVerifyRequest(BaseModel):
+    """What Razorpay Checkout hands back when a payment succeeds."""
+
+    razorpay_order_id: str = Field(min_length=1, max_length=64)
+    razorpay_payment_id: str = Field(min_length=1, max_length=64)
+    razorpay_signature: str = Field(min_length=1, max_length=256)
+
+
+@app.post("/api/sessions/{session_id}/razorpay/verify")
+def razorpay_verify(session_id: str, body: RazorpayVerifyRequest) -> dict[str, Any]:
+    """Check the signature Razorpay Checkout returned, the way a merchant must.
+
+    The browser is not a trustworthy reporter of whether it paid. Razorpay signs
+    ``order_id|payment_id`` with the key secret, and only the server holds that
+    secret -- so this is the step that turns "the popup said it worked" into
+    something a merchant can act on. A forged or replayed payment id fails here.
+
+    The secret never leaves this process. The console holds only the key id,
+    which is publishable and appears in the page source of every Razorpay
+    checkout on the internet.
+    """
+    _session(session_id)
+    try:
+        rail = RazorpayRail()
+    except RazorpayNotConfigured as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    try:
+        rail.verify_checkout_signature(
+            order_id=body.razorpay_order_id,
+            payment_id=body.razorpay_payment_id,
+            signature=body.razorpay_signature,
+        )
+    except SignatureRejected as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    payment = rail.payment(body.razorpay_payment_id)
+    return {
+        "verified": True,
+        "payment_id": body.razorpay_payment_id,
+        "order_id": body.razorpay_order_id,
+        "amount_paise": payment.get("amount"),
+        "method": payment.get("method"),
+        "status": payment.get("status"),
+    }
 
 
 @app.post("/api/sessions/{session_id}/tamper")

@@ -3,14 +3,17 @@ import { ShieldMark } from "./icons";
 
 /** The landing page.
  *
- * Built the way a product page is built rather than the way a README is: one
- * idea per viewport, type large enough that the sentence is the design, and
- * nothing in a box. Boxes are for things that need separating from their
- * neighbours; when a screen holds one idea, there is nothing to separate.
+ * One idea per viewport, type large enough that the sentence is the design.
  *
- * Every number below is measured, not asserted. `make docs-check` fails the
- * build if any of them drifts from what bench/RESULTS.json actually recorded,
- * which is the only reason a landing page is allowed to quote numbers at all.
+ * The version this replaced opened on "No agent spends without one." -- a good
+ * line for someone who already knows what the product is, and four words that
+ * tell a first-time reader nothing, above three lines of category prose. A
+ * judge with sixty seconds could not have said what the software did. It says
+ * what happens now, in the order it happens, and gets out of the way.
+ *
+ * Every number below is measured, not asserted, and `make docs-check` fails the
+ * build if any of them drifts from what bench/RESULTS.json recorded -- which is
+ * the only reason a landing page is allowed to quote numbers at all.
  */
 
 /** Reveal on scroll, once, and not at all for anyone who asked for less motion. */
@@ -71,29 +74,29 @@ export function Landing({ onEnter }: { onEnter: () => void }) {
       {/* ------------------------------------------------------------ act one */}
       <section className="lp-act lp-open">
         <h1 data-reveal>
-          No agent spends
+          Your agent
           <br />
-          without one.
+          has your money.
         </h1>
         <p className="lp-sub" data-reveal>
-          An authorization layer for agent-initiated payments. A person says what they
-          want once. Everything the agent spends after that is checked against it — before
-          the money moves, and provable long after.
+          Say what you want once. It becomes a permission signed by your own key —
+          an amount, a merchant, a category, a deadline. Every basket the agent
+          proposes is checked against it <em>before</em> the money moves.
         </p>
         <div className="lp-actions" data-reveal>
           <button className="lp-cta lp-cta-lg" onClick={onEnter}>
-            See it work
+            Watch it refuse something
           </button>
-          <code className="lp-install">
-            pip install git+https://github.com/YashwanthKamireddi/warrant
-          </code>
+          <span className="lp-under">
+            Runs live against a real shop&rsquo;s catalogue and Razorpay test mode.
+          </span>
         </div>
       </section>
 
       {/* ------------------------------------------------------------ act two */}
       <section className="lp-act lp-gap">
         <p className="lp-kicker" data-reveal>
-          The gap
+          The hole
         </p>
         <h2 data-reveal>
           A mandate enforces the amount.
@@ -101,11 +104,10 @@ export function Landing({ onEnter }: { onEnter: () => void }) {
           <em>Nothing enforces what it is spent on.</em>
         </h2>
         <p className="lp-body" data-reveal>
-          When someone authorises an agent to spend up to a limit, the bank enforces that
-          limit and nothing else. It never sees a basket — only a debit. A ceiling is
-          equally happy to buy the thing that was asked for and the thing that was not,
-          and no fraud signal fires, because nothing here is fraud. The card is real, the
-          device is real, the customer is real. It simply is not what they asked for.
+          The bank never sees a basket, only a debit. A ceiling is equally happy to
+          buy the thing you asked for and the thing you did not — and no fraud
+          signal fires, because none of this is fraud. Real card, real device, real
+          customer. Just not what they asked for.
         </p>
       </section>
 
@@ -129,9 +131,9 @@ export function Landing({ onEnter }: { onEnter: () => void }) {
           </div>
         </div>
         <p className="lp-note" data-reveal>
-          Warrant does not catch everything, and the benchmark prints its own misses
-          rather than hiding them. What it never does is stop a purchase the person
-          actually authorised: <b>zero false stops</b>, across every category.
+          One seed, four policies, and the two categories Warrant scores zero on are
+          printed in the same table as the wins. A benchmark you designed to pass is
+          not a benchmark.
         </p>
       </section>
 
@@ -146,34 +148,32 @@ export function Landing({ onEnter }: { onEnter: () => void }) {
             <span className="lp-link-n">01</span>
             <h3>The permission</h3>
             <p>
-              What the person said, and the limits derived from it — amount, merchant,
-              category, count, window. Signed by their own device key. Nothing else in the
-              system can widen it.
+              What you said, and the limits derived from it. Signed by your own
+              device key. Nothing else in the system can widen it.
             </p>
           </li>
           <li data-reveal>
             <span className="lp-link-n">02</span>
             <h3>The basket</h3>
             <p>
-              What the agent actually proposes to buy, checked line by line against the
-              permission it names. Signed only once it passes, and bound to that exact
-              permission by content address.
+              What the agent proposes, checked line by line against the permission
+              it names, and signed only once it passes.
             </p>
           </li>
           <li data-reveal>
             <span className="lp-link-n">03</span>
             <h3>The payment</h3>
             <p>
-              The rail's own reference for the money that moved, bound to the basket that
-              justified it. A payment with no basket behind it is a payment nobody
-              authorised, and it is visible as one.
+              The rail&rsquo;s own reference for the money that moved, bound to the
+              basket that justified it. A payment with no basket behind it is
+              visible as one.
             </p>
           </li>
         </ol>
         <p className="lp-note" data-reveal>
-          Every decision — including every refusal — is appended to a hash-chained ledger.
-          Editing any earlier entry breaks every entry after it, which the console will let
-          you try.
+          Every decision — including every refusal — is appended to a hash-chained
+          ledger. Edit an earlier entry and every entry after it orphans, which the
+          console will let you try.
         </p>
       </section>
 
@@ -186,32 +186,32 @@ export function Landing({ onEnter }: { onEnter: () => void }) {
           <div data-reveal>
             <dt>No model decides</dt>
             <dd>
-              The gate is a pure function of the signed documents and the state. A language
-              model can propose and can advise, and cannot change a verdict. Prompt
-              injection in a product name is inert by construction, not by filtering.
+              The gate is a pure function of the signed documents. A model can
+              propose and advise; it cannot change a verdict. Prompt injection in a
+              product name is inert by construction, not by filtering.
             </dd>
           </div>
           <div data-reveal>
             <dt>Refusals are records</dt>
             <dd>
-              A blocked purchase is written to the ledger with its reasons, the same as an
-              allowed one. A control plane that only logs its successes cannot be audited.
+              A blocked purchase is written down with its reasons, the same as an
+              allowed one. A control plane that logs only its successes cannot be
+              audited.
             </dd>
           </div>
           <div data-reveal>
-            <dt>Your merchants, not ours</dt>
+            <dt>Categories you don&rsquo;t control</dt>
             <dd>
-              The acquirer's book of underwritten merchants and their ISO 18245 codes is a
-              file you supply. A merchant does not write its own category, so it cannot
-              relabel its way into a mandate it was not underwritten for.
+              A merchant&rsquo;s ISO 18245 code is assigned by its acquirer, so it
+              cannot relabel its way into a mandate it was never underwritten for.
             </dd>
           </div>
           <div data-reveal>
-            <dt>Checked before, provable after</dt>
+            <dt>Provable afterwards</dt>
             <dd>
-              The decision happens before settlement, and the evidence pack that comes out
-              the other side is what a merchant files when a customer disputes the charge.
-              Exportable as AP2 / W3C Verifiable Credentials.
+              The decision happens before settlement, and what comes out is what a
+              merchant files when a customer disputes the charge. Exportable as AP2
+              / W3C Verifiable Credentials.
             </dd>
           </div>
         </dl>
@@ -221,12 +221,12 @@ export function Landing({ onEnter }: { onEnter: () => void }) {
       <section className="lp-act lp-end">
         <h2 data-reveal>See it refuse something.</h2>
         <p className="lp-sub" data-reveal>
-          Four screens. A signed permission, a live agent that gets refused and adapts, the
-          money it would have cost, and the record afterwards.
+          A signed permission, a live model that gets refused and works out why, the
+          money it would have cost, and a real Razorpay payment at the end of it.
         </p>
         <div className="lp-actions" data-reveal>
           <button className="lp-cta lp-cta-lg" onClick={onEnter}>
-            Open the workspace
+            Open the console
           </button>
         </div>
       </section>

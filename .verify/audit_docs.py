@@ -216,6 +216,91 @@ if SHOTS.is_dir() and CONSOLE_SRC.is_dir():
         print(f"  ok   screenshots                    {len(list(SHOTS.glob('*.png')))} current")
 
 print()
+# -- the landing page ------------------------------------------------------- #
+#
+# It quotes five measured figures above the fold, and nothing checked them. Its
+# own docstring claimed this gate did. A landing page is the one surface where
+# a stale number is read by everybody and corrected by nobody.
+
+LANDING = ROOT / "console" / "src" / "components" / "Landing.tsx"
+
+if not LANDING.is_file():
+    failures.append("console/src/components/Landing.tsx is missing")
+else:
+    # Rupees are grouped Indian-style there (1,69,825) and western-style by
+    # `rupees()` here. Comparing digits sidesteps a difference that is only
+    # about where the commas go.
+    landing = re.sub(r"[,\s]+", "", LANDING.read_text())
+
+    def on_landing(label: str, value: object) -> None:
+        if str(value) not in landing:
+            failures.append(
+                f"landing page: says nothing matching {label} = {value}"
+            )
+
+    on_landing("the corpus size", results["cases"])
+    on_landing("what an amount ceiling misses", policies["amount_only"]["misses"])
+    on_landing("what Warrant misses", policies["warrant"]["misses"])
+    on_landing("what an amount ceiling leaks", policies["amount_only"]["leaked_paise"] // 100)
+    on_landing("what Warrant leaks", policies["warrant"]["leaked_paise"] // 100)
+    print("  ok   landing page                    numbers match")
+
+# -- the deck ---------------------------------------------------------------- #
+#
+# Same reason as the landing page, and one step worse: a deck is presented once,
+# to the people deciding, and nobody in the room can check a figure.
+
+DECK = ROOT / "docs" / "deck.html"
+
+if not DECK.is_file():
+    failures.append("docs/deck.html is missing")
+else:
+    deck = re.sub(r"[,\s]+", "", DECK.read_text())
+
+    def on_deck(label: str, value: object) -> None:
+        if str(value) not in deck:
+            failures.append(f"deck: says nothing matching {label} = {value}")
+
+    on_deck("the corpus size", results["cases"])
+    on_deck("what an amount ceiling misses", policies["amount_only"]["misses"])
+    on_deck("what Warrant misses", policies["warrant"]["misses"])
+    on_deck("what an amount ceiling leaks", policies["amount_only"]["leaked_paise"] // 100)
+    on_deck("what Warrant leaks", policies["warrant"]["leaked_paise"] // 100)
+    on_deck("what no gate leaks", policies["no_gate"]["leaked_paise"] // 100)
+    if actual_tests:
+        on_deck("the test count", int(actual_tests.group(1)))
+    on_deck("the gate count", gate_targets)
+    print("  ok   docs/deck.html                   numbers match")
+
+# -- the submission ---------------------------------------------------------- #
+#
+# SUBMISSION.md is the text that gets pasted into the form. It quoted two money
+# figures that had never been measured -- Rs 27,700 and Rs 281,635 against a
+# real Rs 30,208 and Rs 302,663 -- and an eight-gate count that had been eleven
+# for weeks. Of everything here it is the document where a stale number costs
+# the most and is checked by the fewest people.
+
+SUBMISSION = ROOT / "SUBMISSION.md"
+
+if not SUBMISSION.is_file():
+    failures.append("SUBMISSION.md is missing")
+else:
+    filed = re.sub(r"[,\s]+", "", SUBMISSION.read_text())
+
+    def on_form(label: str, value: object) -> None:
+        if str(value) not in filed:
+            failures.append(f"SUBMISSION.md: says nothing matching {label} = {value}")
+
+    on_form("the corpus size", results["cases"])
+    on_form("what an amount ceiling misses", policies["amount_only"]["misses"])
+    on_form("what Warrant misses", policies["warrant"]["misses"])
+    on_form("what Warrant leaks", policies["warrant"]["leaked_paise"] // 100)
+    on_form("what no gate leaks", policies["no_gate"]["leaked_paise"] // 100)
+    on_form("what an amount ceiling leaks", policies["amount_only"]["leaked_paise"] // 100)
+    on_form("the gate count", gate_targets)
+    print("  ok   SUBMISSION.md                    numbers match")
+
+
 # -- the narration script --------------------------------------------------- #
 #
 # NARRATION.md is read aloud over the film, so its numbers are the ones a judge
@@ -323,4 +408,5 @@ if failures:
         print("  -", f)
     sys.exit(1)
 
-print("every number in the README and the narration matches what the code measures")
+print("every number in the README, the landing page, the deck, the submission "
+      "and the narration matches what the code measures")

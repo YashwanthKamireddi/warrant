@@ -37,3 +37,22 @@ export function relativeWindow(from: number, to: number): string {
 export function ruleLabel(rule: string): string {
   return rule;
 }
+
+/** Category identifiers, said the way the permission was said.
+ *
+ * `food_beverage` is what the engine calls it and what an acquirer's category
+ * code maps to. On screen it read as "food beverage", which is not a phrase.
+ */
+const CATEGORY_WORDS: Record<string, string> = {
+  food_beverage: "food & drink",
+  merchandise: "merchandise",
+  electronics: "electronics",
+  grocery: "groceries",
+  pharmacy: "pharmacy",
+};
+
+export function categoryWords(categories: readonly string[]): string {
+  const said = categories.map((c) => CATEGORY_WORDS[c] ?? c.replace(/_/g, " "));
+  if (said.length <= 1) return said[0] ?? "";
+  return `${said.slice(0, -1).join(", ")} and ${said[said.length - 1]}`;
+}

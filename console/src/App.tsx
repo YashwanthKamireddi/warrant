@@ -1,34 +1,40 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "./api";
-import { rupees } from "./format";
-import { Certificate } from "./components/Certificate";
+import { categoryWords, rupees } from "./format";
 import { ChainDiagram } from "./components/ChainDiagram";
-import { DecisionCard } from "./components/DecisionCard";
 import { EvidenceView } from "./components/EvidenceView";
-import { AgentRun } from "./components/AgentRun";
-import { Counterfactual } from "./components/Counterfactual";
+import { Feed } from "./components/Feed";
 import { Landing } from "./components/Landing";
 import { LedgerView } from "./components/LedgerView";
 import { StandardsView } from "./components/StandardsView";
-import { Storefront } from "./components/Storefront";
-import { Rows, ShieldMark } from "./components/icons";
+import { ShieldMark } from "./components/icons";
 import { Gauge } from "./components/primitives";
 import type {
-  AgentAttempt,
   ChainStatus,
-  Comparison,
   EvidencePack,
+  FeedItem,
   LedgerEntry,
   Meta,
   Outcome,
   PendingIntent,
   Scope,
   Signature,
+  VerifiedPayment,
 } from "./types";
 
-
-
-
+/** The console.
+ *
+ * One screen. What you permitted at the top, everything that has happened
+ * since in the middle, where the money stands at the bottom, and the proof in
+ * a drawer for anyone who wants it.
+ *
+ * This replaced a four-act walkthrough with a Next button. That version
+ * explained the idea and demonstrated the product badly: the agent's work and
+ * your own sat on different screens, the record was a step you had to reach,
+ * and the real Razorpay order -- the most credible thing here -- was three
+ * clicks and a disclosure widget away from anything. Nobody who opened it
+ * could say what the software did.
+ */
 export function App() {
   // The landing page is the default. #workspace goes straight in, which is also
   // how the browser gates reach the console without clicking through.
@@ -36,72 +42,63 @@ export function App() {
     () => window.location.hash === "#workspace",
   );
 
-  /** The hash was read once, at mount, so the browser's back button did
-   *  nothing: leaving the workspace changed the URL and left the workspace on
-   *  screen. Following the hash both ways makes back and forward work, and
-   *  makes /#workspace a link somebody can actually send. */
   useEffect(() => {
     const follow = () => setEntered(window.location.hash === "#workspace");
     window.addEventListener("hashchange", follow);
     return () => window.removeEventListener("hashchange", follow);
   }, []);
 
+  /** Escape closes the drawer, because every drawer on the web does. */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setProofOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const [meta, setMeta] = useState<Meta | null>(null);
-  const [utterance, setUtterance] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingIntent | null>(null);
   const [signature, setSignature] = useState<Signature | null>(null);
-  const [justSigned, setJustSigned] = useState(false);
   const [scope, setScope] = useState<Scope | null>(null);
-  const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [chain, setChain] = useState<ChainStatus | null>(null);
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
-
-  const [rail] = useState<"simulated" | "razorpay">("simulated");
   const [razorpayReady, setRazorpayReady] = useState(false);
 
-  /** What the person answered when Warrant escalated to them. An escalation is
-   *  the gate working -- it means "a human has to say yes to this one" -- and
-   *  the walkthrough used to end there, with nobody asked. The run dead-ended,
-   *  nothing settled, and the real Razorpay order at the end of the story was
-   *  unreachable: the console said "nothing has settled yet" and gave no way to
-   *  make it. This is the missing half. */
-  const [cosigned, setCosigned] = useState<Outcome | null>(null);
-  const [declined, setDeclined] = useState(false);
-  /** Real order ids and rzp.io links, keyed by the decision they belong to. */
-  const [realOrders, setRealOrders] = useState<
-    Record<number, { order_id: string | null; payment_link: string | null }>
-  >({});
-  const [cosign, setCosign] = useState(false);
-  const [step, setStep] = useState(1);
-  const [comparison, setComparison] = useState<Comparison | null>(null);
-  const [attempts, setAttempts] = useState<AgentAttempt[]>([]);
+  /** Everything proposed so far, in order, whoever proposed it. */
+  const [feed, setFeed] = useState<FeedItem[]>([]);
   const [agentRunning, setAgentRunning] = useState(false);
+  const [agentStarted, setAgentStarted] = useState(false);
+  /** Set when a person answered "no" to the escalation, so it stops asking. */
+  const [declined, setDeclined] = useState(false);
+
+  /** Orders already created for a cart, so pressing pay twice does not create
+   *  two of them. */
+  const [realOrders, setRealOrders] = useState<
+    Record<string, { order_id: string | null; payment_link: string | null; amount_paise: number }>
+  >({});
+  /** Payments Razorpay signed, confirmed server-side against the key secret. */
+  const [paid, setPaid] = useState<Record<string, VerifiedPayment>>({});
+  const [payError, setPayError] = useState<string | null>(null);
   const [evidence, setEvidence] = useState<EvidencePack | null>(null);
   const [evidenceError, setEvidenceError] = useState<string | null>(null);
+  const [proofOpen, setProofOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [booting, setBooting] = useState(false);
 
-  /** Whose shop this is. It was the literal string "zomato", so pointing the
-   *  console at a real storefront left the storefront rendering nothing at all:
-   *  every product belonged to a merchant the filter had never heard of. */
+  /** Whose shop this is, read from the permission rather than hard-coded. */
   const merchant = useMemo(() => {
     if (scope?.merchants?.length) return scope.merchants[0]!;
     return meta?.catalog[0]?.merchant ?? "";
   }, [scope, meta]);
-
 
   useEffect(() => {
     api
       .meta()
       .then((m) => {
         setMeta(m);
-        setUtterance(m.default_utterance);
-        // The best rail this deployment can actually reach. Asking a visitor to
-        // choose between "simulated" and "real" put the most credible thing in
-        // the product -- a real Razorpay order id -- behind a decision most
-        // people never made.
         setRazorpayReady(m.rails.some((r) => r.id === "razorpay" && r.available));
       })
       .catch((e: ApiError) => setError(e.message));
@@ -119,7 +116,7 @@ export function App() {
     }
   }, []);
 
-  const refreshEvidence = async (id: string) => {
+  const refreshEvidence = useCallback(async (id: string) => {
     try {
       setEvidence(await api.evidence(id));
       setEvidenceError(null);
@@ -127,249 +124,17 @@ export function App() {
       setEvidence(null);
       setEvidenceError(e instanceof Error ? e.message : String(e));
     }
-  };
+  }, []);
 
-  const derive = () =>
-    run(async () => {
-      const started = await api.start(utterance, rail);
-      setSessionId(started.session_id);
-      setPending(started.pending);
-      setSignature(null);
-      setScope(null);
-      setOutcomes([]);
-      setLedger([]);
-      setChain(null);
-      setEvidence(null);
-      setEvidenceError(null);
-      setQuantities({});
-    });
-
-  const approve = () =>
-    run(async () => {
-      if (!sessionId) return;
-      const approved = await api.approve(sessionId);
-      setSignature(approved.intent.signature);
-      setScope(approved.scope);
-      setLedger(approved.ledger);
-      setChain(await api.chain(sessionId));
-      setJustSigned(true);
-      setTimeout(() => setJustSigned(false), 520);
-    });
-
-  const lines = useMemo(
-    () =>
-      Object.entries(quantities)
-        .filter(([, qty]) => qty > 0)
-        .map(([sku, qty]) => ({ sku, qty })),
-    [quantities],
-  );
-
-  const basketTotal = useMemo(() => {
-    if (!meta) return 0;
-    return lines.reduce((sum, line) => {
-      const product = meta.catalog.find((p) => p.sku === line.sku);
-      return sum + (product ? product.unit_paise * line.qty : 0);
-    }, 0);
-  }, [lines, meta]);
-
-  /** Preview both outcomes for whatever is in the basket. Side-effect free --
-   *  the engine evaluates against a copy of the state, so previewing never
-   *  consumes budget, a nonce or an attempt. */
-  useEffect(() => {
-    if (!sessionId || signature === null || lines.length === 0) {
-      setComparison(null);
-      return;
-    }
-    let cancelled = false;
-    api
-      .compare(sessionId, merchant, lines)
-      .then((c) => !cancelled && setComparison(c))
-      .catch(() => !cancelled && setComparison(null));
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId, signature, merchant, lines]);
-
-  const authorize = () =>
-    run(async () => {
-      if (!sessionId || lines.length === 0) return;
-      const result = await api.submitCart(sessionId, merchant, lines, cosign);
-      setOutcomes((prev) => [...prev, result.outcome]);
-      setScope(result.scope);
-      setLedger((prev) => [...prev, ...result.ledger_added]);
-      setChain(await api.chain(sessionId));
-      setQuantities({});
-      setCosign(false);
-      setStep(3);
-      if (result.outcome.receipt) void refreshEvidence(sessionId);
-    });
-
-  /** Approve the basket Warrant escalated, as the person who set the limit.
-   *
-   *  This is a real Ed25519 co-signature by the subject's key over the cart
-   *  body, and the same gate that escalated re-runs against it -- there is no
-   *  branch that waves it through. `step_up.cosignature` goes from fail to
-   *  pass because a signature now exists that did not before. */
-  const approveEscalation = (attempt: AgentAttempt) =>
-    run(async () => {
-      if (!sessionId) return;
-      const picks = attempt.agent.picks.map((p) => ({ sku: p.sku, qty: p.qty }));
-      const result = await api.submitCart(sessionId, merchant, picks, true);
-      setCosigned(result.outcome);
-      setScope(result.scope);
-      setLedger((prev) => [...prev, ...result.ledger_added]);
-      setChain(await api.chain(sessionId));
-      if (result.outcome.receipt) void refreshEvidence(sessionId);
-    });
-
-  /** Runs the scripted baskets one at a time and keeps whatever succeeded. A
-   *  single failing step used to discard the whole run, hiding the failure
-   *  behind an empty screen instead of showing it. */
-  const runScripted = (stay = false) =>
-    run(async () => {
-      if (!sessionId || !meta) return;
-      const failures: string[] = [];
-      for (const step of meta.scripted_steps) {
-        try {
-          const result = await api.submitCart(
-            sessionId,
-            step.merchant,
-            step.lines,
-            false,
-            step.replay_of,
-          );
-          setOutcomes((prev) => [...prev, { ...result.outcome, label: step.teaches }]);
-          setScope(result.scope);
-          setLedger((prev) => [...prev, ...result.ledger_added]);
-        } catch (e) {
-          failures.push(`${step.label}: ${e instanceof Error ? e.message : String(e)}`);
-        }
-      }
-      setChain(await api.chain(sessionId));
-      if (!stay) setStep(3);
-      void refreshEvidence(sessionId);
-      if (failures.length > 0) throw new Error(failures.join(" · "));
-    });
-
-  /** Finishes debits the rail accepted but had not yet captured. On the Razorpay
-   *  path this is the step that turns a paid link into a signed receipt. */
-  const settle = () =>
-    run(async () => {
-      if (!sessionId) return;
-      const result = await api.settle(sessionId);
-      if (result.settled.length > 0) {
-        setOutcomes((prev) => [...prev, ...result.settled]);
-        setScope(result.scope);
-        setLedger((prev) => [...prev, ...result.ledger_added]);
-        setChain(await api.chain(sessionId));
-        void refreshEvidence(sessionId);
-        setStep(3);
-      } else {
-        throw new Error("Nothing has been captured yet. Pay the link, then check again.");
-      }
-    });
-
-  /** Let the model shop. It is never told the customer's limits — only, if refused,
-   *  the reason. Watching it work that out is the demonstration. */
-  const runAgent = () =>
-    run(async () => {
-      if (!sessionId) return;
-      setAttempts([]);
-      setCosigned(null);
-      setDeclined(false);
-      
-      setAgentRunning(true);
-      try {
-        const result = await api.agentRun(sessionId, merchant);
-        setAttempts(result.attempts);
-        setScope(result.scope);
-        setLedger(result.ledger_added);
-        setChain(await api.chain(sessionId));
-        if (result.attempts.some((a) => a.outcome.receipt)) void refreshEvidence(sessionId);
-      } finally {
-        setAgentRunning(false);
-      }
-    });
-
-  /** Put an authorized cart on the real rail. The walkthrough runs on the
-   *  simulator so the audit trail completes; this is what produces a real
-   *  Razorpay order and a link a reviewer can open. */
-  const placeOnRazorpay = (index: number) =>
-    run(async () => {
-      if (!sessionId) return;
-      const placed = await api.placeOnRazorpay(sessionId, index);
-      setRealOrders((prev) => ({ ...prev, [index]: placed }));
-    });
-
-  const tamper = () =>
-    run(async () => {
-      if (!sessionId) return;
-      const result = await api.tamper(sessionId);
-      setChain(result.chain);
-      setStep(4);
-      if (evidence) void refreshEvidence(sessionId);
-    });
-
-  const revoke = () =>
-    run(async () => {
-      if (!sessionId) return;
-      const result = await api.revoke(sessionId);
-      setScope(result.scope);
-      setLedger((prev) => [...prev, ...result.ledger_added]);
-      setChain(await api.chain(sessionId));
-    });
-
-  /** Throw this session away and sign a fresh permission.
-   *
-   *  Revoking a mandate and breaking the chain are both meant to be pressed --
-   *  they are two of the four things this act offers. Both are also permanent,
-   *  and until now there was no way back from either: every basket afterwards
-   *  was refused, correctly, for ever, and the console never said why or
-   *  offered a way out. A demonstration you can brick and not un-brick is a
-   *  demonstration people press once. */
-  const restart = () =>
-    run(async () => {
-      setSessionId(null);
-      setPending(null);
-      setSignature(null);
-      setScope(null);
-      setOutcomes([]);
-      setLedger([]);
-      setChain(null);
-      setAttempts([]);
-      setAgentStarted(false);
-      setCosigned(null);
-      setDeclined(false);
-      setQuantities({});
-      setRealOrders({});
-      setEvidence(null);
-      setEvidenceError(null);
-      setStep(1);
-    });
-
-  const approved = signature !== null;
-  const revoked = scope?.revoked === true;
-  const chainBroken = chain?.break != null;
-  const settledSomething = ledger.some((e) => e.kind === "debit_settled");
-  const needsCosign =
-    scope?.step_up_over_paise != null && basketTotal > scope.step_up_over_paise;
+  const push = (outcome: Outcome, extra: Partial<FeedItem> = {}) =>
+    setFeed((prev) => [
+      ...prev,
+      { id: `${outcome.cart.id}-${prev.length}`, outcome, ...extra },
+    ]);
 
   // ------------------------------------------------------------- bootstrap
-  /** A visitor should land on something real, not an empty form. The permission
-   *  is derived and signed on arrival so step 1 opens on a signed certificate
-   *  and the counterfactual on step 3 has a scope to evaluate against. */
-  const [booting, setBooting] = useState(false);
-
-  /** The agent shops the moment you arrive at its act. It was a button, which
-   *  made the one screen where a real model does real work look like an offer
-   *  rather than the product. */
-  const [agentStarted, setAgentStarted] = useState(false);
-  useEffect(() => {
-    if (step !== 2 || !approved || agentStarted || agentRunning || busy) return;
-    setAgentStarted(true);
-    void runAgent();
-  }, [step, approved, agentStarted, agentRunning, busy, runAgent]);
-
+  /** A visitor lands on something real, not an empty form: the permission is
+   *  derived and signed on arrival, and the agent starts shopping against it. */
   useEffect(() => {
     if (!entered || !meta || sessionId || booting) return;
     setBooting(true);
@@ -378,15 +143,12 @@ export function App() {
         // Deliberately the simulator, and the chip says so.
         //
         // A real Razorpay payment cannot be completed server to server -- the
-        // customer authorises on their own device, which is exactly the property
-        // that makes the rail trustworthy. Defaulting the walkthrough to it
-        // therefore leaves every debit at settled=false forever: no receipt, no
-        // evidence pack, and an AP2 export missing its PaymentMandate. The
-        // audit trail is the thing being demonstrated, so it has to complete.
-        //
-        // The real rail is one click away on any allowed decision, and it
-        // creates a real order and a real payment link. Nothing here pretends
-        // to be Razorpay while running on the simulator.
+        // customer authorises on their own device, which is exactly the
+        // property that makes the rail trustworthy. Defaulting to it therefore
+        // leaves every debit at settled=false forever: no receipt, no evidence
+        // pack, and an AP2 export missing its PaymentMandate. The audit trail
+        // is the thing being demonstrated, so it has to complete. The real rail
+        // is one click away on any allowed decision.
         const started = await api.start(meta.default_utterance, "simulated");
         setSessionId(started.session_id);
         setPending(started.pending);
@@ -403,17 +165,95 @@ export function App() {
     })();
   }, [entered, meta, sessionId, booting]);
 
+  /** Let the model shop. It is never told the limits — only, if refused, the
+   *  reason. Watching it work that out is the demonstration, so it runs on
+   *  arrival rather than waiting behind a button. */
+  const runAgent = useCallback(
+    () =>
+      run(async () => {
+        if (!sessionId) return;
+        setAgentRunning(true);
+        try {
+          const result = await api.agentRun(sessionId, merchant);
+          setFeed((prev) => [
+            ...prev,
+            ...result.attempts.map((a, i) => ({
+              id: `${a.outcome.cart.id}-${prev.length + i}`,
+              agent: a.agent,
+              outcome: a.outcome,
+            })),
+          ]);
+          setScope(result.scope);
+          setLedger(result.ledger_added);
+          setChain(await api.chain(sessionId));
+          if (result.attempts.some((a) => a.outcome.receipt)) {
+            void refreshEvidence(sessionId);
+          }
+        } finally {
+          setAgentRunning(false);
+        }
+      }),
+    [run, sessionId, merchant, refreshEvidence],
+  );
+
+  /** `?agent=manual` opens the console without spending a model call.
+   *
+   *  The layout and overlap gates open the page at eleven viewports each. With
+   *  the agent running on arrival that is eleven live runs per gate, which is
+   *  slow, rate-limits a free key, and tests nothing either gate is for -- they
+   *  measure boxes. The gates that are actually about the agent still open it
+   *  the way a visitor does. */
+  const autoAgent = useMemo(
+    () => new URLSearchParams(window.location.search).get("agent") !== "manual",
+    [],
+  );
+
+  useEffect(() => {
+    if (!autoAgent) return;
+    if (!entered || !signature || agentStarted || agentRunning || busy) return;
+    setAgentStarted(true);
+    void runAgent();
+  }, [autoAgent, entered, signature, agentStarted, agentRunning, busy, runAgent]);
+
+  /** The escalation waiting on a person, if there is one. Only ever the last
+   *  entry: an escalation the agent already worked around is history. */
+  const askAbout = useMemo(() => {
+    if (agentRunning || declined) return null;
+    const last = feed[feed.length - 1];
+    return last && last.outcome.verdict === "escalate" ? last : null;
+  }, [feed, agentRunning, declined]);
+
+  /** Approve the basket Warrant escalated, as the person who set the limit.
+   *
+   *  A real Ed25519 co-signature by the subject's key over the cart body, and
+   *  the same gate re-runs against it. `step_up.cosignature` goes from fail to
+   *  pass because a signature now exists that did not before — there is no
+   *  branch that waves it through, and a basket that also fails on category or
+   *  budget stays refused with the signature attached. */
+  const approveEscalation = (item: FeedItem) =>
+    run(async () => {
+      if (!sessionId) return;
+      const picks = item.outcome.cart.line_items.map((l) => ({
+        sku: l.sku,
+        qty: l.qty,
+      }));
+      const result = await api.submitCart(sessionId, merchant, picks, true);
+      push(result.outcome, { note: "You approved it, and signed it with your key." });
+      setScope(result.scope);
+      setLedger((prev) => [...prev, ...result.ledger_added]);
+      setChain(await api.chain(sessionId));
+      if (result.outcome.receipt) void refreshEvidence(sessionId);
+    });
+
   /** The cheapest thing this merchant sells that the permission does not cover.
    *  Asked of the catalogue rather than named: the products are a real
-   *  storefront's now, so a hard-coded sku is a promise about somebody else's
-   *  inventory -- and it was `powerbank`, which that merchant does not stock. */
+   *  storefront's, so a hard-coded sku is a promise about somebody else's
+   *  inventory. Never one of the adversarial fixtures Warrant appends — seeding
+   *  this with our own planted item would make the sharpest moment in the
+   *  console look invented. */
   const outOfScope = useMemo(() => {
     if (!meta || !scope) return null;
     const permitted = new Set(scope.categories);
-    // A product the merchant actually sells, never one of the adversarial
-    // fixtures Warrant appends. Seeding the counterfactual with our own planted
-    // item makes the strongest screen in the console look invented, which is
-    // the whole reason the catalogue is a real storefront's now.
     return (
       meta.catalog
         .filter(
@@ -426,16 +266,188 @@ export function App() {
     );
   }, [meta, scope, merchant]);
 
-  /** The order placed from the record, keyed at -1 so it cannot collide with a
-   *  decision's own index. */
-  const latestRealOrder = realOrders[-1];
+  /** Buy something the permission never covered, and price the refusal.
+   *
+   *  The counterfactual is a real evaluation by the same gate against a copy of
+   *  the state, so asking what it would have cost consumes no budget, nonce or
+   *  attempt. */
+  const probeOutOfScope = () =>
+    run(async () => {
+      if (!sessionId || !outOfScope) return;
+      const picks = [{ sku: outOfScope.sku, qty: 1 }];
+      const [result, comparison] = await Promise.all([
+        api.submitCart(sessionId, merchant, picks, false),
+        api.compare(sessionId, merchant, picks).catch(() => null),
+      ]);
+      push(result.outcome, {
+        note: `Something you never asked for: ${outOfScope.name}.`,
+        ...(comparison ? { counterfactual: comparison } : {}),
+      });
+      setScope(result.scope);
+      setLedger((prev) => [...prev, ...result.ledger_added]);
+      setChain(await api.chain(sessionId));
+    });
 
-  const seedBasket = (n: number) => {
-    setStep(n);
-    if (n === 3 && approved && outOfScope && Object.keys(quantities).length === 0) {
-      setQuantities({ [outOfScope.sku]: 1 });
-    }
-  };
+  /** The five baskets that each teach a different verdict — replay, expiry, a
+   *  planted product name, a merchant swap, a ceiling breach. Real evaluations,
+   *  kept because a record with one refusal in it does not show what a record
+   *  is for. */
+  const runScripted = () =>
+    run(async () => {
+      if (!sessionId || !meta) return;
+      const failures: string[] = [];
+      for (const step of meta.scripted_steps) {
+        try {
+          const result = await api.submitCart(
+            sessionId,
+            step.merchant,
+            step.lines,
+            false,
+            step.replay_of,
+          );
+          push(result.outcome, { note: step.teaches });
+          setScope(result.scope);
+          setLedger((prev) => [...prev, ...result.ledger_added]);
+        } catch (e) {
+          failures.push(`${step.label}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+      setChain(await api.chain(sessionId));
+      void refreshEvidence(sessionId);
+      if (failures.length > 0) throw new Error(failures.join(" · "));
+    });
+
+  /** Pay for an allowed cart on Razorpay, in Razorpay's own payment sheet.
+   *
+   *  The server creates a real test-mode order, Checkout opens over the page,
+   *  and whatever it hands back goes straight to the server to be checked
+   *  against the key secret. A browser saying it paid is not evidence; an HMAC
+   *  only the server can recompute is. Until that check returns, nothing here
+   *  claims the payment happened.
+   */
+  const payOnRazorpay = (item: FeedItem) =>
+    run(async () => {
+      if (!sessionId || !meta?.razorpay_key_id) return;
+
+      // Reuse the order this cart already has. Closing Razorpay and pressing
+      // the button again used to mint a second order for the same basket, so a
+      // reviewer who dismissed the sheet once left two orders on the account
+      // for one purchase -- and a test account gets thirty a day.
+      const placed =
+        realOrders[item.id] ?? (await api.placeOnRazorpay(sessionId, -1));
+      setRealOrders((prev) => ({ ...prev, [item.id]: placed }));
+      if (!placed.order_id || !window.Razorpay) return;
+
+      const checkout = new window.Razorpay({
+        key: meta.razorpay_key_id,
+        order_id: placed.order_id,
+        amount: placed.amount_paise,
+        currency: "INR",
+        name: merchant,
+        description: item.outcome.cart.line_items
+          .map((l) => `${l.name} ×${l.qty}`)
+          .join(", "),
+        // Razorpay's sheet takes a literal colour, so read it from the token
+        // rather than writing the hex twice and letting them drift.
+        theme: {
+          color:
+            getComputedStyle(document.documentElement)
+              .getPropertyValue("--brand")
+              .trim() || undefined,
+        },
+        // Netbanking, and a contact already filled in.
+        //
+        // Razorpay's own /v1/methods for this account reports upi: false, so
+        // the sheet never offered it -- and the generic test card numbers come
+        // back "international cards not supported", because a test account is
+        // an Indian account and those cards are not. Netbanking is enabled
+        // here on forty banks and its test flow ends on a page with a Success
+        // button, so it is the path that actually completes. The contact step
+        // is prefilled because being asked for a phone number is not part of
+        // what this is demonstrating.
+        // Razorpay collects a mobile number itself no matter what is passed
+        // for `contact`, so that field is not set: config that does nothing is
+        // worse than no config, because the next person believes it. The email
+        // does take, and the method opens the sheet on netbanking.
+        prefill: { method: "netbanking", email: "test@razorpay.com" },
+        modal: {
+          ondismiss: () =>
+            setPayError(
+              "You closed Razorpay before paying. The order is still open — the " +
+                "button reopens it.",
+            ),
+        },
+        handler: (response) => {
+          setPayError(null);
+          void run(async () => {
+            const proof = await api.verifyRazorpay(sessionId, response);
+            setPaid((prev) => ({ ...prev, [item.id]: proof }));
+          });
+        },
+      });
+
+      // Razorpay declining a payment is a real answer from a real API, and the
+      // console says what it said rather than falling silent.
+      checkout.on("payment.failed", (failure) => {
+        const why = failure.error?.description || failure.error?.reason;
+        setPayError(
+          why
+            ? `Razorpay declined it: ${why}. On this test account, pay by ` +
+              "Netbanking — pick any bank and press Success on the page it opens."
+            : "Razorpay declined the payment. Pay by Netbanking: pick any bank, " +
+              "then Success.",
+        );
+      });
+
+      checkout.open();
+    });
+
+  const tamper = () =>
+    run(async () => {
+      if (!sessionId) return;
+      const result = await api.tamper(sessionId);
+      setChain(result.chain);
+      setProofOpen(true);
+      if (evidence) void refreshEvidence(sessionId);
+    });
+
+  const revoke = () =>
+    run(async () => {
+      if (!sessionId) return;
+      const result = await api.revoke(sessionId);
+      setScope(result.scope);
+      setLedger((prev) => [...prev, ...result.ledger_added]);
+      setChain(await api.chain(sessionId));
+    });
+
+  /** Revoking and breaking the chain are both permanent, which is the point of
+   *  them. A demonstration you can brick and cannot un-brick is one people
+   *  press once, so this hands back a fresh permission. */
+  const restart = () =>
+    run(async () => {
+      setSessionId(null);
+      setPending(null);
+      setSignature(null);
+      setScope(null);
+      setLedger([]);
+      setChain(null);
+      setFeed([]);
+      setAgentStarted(false);
+      setDeclined(false);
+      setRealOrders({});
+      setPaid({});
+      setPayError(null);
+      setEvidence(null);
+      setEvidenceError(null);
+      setProofOpen(false);
+    });
+
+  const approved = signature !== null;
+  const revoked = scope?.revoked === true;
+  const chainBroken = chain?.break != null;
+  const refusals = feed.filter((f) => f.outcome.verdict === "block").length;
+  const escalations = feed.filter((f) => f.outcome.verdict === "escalate").length;
+  const settledItem = [...feed].reverse().find((f) => f.outcome.rail?.settled) ?? null;
 
   if (!entered) {
     return (
@@ -447,38 +459,6 @@ export function App() {
       />
     );
   }
-
-  const STEPS = [
-    // One viewpoint the whole way through: you are the person whose money it
-    // is. The walkthrough used to cast the viewer as three different people --
-    // "You are Priya", then the agent, then the risk team -- without ever
-    // saying who Priya was, and then Warrant would escalate and address "you"
-    // as the customer while the band still said you were the agent.
-    // The line under each title says what you are looking at. It used to name
-    // which character you were playing, which is only useful if you already
-    // understand the product.
-    {
-      n: 1,
-      label: "You set a permission",
-      who: "What you told your agent it may spend — and the hard bounds that came out of it.",
-    },
-    {
-      n: 2,
-      label: "Your agent shops",
-      who: "A live model buying from a real shop, with no idea what your limits are.",
-    },
-    {
-      n: 3,
-      label: "What it prevents",
-      who: "The same basket in two worlds — with Warrant, and without — priced in rupees.",
-    },
-    {
-      n: 4,
-      label: "The record",
-      who: "Everything that happened, in order, and what a merchant could show a bank.",
-    },
-  ];
-  const here = STEPS[step - 1] ?? STEPS[0]!;
 
   return (
     <div className="shell">
@@ -494,34 +474,27 @@ export function App() {
           </span>
         </a>
         <span className="grow" />
-        {scope?.revoked && (
+        {revoked && (
           <span className="pill stop">
             <span className="dot" />
-            Revoked
+            Permission revoked
           </span>
         )}
-        {sessionId && (
-          <span className={`pill ${rail === "razorpay" ? "ok" : ""}`}>
-            <span className="dot" />
-            {rail === "razorpay" ? "Razorpay test mode" : "Simulated rail"}
-          </span>
-        )}
+        {/* "Simulated rail" is a word from inside the engine. What a reader
+            needs to know is that no real money is at stake, which is a
+            different sentence and the one that reassures rather than puzzles. */}
+        <span className="pill" title="Razorpay test mode. No real money can move.">
+          <span className="dot" />
+          Test mode — no real money
+        </span>
+        <button
+          className={`btn btn-sm${proofOpen ? " on" : ""}`}
+          onClick={() => setProofOpen((v) => !v)}
+          aria-expanded={proofOpen}
+        >
+          {proofOpen ? "Hide the record" : "See the record"}
+        </button>
       </header>
-
-      {/* --------------------------------------------------------- stepper */}
-      <nav className="steps" aria-label="Walkthrough">
-        {STEPS.map((s) => (
-          <button
-            key={s.n}
-            className={`stepbtn${step === s.n ? " on" : ""}${step > s.n ? " done" : ""}`}
-            aria-current={step === s.n ? "step" : undefined}
-            onClick={() => seedBasket(s.n)}
-          >
-            <span className="stepbtn-n">{s.n}</span>
-            <span className="stepbtn-label">{s.label}</span>
-          </button>
-        ))}
-      </nav>
 
       {error && (
         <div className="stage-error" role="alert">
@@ -533,10 +506,10 @@ export function App() {
         <div className="spent-banner" role="status">
           <span>
             {revoked && chainBroken
-              ? "This permission is revoked and this ledger is broken."
+              ? "This permission is revoked and this record is broken."
               : revoked
                 ? "This permission is revoked, so every basket from here is refused."
-                : "This ledger is broken, so every entry after the edit is orphaned."}{" "}
+                : "This record is broken, so every entry after the edit is orphaned."}{" "}
             Both are permanent, which is the point of them.
           </span>
           <button className="btn btn-sm" onClick={restart} disabled={busy}>
@@ -545,253 +518,159 @@ export function App() {
         </div>
       )}
 
-      {/* ----------------------------------------------------------- stage */}
-      <main className="stage">
-        {step === 1 && (
-          <section className="act">
-            <h1 className="act-head">
-              You say it once. Your key signs it. Nothing can be spent outside it.
-            </h1>
-            <p className="act-sub">{here!.who}</p>
-            {pending ? (
-              <>
-                <blockquote className="said-big">{utterance}</blockquote>
-                <Certificate
-                  pending={pending}
-                  scope={scope}
-                  signature={signature}
-                  justSigned={justSigned}
-                />
-              </>
-            ) : (
-              <p className="act-wait">Deriving the permission…</p>
+      <main className="work">
+        {/* ------------------------------------------------- the permission */}
+        <section className="perm" aria-label="What you permitted">
+          <div className="perm-said">
+            <span className="perm-label">You said, once</span>
+            <p className="perm-quote">
+              {pending ? `“${meta?.default_utterance ?? ""}”` : "…"}
+            </p>
+          </div>
+          <div className="perm-bounds">
+            <span className="perm-label">
+              {approved ? "So your agent may spend" : "Deriving the bounds…"}
+            </span>
+            {scope && (
+              <ul className="bounds">
+                <li>
+                  up to <b className="num">{rupees(scope.max_total_paise)}</b> in total
+                </li>
+                <li>
+                  at <b>{merchant}</b>, nowhere else
+                </li>
+                <li>
+                  on <b>{categoryWords(scope.categories)}</b> only
+                </li>
+                <li>
+                  across <b>{scope.max_txns}</b> orders
+                </li>
+                {scope.step_up_over_paise !== null && (
+                  <li>
+                    and anything over <b className="num">{rupees(scope.step_up_over_paise)}</b>{" "}
+                    has to come back to you
+                  </li>
+                )}
+              </ul>
             )}
-
-            <details className="tryown">
-              <summary>Use your own words</summary>
-              <textarea
-                className="field"
-                value={utterance}
-                onChange={(e) => setUtterance(e.target.value)}
-                spellCheck={false}
-                aria-label="Instruction given to the agent"
-              />
-              <button
-                className="btn btn-primary"
-                onClick={derive}
-                disabled={busy || !utterance.trim()}
-              >
-                {busy ? "Deriving…" : "Derive a new permission"}
-              </button>
-              {pending && !approved && (
-                <button className="btn btn-primary" onClick={approve} disabled={busy}>
-                  Approve and sign with the subject&rsquo;s key
-                </button>
-              )}
-            </details>
-          </section>
-        )}
-
-        {step === 2 && (
-          <section className="act">
-            <h1 className="act-head">
-              Your agent is never told your limits. It finds them by being refused.
-            </h1>
-            <p className="act-sub">{here!.who}</p>
-            <div className="act-do">
-              <button
-                className="btn btn-primary"
-                onClick={runAgent}
-                disabled={busy || !approved || agentRunning}
-              >
-                {agentRunning
-                  ? "The agent is shopping…"
-                  : attempts.length > 0
-                    ? "Run it again"
-                    : "Run the agent"}
-              </button>
-              {/* This screen promises that a model reads the instruction. Whether
-                  one is actually reachable belongs next to the button that
-                  claims it, not in a chip in the corner -- and a clone with no
-                  key should find out before clicking, not after. */}
-              {meta && (
-                <span className="act-note" title={meta.capability_note}>
-                  {meta.capability.credentials_configured
-                    ? "A live model call."
-                    : meta.capability.transcript_available
-                      ? "No model configured, so this replays a captured response — " +
-                        meta.capability.transcript_provenance
-                      : "No model configured and no transcript, so the scope stays at " +
-                        "the deterministic minimum."}
-                </span>
-              )}
-            </div>
-            <AgentRun
-              attempts={attempts}
-              running={agentRunning}
-              cosigned={cosigned}
-              declined={declined}
-              busy={busy}
-              onApprove={approveEscalation}
-              onDecline={() => setDeclined(true)}
-              onPlaceOnRazorpay={
-                razorpayReady && cosigned?.receipt ? () => placeOnRazorpay(-1) : undefined
-              }
-              realOrder={latestRealOrder}
-            />
-          </section>
-        )}
-
-        {step === 3 && (
-          <section className="act">
-            <h1 className="act-head">
-              Put something in the basket you never permitted.
-            </h1>
-            <p className="act-sub">{here!.who}</p>
-            <Counterfactual
-              comparison={comparison}
-              empty="Add anything below to see what it costs with and without Warrant."
-            />
-            {meta && (
-              <Storefront
-                catalog={meta.catalog}
-                quantities={quantities}
-                merchant={merchant}
-                permitted={scope?.categories}
-                onChange={(sku, qty) =>
-                  setQuantities((q) => ({ ...q, [sku]: qty }))
-                }
-                disabled={!approved || busy}
-              />
-            )}
-            <div className="act-do">
-              <button
-                className="btn btn-primary"
-                onClick={authorize}
-                disabled={busy || !approved || lines.length === 0}
-              >
-                Authorise this basket
-                <span className="btn-amount">{rupees(basketTotal)}</span>
-              </button>
-              {needsCosign && (
-                <label className="cosign">
-                  <input
-                    type="checkbox"
-                    checked={cosign}
-                    onChange={(e) => setCosign(e.target.checked)}
-                  />
-                  Attach the second signature this amount requires
-                </label>
-              )}
-            </div>
-            {outcomes.length > 0 && (
-              <div className="decisions">
-                {outcomes.map((outcome, i) => (
-                  <DecisionCard
-                    key={`${outcome.cart.id}-${i}`}
-                    outcome={outcome}
-                    index={i}
-                    realOrder={realOrders[i]}
-                    onPlaceOnRazorpay={
-                      razorpayReady && outcome.receipt ? () => placeOnRazorpay(i) : undefined
-                    }
-                    busy={busy}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        {step === 4 && (
-          <section className="act">
-            <h1 className="act-head">
-              Every decision, in order, and provable after the fact.
-            </h1>
-            <p className="act-sub">{here!.who}</p>
-            {ledger.length < 3 && (
-              <div className="act-do">
-                <button
-                  className="btn btn-primary"
-                  onClick={() => runScripted(true)}
-                  disabled={busy || !approved}
-                >
-                  {busy ? "Deciding…" : "Put five baskets through the gate"}
-                </button>
-                <span className="act-note">
-                  Nothing has been decided yet, so there is nothing to prove. This
-                  runs the five that teach each verdict and writes every one of
-                  them — including the refusals — into the record below.
-                </span>
-              </div>
-            )}
-            <LedgerView entries={ledger} chain={chain} />
-            {/* Where somebody looking for "the payment" actually looks. The
-                action existed only on a decision card on the previous act, and
-                an allowed card is collapsed by default, so the one thing that
-                produces a real Razorpay order was behind a chevron. */}
-            {/* Only when something actually settled. Offering it otherwise gives
-                you a button whose only possible answer is "nothing has settled
-                yet" -- which is true, and is not a thing to make somebody click
-                to find out. */}
-            {razorpayReady && !settledSomething && (
-              <p className="act-note">
-                Nothing has settled yet, so there is no debit to put on Razorpay.
-                Let the agent buy something the permission covers, or run the five
-                baskets above.
+            {signature && (
+              <p className="perm-sig">
+                Signed by your own key · <span className="mono">{signature.key_id}</span>.
+                Nothing in this system can widen it.
               </p>
             )}
+          </div>
+        </section>
 
-            {razorpayReady && settledSomething && (
-              <div className="act-do">
-                {latestRealOrder ? (
-                  <span className="real-rail placed">
-                    <b>On Razorpay</b>
-                    <span className="mono">{latestRealOrder.order_id}</span>
-                    {latestRealOrder.payment_link && (
-                      <a
-                        className="btn btn-sm"
-                        href={latestRealOrder.payment_link}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open the real checkout ↗
-                      </a>
-                    )}
-                  </span>
-                ) : (
-                  <>
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => placeOnRazorpay(-1)}
-                      disabled={busy}
-                    >
-                      {busy ? "Placing…" : "Place the settled debit on real Razorpay"}
-                    </button>
-                    <span className="act-note">
-                      The walkthrough settles on the simulator so this record can
-                      complete — a real payment finishes on the customer's own
-                      device. This puts the same signed cart on Razorpay and gives
-                      you the order and the checkout link it produced.
-                    </span>
-                  </>
-                )}
-              </div>
+        {/* -------------------------------------------------------- the feed */}
+        <section className="live" aria-label="What has happened">
+          {approved && (
+            <div className="live-do">
+              {outOfScope && (
+                <button
+                  className="btn btn-primary"
+                  onClick={probeOutOfScope}
+                  disabled={busy || agentRunning}
+                >
+                  Try to buy something you never asked for
+                </button>
+              )}
+              <button className="btn" onClick={runAgent} disabled={busy || agentRunning}>
+                Let the agent shop again
+              </button>
+              <button className="btn" onClick={runScripted} disabled={busy || agentRunning}>
+                Put five harder baskets through it
+              </button>
+            </div>
+          )}
+
+          <Feed
+            items={feed}
+            running={agentRunning || booting}
+            busy={busy}
+            askAbout={askAbout}
+            onApprove={approveEscalation}
+            onDecline={() => setDeclined(true)}
+            onPay={razorpayReady && meta?.razorpay_key_id ? payOnRazorpay : undefined}
+            payments={paid}
+            payError={payError}
+          />
+
+          {declined && (
+            <p className="live-note">
+              You said no, so the basket was never submitted and no money moved.
+              Warrant asking is already in the record — a dispute usually turns on
+              what was stopped.
+            </p>
+          )}
+        </section>
+      </main>
+
+      {/* ------------------------------------------------ where the money is */}
+      <footer className="money">
+        {scope && (
+          <>
+            <Gauge label="Spent" used={scope.spent_paise} total={scope.max_total_paise} />
+            <Gauge
+              label="Orders"
+              used={scope.txns_used}
+              total={scope.max_txns}
+              unit="count"
+            />
+            <span className="money-refused">
+              <b>{refusals}</b> {refusals === 1 ? "basket" : "baskets"} refused
+            </span>
+            {escalations > 0 && (
+              <span className="money-asked">
+                <b>{escalations}</b> sent back for your approval
+              </span>
             )}
+          </>
+        )}
+        <span className="grow" />
+        {settledItem && paid[settledItem.id] && (
+          <span className="money-order">
+            Paid on Razorpay{" "}
+            <span className="mono">{paid[settledItem.id]!.payment_id}</span>
+          </span>
+        )}
+      </footer>
 
-            <div className="act-do">
+      {/* ------------------------------------------------------- the drawer */}
+      {proofOpen && (
+        <>
+          {/* Dimming what is behind it is what makes a panel read as a layer
+              rather than as a column that appeared. Clicking it closes. */}
+          <div
+            className="proof-scrim"
+            onClick={() => setProofOpen(false)}
+            aria-hidden
+          />
+          <aside className="proof" role="dialog" aria-label="The proof" aria-modal>
+            <header className="proof-head">
+              <div>
+                <h2>The proof</h2>
+                <p className="proof-sub">
+                  Every decision above, in order, with what a merchant would send a
+                  bank if you disputed one.
+                </p>
+              </div>
+              <button className="btn btn-sm" onClick={() => setProofOpen(false)}>
+                Close
+              </button>
+            </header>
+
+            <LedgerView entries={ledger} chain={chain} />
+
+            <div className="proof-do">
               <button className="btn" onClick={tamper} disabled={busy || !sessionId}>
-                <Rows size={13} /> Try to rewrite the ledger
+                Try to rewrite the ledger
               </button>
               <button className="btn" onClick={revoke} disabled={busy || !approved}>
                 Revoke the permission
               </button>
-              {outcomes.some((o) => o.rail?.ok && !o.rail.settled) && (
-                <button className="btn" onClick={settle} disabled={busy}>
-                  Settle what the rail captured
-                </button>
-              )}
             </div>
+
             <details className="more">
               <summary>The dispute pack a merchant would file</summary>
               <EvidenceView pack={evidence} error={evidenceError} />
@@ -804,32 +683,9 @@ export function App() {
               <summary>How the three artefacts bind to each other</summary>
               <ChainDiagram />
             </details>
-          </section>
-        )}
-      </main>
-
-      {/* ------------------------------------------------------- stage nav */}
-      <footer className="stagenav">
-        <button className="btn" onClick={() => setStep(step - 1)} disabled={step === 1}>
-          Back
-        </button>
-        {scope && (step === 2 || step === 3) && (
-          <span className="budget">
-            <Gauge label="Spent" used={scope.spent_paise} total={scope.max_total_paise} />
-            <Gauge label="Orders" used={scope.txns_used} total={scope.max_txns} unit="count" />
-          </span>
-        )}
-        <span className="grow" />
-        {step === 4 ? (
-          <a className="btn btn-primary" href="#">
-            Back to the overview
-          </a>
-        ) : (
-          <button className="btn btn-primary" onClick={() => seedBasket(step + 1)}>
-            Next — {STEPS[step]!.label}
-          </button>
-        )}
-      </footer>
+          </aside>
+        </>
+      )}
     </div>
   );
 }

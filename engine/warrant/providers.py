@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ValidationError
@@ -126,9 +127,20 @@ class AnthropicProvider:
         if client is not None:
             self._client = client
             return
+        # A provider with no key is unavailable, and has to say so here rather
+        # than at call time. The SDK will happily construct against ambient
+        # workload credentials it finds in the environment -- a developer
+        # machine running some other Anthropic tool has them -- so an empty
+        # ANTHROPIC_API_KEY produced a provider that built, led the order, and
+        # failed every call with "credentials rejected". The console reported
+        # that verbatim, mid-demo, on the one screen where a live model is the
+        # entire point.
+        key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+        if not key:
+            raise RuntimeError("ANTHROPIC_API_KEY is not set")
         import anthropic
 
-        self._client = anthropic.Anthropic()
+        self._client = anthropic.Anthropic(api_key=key)
 
     def structured(
         self,
@@ -147,6 +159,17 @@ class AnthropicProvider:
             output_format=output_format,
         )
         return response.parsed_output
+
+
+def _retry_after(response: Any) -> float | None:
+    """How long Groq asked us to wait, when it says so."""
+    raw = response.headers.get("retry-after")
+    if raw is None:
+        return 1.0
+    try:
+        return float(raw)
+    except ValueError:
+        return None
 
 
 class GroqProvider:
@@ -186,21 +209,35 @@ class GroqProvider:
             f"against this JSON Schema:\n{schema}"
         )
 
-        response = httpx.post(
-            self.ENDPOINT,
-            timeout=self._timeout,
-            headers={"Authorization": f"Bearer {self._key}"},
-            json={
-                "model": model,
-                "max_tokens": max_tokens,
-                "temperature": 0,
-                "response_format": {"type": "json_object"},
-                "messages": [
-                    {"role": "system", "content": instructions},
-                    {"role": "user", "content": content},
-                ],
-            },
-        )
+        payload = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": instructions},
+                {"role": "user", "content": content},
+            ],
+        }
+
+        # The free tier rate-limits, and one agent run is several calls in a few
+        # seconds -- scope derivation, a basket per attempt, the advisory judge.
+        # Falling back to a fixed basket because the second call landed a
+        # millisecond too early is a worse answer than waiting a moment, and it
+        # is the difference between a live demonstration and an apology.
+        for attempt in range(3):
+            response = httpx.post(
+                self.ENDPOINT,
+                timeout=self._timeout,
+                headers={"Authorization": f"Bearer {self._key}"},
+                json=payload,
+            )
+            if response.status_code != 429 or attempt == 2:
+                break
+            wait = _retry_after(response)
+            if wait is None or wait > 8:
+                break
+            time.sleep(wait)
         response.raise_for_status()
         body = response.json()["choices"][0]["message"]["content"]
 

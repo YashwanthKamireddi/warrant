@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Warrant — Razorpay AI Buildathon, Track 01</title>
+<style>
+  /* A deck that is one file and prints to PDF without a tool.
+     Open it, Cmd/Ctrl-P, "Save as PDF", landscape, background graphics on. */
+
+  :root {
+    --ink: #101828;
+    --ink-2: #344054;
+    --ink-3: #667085;
+    --line: #e4e7ec;
+    --brand: #16264f;
+    --ok: #067647;
+    --stop: #b42318;
+    --hold: #b54708;
+    --paper: #ffffff;
+    --sunken: #f5f6f8;
+    --font: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: #d7dae0;
+    font-family: var(--font);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .slide {
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    margin: 24px auto;
+    padding: 68px 84px;
+    background: var(--paper);
+    box-shadow: 0 8px 28px rgba(16, 24, 40, 0.16);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .num {
+    position: absolute;
+    right: 40px;
+    bottom: 30px;
+    font-size: 13px;
+    color: #98a2b3;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kicker {
+    font-size: 14px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 22px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 84px;
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    font-weight: 700;
+  }
+
+  h2 {
+    margin: 0 0 26px;
+    font-size: 48px;
+    line-height: 1.1;
+    letter-spacing: -0.028em;
+    font-weight: 600;
+  }
+
+  p, li { font-size: 22px; line-height: 1.55; color: var(--ink-2); }
+  p { margin: 0 0 18px; max-width: 62ch; }
+  em { font-style: normal; color: var(--ink); font-weight: 600; }
+  .lede { font-size: 27px; line-height: 1.5; max-width: 40ch; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 52px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 34px; }
+  .fill { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  /* `.fill` sets display:flex and is defined after the grids, so a slide using
+     both had its columns silently ignored and stacked instead. */
+  .fill.grid2, .fill.grid3 { display: grid; align-content: center; }
+
+  .card {
+    padding: 28px 30px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--paper);
+  }
+  .card h3 {
+    margin: 0 0 10px;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .card p { font-size: 18px; margin: 0; }
+
+  .stat { font-size: 96px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+  .stat.bad { color: var(--stop); }
+  .stat.good { color: var(--ok); }
+  .stat-of { font-size: 19px; color: var(--ink-3); margin-top: 10px; }
+  .stat-money { font-size: 21px; color: var(--ink-2); margin-top: 6px; font-weight: 600; }
+
+  .rule { height: 1px; background: var(--line); margin: 30px 0; }
+
+  .chain { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: stretch; }
+  .link { padding: 26px 26px 28px; border-radius: 14px; background: var(--sunken); }
+  .link .n { font-family: var(--mono); font-size: 14px; color: var(--ink-3); }
+  .link h3 { margin: 8px 0 10px; font-size: 24px; font-weight: 600; }
+  .link p { font-size: 17px; margin: 0; }
+
+  .mono { font-family: var(--mono); font-size: 18px; }
+  .tag {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .tag.stop { background: #fef3f2; color: var(--stop); }
+  .tag.ok { background: #ecfdf3; color: var(--ok); }
+  .tag.hold { background: #fffaeb; color: var(--hold); }
+
+  .shot {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    display: block;
+  }
+
+  .dark { background: var(--brand); color: #fff; }
+  .dark h1, .dark h2, .dark em { color: #fff; }
+  .dark p, .dark li { color: #c8d2e6; }
+  .dark .kicker { color: #8fa3c8; }
+
+  .foot {
+    margin-top: auto;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    font-size: 16px;
+    color: var(--ink-3);
+    display: flex;
+    gap: 26px;
+  }
+  .dark .foot { border-top-color: rgba(255, 255, 255, 0.16); color: #8fa3c8; }
+
+  @page { size: 1280px 720px; margin: 0; }
+  @media print {
+    body { background: #fff; }
+    .slide { margin: 0; box-shadow: none; page-break-after: always; }
+    .slide:last-child { page-break-after: auto; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 1 ------------------------------------------------------------------- -->
+<section class="slide dark">
+  <div class="fill">
+    <p class="kicker">Razorpay AI Buildathon · Track 01 · AI Growth &amp; Agentic Commerce</p>
+    <h1>No agent spends<br>without one.</h1>
+    <p class="lede" style="margin-top:34px">
+      An authorization layer for agent-initiated payments. Built on Razorpay
+      test-mode APIs.
+    </p>
+  </div>
+  <div class="foot">
+    <span>Warrant</span>
+    <span>github.com/YashwanthKamireddi/warrant</span>
+  </div>
+  <span class="num">1</span>
+</section>
+
+<!-- 2 ------------------------------------------------------------------- -->
+<section class="slide">
+  <p class="kicker">This is already live</p>
+  <h2>Agents are spending real money<br>in production, today.</h2>
+  <div class="fill">
+    <p>
+      Since February 2026, Razorpay and NPCI have run agentic UPI payments in
+      production with <em>Zomato, Swiggy and Zepto</em>. The mechanism is UPI
+      Reserve Pay: you approve once with your PIN, funds are blocked, and the
+      agent debits against that block again and again.
+    </p>
+    <p><em>No further PIN. No further question.</em></p>
+  </div>
+  <span class="num">2</span>
+</section>
+
+<!-- 3 ------------------------------------------------------------------- -->
+<section class="slide">
+  <p class="kicker">The hole</p>
+  <h2>A mandate enforces the amount.<br>Nothing enforces what it buys.</h2>
+  <div class="fill grid2">
+    <div class="card">
+      <h3>Nobody checks the basket</h3>
+      <p>
+        The bank never sees a basket, only a debit. A ceiling is equally happy to
+        buy what you asked for and what you did not — and no fraud signal fires,
+        because none of this is fraud. Real card, real device, real customer.
+      </p>
+    </div>
+    <div class="card">
+      <h3>And the merchant can't prove anything</h3>
+      <p>
+        An agent payment has no device fingerprint, no session, no click. Chargeback
+        reason codes have no category for <em>“correctly authorised agent, wrong
+        outcome.”</em> The merchant absorbs it.
+      </p>
+    </div>
+  </div>
+  <span class="num">3</span>
+</section>
+
+<!-- 4 ------------------------------------------------------------------- -->
+<section class="slide">
+  <p class="kicker">What Warrant is</p>
+  <h2>One signed chain, from the words<br>a person said to the rupee that moved.</h2>
+  <div class="fill">
+    <div class="chain">
+      <div class="link">
+        <span class="n">01</span>
+        <h3>The permission</h3>
+        <p>What you said, and the bounds derived from it — amount, merchant,
+           category, count, window. Signed by your own device key. Nothing in the
+           system can widen it.</p>
+      </div>
+      <div class="link">
+        <span class="n">02</span>
+        <h3>The basket</h3>
+        <p>What the agent proposes, checked line by line against the permission it
+           names, by deterministic code, before any payment exists.</p>
+      </div>
+      <div class="link">
+        <span class="n">03</span>
+        <h3>The payment</h3>
+        <p>Razorpay's own reference for the money that moved, bound to the basket
+           that justified it. A payment with no basket behind it is visible as one.</p>
+      </div>
+    </div>
+    <p style="margin-top:30px">
+      Every decision — <em>including every refusal</em> — is appended to a
+      hash-chained ledger that later renders as dispute evidence a bank can verify
+      without trusting the merchant.
+    </p>
+  </div>
+  <span class="num">4</span>
+</section>
+
+<!-- 5 ------------------------------------------------------------------- -->
+<section class="slide">
+  <p class="kicker">The product, running</p>
+  <h2>An agent shops. The gate answers.<br>When it needs a human, it asks one.</h2>
+  <div class="fill">
+    <img class="shot" src="screenshots/02-decisions.png" alt="The agent proposing a basket and Warrant answering">
+  </div>
+  <div class="foot">
+    <span>A live model reads a real merchant's catalogue</span>
+    <span>It is never told the limits — only, if refused, the reason</span>
+  </div>
+  <span class="num">5</span>
+</section>
+
+<!-- 6 ------------------------------------------------------------------- -->
+<section class="slide">
+  <p class="kicker">The moment that matters</p>
+  <h2>₹449, under every ceiling,<br>and refused anyway.</h2>
+  <div class="fill grid2">
+    <div>
+      <p>
+        A coffee mug from the same shop. Comfortably under the amount, the
+        per-transaction cap and the budget. <em>The bank would pay it without
+        blinking.</em>
+      </p>
+      <p>
+        Nobody planted it — a coffee company sells mugs. The permission was for
+        food and drink, so it is refused twice: by the category code the
+        merchant's acquirer assigned, and by the permission itself.
+      </p>
+      <p style="margin-top:26px">
+        <span class="tag stop">Refused</span>
+        <span class="tag hold" style="margin-left:8px">before settlement</span>
+      </p>
+    </div>
+    <div>
+      <img class="shot" src="screenshots/07-razorpay.png" alt="A refusal, priced">
+    </div>
+  </div>
+  <span class="num">6</span>
+</section>
+
+<!-- 7 ------------------------------------------------------------------- -->
+<section class="slide">
+  <p class="kicker">On Razorpay</p>
+  <h2>Razorpay's own Checkout,<br>verified on our server.</h2>
+  <div class="fill grid2">
+    <div class="card">
+      <h3>Their sheet, their order</h3>
+      <p>
+        An allowed basket opens <em>Razorpay Checkout</em> — their script, their
+        payment sheet — on an order this server created against the real test API.
+        Nothing is drawn to look like Razorpay.
+      </p>
+    </div>
+    <div class="card">
+      <h3>And the browser is not believed</h3>
+      <p>
+        Checkout returns an order id, a payment id and an HMAC of the two under
+        the key secret. The server recomputes it before anything claims the payment
+        happened. <em>The secret never leaves the server.</em>
+      </p>
+    </div>
+  </div>
+  <p style="margin-top:26px">
+    Also implemented against the real API: <em>UPI Autopay mandate</em>
+    registration, debit and revocation — the reachable primitive, since Reserve
+    Pay is a closed pilot.
+  </p>
+  <span class="num">7</span>
+</section>
+
+<!-- 8 ------------------------------------------------------------------- -->
+<section class="slide">
+  <p class="kicker">Measured · 540 labelled sessions · one seed</p>
+  <h2>What an amount ceiling misses.</h2>
+  <div class="fill grid2">
+    <div class="card">
+      <h3>An amount ceiling, alone</h3>
+      <div class="stat bad">416</div>
+      <div class="stat-of">of 540 violations got through</div>
+      <div class="stat-money">₹1,69,825 spent outside what was agreed</div>
+    </div>
+    <div class="card">
+      <h3>With Warrant in front</h3>
+      <div class="stat good">90</div>
+      <div class="stat-of">of 540 violations got through</div>
+      <div class="stat-money">₹30,208 — and not one wrongful refusal</div>
+    </div>
+  </div>
+  <p style="margin-top:28px">
+    With no gate at all, ₹3,02,663 moves. Decisions take under 300µs at the
+    median, because this sits in the payment path.
+  </p>
+  <span class="num">8</span>
+</section>
+
+<!-- 9 ------------------------------------------------------------------- -->
+<section class="slide">
+  <p class="kicker">Where it loses</p>
+  <h2>Two categories score zero.<br>They are in the same table as the wins.</h2>
+  <div class="fill">
+    <p>
+      <span class="mono">injection_subtle</span> — 0 of 45.
+      <span class="mono" style="margin-left:18px">semantic_drift</span> — 0 of 45.
+    </p>
+    <p>
+      Baskets inside every bound the person signed — right merchant, right
+      category, under every ceiling — that are still not what was asked for. No
+      arithmetic catches those. Only reading the basket against the instruction
+      does, and the deterministic gate does not read.
+    </p>
+    <div class="rule"></div>
+    <p>
+      Categories also come from the merchant's own catalogue. The acquirer's
+      category code closes half of that gap; a mislabelled item inside a
+      legitimate catalogue still passes. <em>There is a test asserting that gap,
+      so nobody later mistakes the fix for a complete one.</em>
+    </p>
+    <p><em>A benchmark you designed to pass is not a benchmark.</em></p>
+  </div>
+  <span class="num">9</span>
+</section>
+
+<!-- 10 ------------------------------------------------------------------ -->
+<section class="slide">
+  <p class="kicker">What is actually built</p>
+  <h2>373 tests. 11 gates. Green from a clean clone.</h2>
+  <div class="fill grid3">
+    <div class="card">
+      <h3>Engine</h3>
+      <p>Python 3.14, FastAPI, SQLite. Ed25519 over RFC 8785 canonical JSON,
+         integer paise throughout. A published SDK facade with idempotent retries
+         and single-flight per key.</p>
+    </div>
+    <div class="card">
+      <h3>Gates</h3>
+      <p>Tests, lint, types, secrets, executed doc examples, link checking,
+         colour tokens, WCAG contrast, overlap, layout at 11 viewports, and a
+         browser walk of the real console.</p>
+    </div>
+    <div class="card">
+      <h3>Nothing is a mock</h3>
+      <p>62 products read from a real Shopify storefront's public feed. A live
+         model choosing from it. Real Razorpay test-mode orders, payments and
+         mandates.</p>
+    </div>
+  </div>
+  <p style="margin-top:26px">
+    Every number in the README, the landing page, this deck's source and the
+    video narration is checked against what the code measures. <em>The build
+    fails if any of them drifts.</em>
+  </p>
+  <span class="num">10</span>
+</section>
+
+<!-- 11 ------------------------------------------------------------------ -->
+<section class="slide dark">
+  <div class="fill">
+    <h2 style="font-size:64px">Warrant.<br>No agent spends without one.</h2>
+    <p class="lede" style="margin-top:30px">
+      The layer that answers “did the person actually agree to this?” — before
+      the money moves, and provably long after.
+    </p>
+  </div>
+  <div class="foot">
+    <span>github.com/YashwanthKamireddi/warrant</span>
+    <span>Yashwanth Kamireddi</span>
+  </div>
+  <span class="num">11</span>
+</section>
+
+</body>
+</html>

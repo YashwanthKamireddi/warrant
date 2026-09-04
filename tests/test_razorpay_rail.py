@@ -15,7 +15,11 @@ from __future__ import annotations
 import pytest
 
 from warrant.crypto import SigningKey
-from warrant.rails.razorpay_rail import RazorpayNotConfigured, RazorpayRail
+from warrant.rails.razorpay_rail import (
+    RazorpayNotConfigured,
+    RazorpayRail,
+    SignatureRejected,
+)
 
 
 class _Resource:
@@ -235,3 +239,71 @@ def test_a_seeded_cart_produces_a_stable_idempotency_key(intent, make_cart, chai
     b = make_cart((chai,), nonce="same")
     assert a.digest == b.digest
     assert SigningKey.from_seed("x")  # keys are irrelevant to the digest
+
+
+# -- Checkout signature verification --------------------------------------- #
+
+
+class _Utility:
+    """Razorpay's own verifier: an HMAC over "order_id|payment_id"."""
+
+    def __init__(self, secret: str) -> None:
+        self._secret = secret
+
+    def verify_payment_signature(self, params: dict) -> None:
+        import hashlib
+        import hmac
+
+        expected = hmac.new(
+            self._secret.encode(),
+            f"{params['razorpay_order_id']}|{params['razorpay_payment_id']}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(expected, params["razorpay_signature"]):
+            raise ValueError("signature mismatch")
+
+
+class _VerifyingClient:
+    def __init__(self, secret: str = "shh") -> None:
+        self.utility = _Utility(secret)
+
+
+def _signature(secret: str, order_id: str, payment_id: str) -> str:
+    import hashlib
+    import hmac
+
+    return hmac.new(
+        secret.encode(), f"{order_id}|{payment_id}".encode(), hashlib.sha256
+    ).hexdigest()
+
+
+def test_a_payment_razorpay_signed_is_accepted():
+    rail = RazorpayRail(client=_VerifyingClient())
+    rail.verify_checkout_signature(
+        order_id="order_1",
+        payment_id="pay_1",
+        signature=_signature("shh", "order_1", "pay_1"),
+    )
+
+
+def test_a_payment_nobody_signed_is_rejected():
+    """The browser reports the payment; the browser is not the authority.
+
+    Without this, anyone who can post to the endpoint can claim a Razorpay
+    payment happened by inventing a payment id.
+    """
+    rail = RazorpayRail(client=_VerifyingClient())
+    with pytest.raises(SignatureRejected):
+        rail.verify_checkout_signature(
+            order_id="order_1", payment_id="pay_1", signature="deadbeef"
+        )
+
+
+def test_a_signature_from_another_order_is_rejected():
+    """A real signature, replayed onto a different order, still fails."""
+    rail = RazorpayRail(client=_VerifyingClient())
+    stolen = _signature("shh", "order_OTHER", "pay_1")
+    with pytest.raises(SignatureRejected):
+        rail.verify_checkout_signature(
+            order_id="order_1", payment_id="pay_1", signature=stolen
+        )

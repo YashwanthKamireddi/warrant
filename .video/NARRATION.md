@@ -60,8 +60,8 @@ you reach the losses, slow down; that's the part they remember.
 
 ### 1:26 · 14s — the permission *(live)*
 
-> She says the thing once, and it becomes a permission with hard ceilings,
-> restated in plain English, signed by her own key.
+> You say the thing once, and it becomes a permission with hard ceilings,
+> restated in plain English, signed by your own key.
 >
 > This isn't a new step. Reserve Pay already asks for a PIN. That tap used to mean
 > "block a thousand rupees." Now it means "up to a thousand, at this merchant, on
@@ -73,23 +73,26 @@ you reach the losses, slow down; that's the part they remember.
 >
 > Nobody pressed anything. A live model is reading a real merchant's catalogue —
 > that's Sleepy Owl's actual storefront, their products, their prices, their
-> photographs.
+> photographs — and it has no idea what your limits are.
 >
-> It picks two units. Six hundred and ninety-eight rupees. Warrant escalates: that
-> crosses the five hundred rupee threshold she set for a second signature.
+> It picks two packs. Six hundred and ninety-eight rupees. Warrant will not decide
+> this one: it crosses the five hundred rupee threshold you set, so it stops and
+> comes back to you. It cannot approve this by itself, and neither can the agent.
 >
-> The agent is told the *reason*. Never the limits. And it comes back with one
-> unit, three hundred and forty-nine, and says why. That is an agent discovering
-> its boundary by being refused.
+> So you approve it, and your key signs the basket. The same gate runs again, and
+> the check that failed a moment ago passes — because a signature exists that did
+> not before. That is a machine refusing to decide something that was never its
+> to decide.
 
 ### 2:05 · 16s — what it prevents *(live)*
 
 > Same shop, a different basket. A coffee mug. Four hundred and forty-nine rupees,
 > comfortably under every ceiling — the bank would pay it without blinking.
 >
-> Nobody planted that mug. A coffee company sells mugs. Her permission was for
-> food and drink, so it is refused twice: once by the category code her merchant's
-> acquirer assigned, and once by the permission itself.
+> Nobody planted that mug. A coffee company sells mugs. Your permission was for
+> food and drink, so it is refused twice: once by the category code the merchant's
+> acquirer assigned, and once by the permission itself. And there is what it would
+> have cost with nothing checking.
 
 ### 2:21 · 28s — where the model runs *(dark card)*
 
@@ -124,10 +127,14 @@ you reach the losses, slow down; that's the part they remember.
 
 ### 3:22 · 12s — a real Razorpay order *(live)*
 
-> And this is a real Razorpay order, created from that record on their test API.
-> The gate already allowed this basket; nothing is re-decided. If the account has
-> hit its daily cap, the console says so in Razorpay's own words rather than
-> pretending.
+> And that is Razorpay Checkout. Their script, their payment sheet, their test
+> cards, on an order this server created against the real test API. The gate
+> already allowed this basket; nothing is re-decided at the till.
+>
+> And what comes back is not taken at face value. Checkout hands the page an order
+> id, a payment id, and a signature over the two under the key secret. The server
+> recomputes that before anything here says the payment happened, because a
+> browser claiming it paid is not evidence.
 
 > The fair objection is that Google's AP2 already defines a chained mandate model.
 > It does. But AP2 standardises what the credential *is*, not who *checks* it. The
@@ -182,7 +189,7 @@ you reach the losses, slow down; that's the part they remember.
 
 ### 4:38 · 16s — close *(dark card)*
 
-> Three hundred and sixty-eight tests. Eleven gates, green from a clean clone. The
+> Three hundred and seventy-three tests. Eleven gates, green from a clean clone. The
 > interesting ones exist because a green build didn't catch a real bug — a ledger
 > that forked under concurrent writes, six baskets that overspent a hundred-rupee
 > mandate, and a detector I'd written that didn't detect the thing it was for. I

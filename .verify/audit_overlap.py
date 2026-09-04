@@ -106,7 +106,7 @@ DETECT = """() => {
     return { problems, spills };
 }"""
 
-STATES = ("first run", "permission derived", "signed", "decisions", "ledger", "evidence")
+STATES = ("landing", "console", "signed", "the feed", "the record", "the dispute pack")
 failures: list[str] = []
 
 with sync_playwright() as pw:
@@ -153,15 +153,12 @@ with sync_playwright() as pw:
     page.goto(f"{BASE}/#workspace", wait_until="networkidle")
     scan(STATES[0])
 
-    drive.enter(page, BASE)
+    drive.enter(page, BASE, agent="manual")
     drive.scripted_baskets(page)
-    page.wait_for_function(
-        "document.querySelectorAll('.decision').length === 5", timeout=30_000
-    )
     page.wait_for_timeout(400)
     scan(STATES[3])
 
-    drive.step(page, "record")
+    drive.open_proof(page)
     page.wait_for_selector(".ledger-row", timeout=10_000)
     scan(STATES[4])
 

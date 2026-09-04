@@ -31,6 +31,10 @@ from .base import RailResult
 __all__ = ["RazorpayRail", "RazorpayNotConfigured"]
 
 
+class SignatureRejected(RuntimeError):
+    """Razorpay Checkout reported a payment the key secret does not vouch for."""
+
+
 class RazorpayNotConfigured(RuntimeError):
     """Raised when the Razorpay rail is selected without test-mode credentials."""
 
@@ -136,6 +140,36 @@ class RazorpayRail:
                 },
             }
         )
+
+    def verify_checkout_signature(
+        self, *, order_id: str, payment_id: str, signature: str
+    ) -> None:
+        """Confirm Razorpay signed this payment, using the secret we hold.
+
+        Razorpay Checkout runs in the customer's browser and hands the page back
+        an order id, a payment id and an HMAC of the two under the key secret. A
+        browser is not a trustworthy reporter of whether it paid, so this is the
+        step that separates "the popup said it worked" from a fact: only a party
+        holding the secret can produce that signature, and only this process
+        holds it.
+        """
+        try:
+            self._client.utility.verify_payment_signature(
+                {
+                    "razorpay_order_id": order_id,
+                    "razorpay_payment_id": payment_id,
+                    "razorpay_signature": signature,
+                }
+            )
+        except Exception as exc:  # noqa: BLE001 - the SDK raises its own type
+            raise SignatureRejected(
+                "Razorpay did not sign this payment. The order id, payment id and "
+                "signature do not agree under the key secret."
+            ) from exc
+
+    def payment(self, payment_id: str) -> dict[str, Any]:
+        """What Razorpay itself says about a payment, fetched server-side."""
+        return dict(self._client.payment.fetch(payment_id))
 
     def poll(self, order_id: str, cart: CartMandate) -> RailResult:
         """Ask Razorpay whether anything has been captured against this order yet."""

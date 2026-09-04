@@ -36,27 +36,31 @@ with sync_playwright() as pw:
 
     drive.enter(page, BASE)
 
-    # Something has to have settled before there is a debit to place.
-    drive.scripted_baskets(page)
-    drive.step(page, "record")
+    # Something has to have settled before there is a payment to make.
+    drive.agent_settled(page)
     page.wait_for_timeout(800)
 
-    button = page.get_by_role("button", name="Place the settled debit on real Razorpay")
+    button = page.get_by_role("button", name="Pay ")
     if button.count() == 0:
         print("the console did not offer the real rail -- are RAZORPAY_KEY_* set?")
         browser.close()
         raise SystemExit(1)
 
-    button.click()
-    page.wait_for_selector(".real-rail.placed, .stage-error", timeout=90_000)
-    page.wait_for_timeout(700)
-
-    if page.locator(".stage-error").count():
-        note = page.locator(".stage-error").inner_text().strip()
-    else:
-        order = page.locator(".real-rail.placed .mono").first.inner_text().strip()
-        anchor = page.locator(".real-rail.placed a")
-        link = (anchor.first.get_attribute("href") or "") if anchor.count() else ""
+    button.first.click()
+    # Razorpay Checkout renders in its own iframe over the page. Reaching it is
+    # the proof that a real order id was minted and accepted by Razorpay.
+    try:
+        page.wait_for_selector("iframe.razorpay-checkout-frame", timeout=90_000)
+        order = page.evaluate(
+            "() => document.querySelector('iframe.razorpay-checkout-frame')"
+            "  ?.src.match(/order_[A-Za-z0-9]+/)?.[0] ?? ''"
+        )
+        link = ""
+    except Exception:  # noqa: BLE001 - the console reporting a refusal is a result
+        if page.locator(".stage-error").count():
+            note = page.locator(".stage-error").inner_text().strip()
+        else:
+            note = "Razorpay Checkout did not open"
 
     page.screenshot(path=str(SHOTS / "09-razorpay.png"))
     browser.close()

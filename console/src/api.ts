@@ -76,6 +76,27 @@ export const api = {
       },
     ),
 
+  /** Ask the server whether Razorpay really signed what Checkout handed back. */
+  verifyRazorpay: (
+    sessionId: string,
+    proof: {
+      razorpay_order_id: string;
+      razorpay_payment_id: string;
+      razorpay_signature: string;
+    },
+  ) =>
+    request<{
+      verified: boolean;
+      payment_id: string;
+      order_id: string;
+      amount_paise: number | null;
+      method: string | null;
+      status: string | null;
+    }>(`/sessions/${sessionId}/razorpay/verify`, {
+      method: "POST",
+      body: JSON.stringify(proof),
+    }),
+
   compare: (sessionId: string, merchant: string, lines: { sku: string; qty: number }[]) =>
     request<Comparison>(`/sessions/${sessionId}/compare`, {
       method: "POST",
