@@ -18,49 +18,66 @@ The form's fields, in the form's order, ready to paste.
 
 ## Project Objectives — what does it solve?
 
+> **Razorpay has already placed the bet. Warrant is what stops it hitting a
+> ceiling.**
+>
 > Since February 2026, Razorpay and NPCI have run agentic UPI payments in
-> production with Zomato, Swiggy and Zepto. The mechanism is UPI Reserve Pay: the
-> customer approves once with their PIN, funds are blocked, and the agent then
-> debits against that block repeatedly with no further PIN.
+> production with Zomato, Swiggy and Zepto. The customer approves once with a
+> PIN, funds are blocked, and the agent spends against that block with no
+> further PIN. That is a genuinely new payment surface, and Razorpay owns the
+> rails under it.
 >
-> That leaves two holes, and both are open today.
+> Here is what caps it. When an agent buys the wrong thing — and it will, because
+> a model chose the basket — the customer disputes the charge, and the merchant
+> has nothing to show. No device fingerprint. No session. No click. Chargeback
+> reason codes do not have a category for *"correctly authorised agent, wrong
+> outcome"*, so it is not even classifiable, let alone defensible. The merchant
+> eats it.
 >
-> **Nothing checks what the agent buys against what the customer asked for.** The
-> bank never sees a basket, only a debit. A ceiling is equally happy to buy the
-> thing that was asked for and the thing that was not — and no fraud signal
-> fires, because none of this is fraud. Real card, real device, real customer.
-> It simply is not what they agreed to.
+> Merchants respond to undefendable losses in exactly one way: they throttle the
+> traffic that causes them. Low agent limits, category blocks, or refusing agent
+> checkouts outright. Every one of those is a brake on the category Razorpay is
+> building. **The bottleneck on agentic commerce is not payment rails. It is that
+> nobody can prove what the customer agreed to.**
 >
-> **And when the dispute arrives, the merchant has nothing.** An agent-initiated
-> payment has no device fingerprint, no browsing session, no click. Chargeback
-> reason codes have no category for "correctly authorised agent, wrong outcome",
-> so the merchant absorbs it.
+> Warrant is that proof. The customer's own device key signs a bounded permission
+> — an amount, a merchant, a category, a deadline. Every basket the agent
+> proposes is checked against it by deterministic code *before* settlement. Every
+> decision, including every refusal, lands in a hash-chained ledger that renders
+> as dispute evidence a bank can verify without taking the merchant's word for
+> anything.
 >
-> Warrant closes both with one object: a signed chain from the words a person
-> said to the rupee that moved. The customer's own device key signs a bounded
-> permission — an amount, a merchant, a category, a deadline. Every basket the
-> agent proposes is checked against it by deterministic code before settlement.
-> Every decision, including every refusal, is appended to a hash-chained ledger
-> that later renders as dispute evidence a bank can verify without trusting the
-> merchant's records.
+> **This is a growth product wearing a risk product's clothes.** A merchant with
+> Warrant in front of it can accept agent traffic its competitors have to refuse.
+> That is Track 01's brief almost word for word: it makes a merchant transactable
+> by an AI buyer, end to end.
 >
-> Measured over 540 labelled sessions: Warrant stops 81.8% of violations and
-> leaks ₹30,208, against ₹1,69,825 with the amount ceiling a mandate already
-> gives you and ₹3,02,663 with no gate at all — and it has never once stopped a
-> purchase the person actually authorised. Two categories score zero, and they
-> are printed in the same table as the wins.
+> **And it is a layer only the acquirer can credibly own.** Stripe has Radar for
+> *"is this fraud?"* — a statistical question about the payer. Nobody has
+> *"did this person agree to this?"* — a cryptographic question about the
+> permission. Fraud engines are structurally blind to it: the card is real, the
+> device is real, the customer is real. Every signal says the transaction is
+> fine, and it is fine. It is simply not what was asked for. That gap is a new
+> product line, a new pricing surface, and a reason for merchants to route agent
+> volume to whoever offers it.
 >
-> Nothing in the demonstration is a mock. The catalogue is 62 products read from
-> a real Indian coffee brand's public Shopify feed. The agent is a live model
-> that is never told the limits, only the reason it was refused. The payment is
-> Razorpay's own Checkout on a real test-mode order, and what Checkout returns is
-> verified server-side against the key secret before anything claims the payment
-> happened.
+> **The timing is the whole point.** NPCI's UAP is being specified now, and this
+> is a working specification of what that layer has to enforce — running
+> merchant-side today because that is where it can run, and exporting to Google's
+> AP2 / W3C Verifiable Credentials so it is not a private format.
 >
-> No model can change a verdict. The gate is a pure function of the signed
-> documents and the state; a model can propose and can advise, and neither can
-> grant authority. Prompt injection in a product name is inert by construction
-> rather than by filtering.
+> What it is worth, measured on 540 labelled sessions. With nothing checking,
+> **₹3,02,663** moves outside what customers agreed. The amount ceiling a mandate
+> already gives you only brings that to **₹1,69,825** — it stops big purchases,
+> not wrong ones. Warrant cuts it to **₹30,208**, and has never once blocked a
+> purchase the person actually authorised, because a control layer that
+> inconveniences good customers gets switched off in a week.
+>
+> None of it is staged. The catalogue is 62 products read live from a real Indian
+> coffee brand's public storefront. The agent is a live model that is never told
+> the limits, only the reason it was refused. The payment is Razorpay's own
+> Checkout on a real test-mode order, and what Checkout returns is verified
+> server-side against the key secret before anything claims money moved.
 
 ---
 
@@ -82,67 +99,74 @@ The form's fields, in the form's order, ready to paste.
 
 ## Build Challenges & Technical Obstacles
 
-*The long version, with commits, is in [INCIDENTS.md](INCIDENTS.md).*
+*Commits and the long version: [INCIDENTS.md](INCIDENTS.md).*
 
-> **A simulator agrees with whatever assumption you built into it.**
+> **Spending two days getting real keys instead of shipping features.**
 >
-> Ten minutes after I got Razorpay test keys, the first run against the real rail
-> printed `the same cart, replayed → ALLOW (expected block)`. The simulated rail
-> had passed that step for days, across 155 tests.
+> The tempting call was to demo on a simulator and spend the time on surface. I
+> went and got Razorpay test credentials first. Ten minutes in, the first run
+> against the real rail printed `the same cart, replayed → ALLOW (expected
+> block)` — a step the simulator had passed for days across 155 tests.
 >
 > Replay protection consumed a cart's nonce on *settlement*. The simulator
 > settles synchronously, so the nonce was always spent before a replay could
-> arrive. A real rail does not work that way: Razorpay issues an order
+> arrive. A real rail does not behave that way: Razorpay creates the order
 > server-side and reports `settled=false` until the customer authorises on their
-> own device — which is exactly the property that makes the rail trustworthy. So
-> on any real rail there was a window between *placed* and *settled* where the
-> same cart could be presented again and again, placing an order every time.
-> Under Reserve Pay each of those can capture. That is a double-spend, not a
-> cosmetic bug.
+> own device — the very property that makes the rail trustworthy. So on any real
+> rail there was a window between *placed* and *settled* where the same cart
+> could be presented repeatedly, placing an order each time. Under Reserve Pay
+> each of those can capture. That is a double-spend in a payments product.
 >
 > The fix was to split a state transition that had always been two things wearing
 > one name: `record_authorized()` consumes the nonce the moment the cart reaches
-> the rail, and `record_settled()` charges spend and attempt count so an abandoned
-> payment does not burn the mandate's budget. Every argument I had made for
-> getting real keys was about credibility with a reviewer. The actual return was a
-> double-spend vector found in the first minute, in a path that a passing test
-> suite and a working demo both agreed was fine.
+> the rail; `record_settled()` charges spend and attempt count, so an abandoned
+> payment does not burn the customer's budget. The lesson I actually took: a
+> simulator agrees with whatever assumption you built into it, and the cost of
+> finding that out later is not a bug, it is a recall.
 >
-> **A check you have never watched fail is not a check.**
+> **Discovering my own safety checks were theatre.**
 >
-> I wrote a detector for a CSS collision that was painting a label over the text
-> beneath it — then reintroduced the bug deliberately to confirm the detector
-> fired. It did not. Overflowing text does not change its element's bounding box,
-> so sibling-box overlap can never catch a cascade collision. I had written
-> something that would have passed forever while reporting that it worked.
+> I wrote a detector for a CSS collision, then reintroduced the bug deliberately
+> to watch it fire. It did not. Overflowing text does not change its element's
+> bounding box, so sibling-box overlap can never catch a cascade collision. I had
+> shipped something that would have passed forever while reporting it worked.
 >
-> That happened a second time, and I only caught it because I now look. I added a
-> gate that checks the numbers in the video narration against what the code
-> measures. Its checks ran *after* the block that reports failures and exits, so
-> everything it found was collected and thrown away — it printed "numbers match"
-> over a script claiming 211 tests when there were 373. Both are fixed, and both
-> are now verified by breaking them on purpose.
+> It happened a second time, and I only caught it because I now look. I added a
+> gate comparing the numbers in my video narration to what the code measures. Its
+> checks ran *after* the block that reports failures and exits, so everything it
+> found was collected and discarded — it printed "numbers match" over a script
+> claiming 211 tests when there were 373. Both are fixed. More usefully, "break
+> it on purpose and confirm the check fails" is now how I finish any check, and
+> it has caught two more since.
 >
-> **A real payment, reported as a failure.**
+> **A real payment, reported to the customer as a failure.**
 >
 > `POST /razorpay/{index}` was declared before `POST /razorpay/verify`, and
 > FastAPI matches routes in declaration order — so every verification call was
-> read as the index route with `index="verify"` and answered 422. Razorpay had
-> taken the money and returned a signed payment id the whole time. The console,
-> which will not claim a payment happened until the server has recomputed that
-> signature, correctly said nothing. It looked exactly like a payment failing,
-> and it was a routing bug. There is now a test asserting the route resolves,
-> because nothing else would have caught it.
+> read as the index route with `index="verify"` and rejected as a bad integer.
+> Razorpay had taken the money and returned a signed payment id the entire time.
+> The console, which refuses to claim a payment happened until the server has
+> recomputed that signature, correctly showed nothing. It presented exactly like
+> a payment failure and it was a routing bug — the worst class of payments
+> incident, because the money is gone and your own system says it is not. There
+> is a test asserting that route resolves now, since nothing else would have
+> caught it.
 >
-> **Numbers rot faster than code.**
+> **Deciding what a judge can trust.**
 >
 > I found four figures in my own README that had quietly stopped being true — a
 > corpus described as 405 sessions that had grown to 540, a headline of 13.3%
-> where the code measured 81.8%. For a project whose entire argument is honest
-> reporting, that is worse than a bug. `make docs-check` now fails the build if
-> any number in the README, the landing page, the deck, the submission or the
-> video narration drifts from what the code measures. It has caught a stale count
-> four times since.
+> where the code measured 81.8%. For a project whose entire pitch is provable
+> claims, that is worse than a bug: it is the pitch failing on itself. Rather
+> than proofread, I made it structural. `make docs-check` fails the build if any
+> number in the README, the landing page, the deck, this submission or the video
+> narration drifts from what the code measures. Five documents, one source of
+> truth. It has caught a stale figure four times since, including twice while
+> writing this.
+>
+> The same instinct runs through the rest: 374 tests, 11 gates, and they pass
+> from a cold clone with no credentials — cloned into an empty directory and run,
+> because "works on my machine" is not a claim anyone should accept from me.
 
 ---
 

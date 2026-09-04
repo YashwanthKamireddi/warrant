@@ -62,8 +62,14 @@ That leaves two holes, and both are open today.
 > click. Chargeback reason codes have no category for *correctly authorized agent,
 > wrong outcome*. The merchant eats it.
 
-Warrant closes both with one object: **a signed chain from the words a person said
-to the rupee that moved.**
+Merchants respond to undefendable losses in exactly one way: they throttle the
+traffic that causes them. Low agent limits, category blocks, or refusing agent
+checkouts outright. **The bottleneck on agentic commerce is not the payment
+rails — it is that nobody can prove what the customer agreed to.**
+
+Warrant closes both holes with one object: **a signed chain from the words a
+person said to the rupee that moved.** A merchant with it in front can accept
+agent traffic that its competitors have to refuse.
 
 <br>
 
